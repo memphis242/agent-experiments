@@ -81,13 +81,16 @@ def parse(path: Path) -> dict[str, object]:
                       "fail_lines": seg["fail_lines"]})
     return {
         "complete": complete,
-        "tests": len(cases),
+        "tests": len(cases) + (0 if complete else 1),
+        "segments": len(cases),
         "failures": sum(1 for c in cases if c["failing"]),
         "skipped": sum(1 for c in cases if c["skipped"]),
+        "errors": 0 if complete else 1,
         "mir": totals["MIR"],
+        "na": totals["N/A"],
         "totals": {"total": sum(totals.values()), "pass": totals["PASS"],
                    "fail": totals["FAIL"], "mir": totals["MIR"],
-                   "tsf": totals["TSF"], "ttf": totals["TTF"]},
+                   "tsf": totals["TSF"], "ttf": totals["TTF"], "na": totals["N/A"]},
         "cases": cases,
     }
 

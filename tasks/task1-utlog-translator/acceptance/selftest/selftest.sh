@@ -57,7 +57,7 @@ echo "failed ids: $ids"
 for want in failing-log-exit-1 truncated-log-error-case truncated-log-exit-1 tsf-counted-as-failure; do
     case " $ids " in *" $want "*) ;; *) echo "SELFTEST FAIL: $want should fail"; status=1 ;; esac
 done
-for must_pass in tool-exists usage-no-output-flag-exit-2 real-dir-exit-0 mir-property strict-rejects-unknown-exit-2; do
+for must_pass in strict-accepts-real-log na-property tool-exists usage-no-output-flag-exit-2 real-dir-exit-0 mir-property strict-rejects-unknown-exit-2; do
     case " $ids " in *" $must_pass "*) echo "SELFTEST FAIL: $must_pass should pass"; status=1 ;; esac
 done
 

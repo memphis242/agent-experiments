@@ -111,6 +111,24 @@ def junit_run(ctx: Ctx, tmp: Path, rels: list[str], extra: list[str] | None = No
     return proc, out
 
 
+def attrs_consistent(suite: ET.Element) -> None:
+    """Spec: tests/failures/errors/skipped count the matching child elements."""
+    got = {k: int(suite.get(k, "-1")) for k in ("tests", "failures", "errors", "skipped")}
+    want = {"tests": len(suite.findall("testcase")),
+            "failures": len(suite.findall("testcase/failure")),
+            "errors": len(suite.findall("testcase/error")),
+            "skipped": len(suite.findall("testcase/skipped"))}
+    if got != want:
+        raise Fail(f"suite {suite.get('name')}: attributes {got} != element counts {want}")
+
+
+def prop_value(suite: ET.Element, name: str) -> str | None:
+    for p in suite.findall("properties/property"):
+        if p.get("name") == name:
+            return p.get("value")
+    return None
+
+
 def case_named(suite: ET.Element, name: str) -> ET.Element:
     for tc in suite.findall("testcase"):
         if tc.get("name") == name:
@@ -188,6 +206,7 @@ def c_real_wellformed(ctx: Ctx) -> None:
                 raise Fail(f"suite {s.get('name')} time={s.get('time')!r}")
             for k in sums:
                 sums[k] += int(s.get(k, "0"))
+            attrs_consistent(s)
             for tc in s.findall("testcase"):
                 if tc.get("classname") != s.get("name"):
                     raise Fail(f"testcase {tc.get('name')} classname {tc.get('classname')!r}")
@@ -264,9 +283,9 @@ def c_failing_elements(ctx: Ctx) -> None:
             first_text = c["fail_lines"][0].partition(" - ")[2]
             if fails[0].get("message") != first_text:
                 raise Fail(f"message {fails[0].get('message')!r} != {first_text!r}")
-        nfail = len(suite.findall("testcase/failure"))
-        if int(suite.get("failures", "-1")) != nfail:
-            raise Fail(f"failures attribute {suite.get('failures')} != {nfail} failure elements")
+        attrs_consistent(suite)
+        if suite.get("failures") != "1":
+            raise Fail(f"failures attribute {suite.get('failures')}")
 
 
 def c_truncated_error(ctx: Ctx) -> None:
@@ -281,8 +300,10 @@ def c_truncated_error(ctx: Ctx) -> None:
             raise Fail(f"(log complete) has {len(errs)} error elements")
         if errs[0].get("message") != "incomplete log: no COMPLETE line":
             raise Fail(f"error message {errs[0].get('message')!r}")
-        if int(suite.get("errors", "0")) < 1:
-            raise Fail(f"errors attribute {suite.get('errors')}")
+        attrs_consistent(suite)
+        exp_t = ctx.expected["crafted/truncated.log"]
+        if (int(suite.get("tests", "-1")), int(suite.get("errors", "-1"))) != (exp_t["tests"], exp_t["errors"]):
+            raise Fail(f"tests/errors {suite.get('tests')}/{suite.get('errors')}")
         exp = ctx.expected["crafted/truncated.log"]["cases"]
         assert isinstance(exp, list)
         got = [tc.get("name") for tc in suite.findall("testcase") if tc.get("name") != "(log complete)"]
@@ -314,13 +335,6 @@ def c_tsf(ctx: Ctx) -> None:
             raise Fail(f"failures attribute {suite.get('failures')}")
 
 
-def mir_value(suite: ET.Element) -> str | None:
-    for p in suite.findall("properties/property"):
-        if p.get("name") == "mir":
-            return p.get("value")
-    return None
-
-
 def c_mir(ctx: Ctx) -> None:
     with tempfile.TemporaryDirectory() as t:
         tmp = Path(t)
@@ -332,10 +346,27 @@ def c_mir(ctx: Ctx) -> None:
             if s is None:
                 raise Fail(f"suite {name} missing")
             want = str(ctx.expected[rel]["mir"])
-            if mir_value(s) != want:
-                raise Fail(f"suite {name}: mir property {mir_value(s)!r}, wanted {want!r}")
+            if prop_value(s, "mir") != want:
+                raise Fail(f"suite {name}: mir property {prop_value(s, "mir")!r}, wanted {want!r}")
             if s.findall("testcase/failure") or s.findall("testcase/error"):
                 raise Fail(f"suite {name}: MIR produced failure/error")
+
+
+def c_na_property(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        proc, out = junit_run(ctx, Path(t), ["real/osal_core_UT.log", "real/coverage-shared-heap.log"])
+        expect_rc(proc, 0)
+        suites = suites_of(load_xml(out))
+        for name, rel in (("osal_core_UT", "real/osal_core_UT.log"),
+                          ("coverage-shared-heap", "real/coverage-shared-heap.log")):
+            s = suites.get(name)
+            if s is None:
+                raise Fail(f"suite {name} missing")
+            want = str(ctx.expected[rel]["na"])
+            if prop_value(s, "na") != want:
+                raise Fail(f"suite {name}: na property {prop_value(s, 'na')!r}, wanted {want!r}")
+            if s.findall("testcase/failure") or s.findall("testcase/error"):
+                raise Fail(f"suite {name}: N/A produced failure/error")
 
 
 def c_no_cases(ctx: Ctx) -> None:
@@ -351,8 +382,9 @@ def c_no_cases(ctx: Ctx) -> None:
         for bad in ("SETUP", "SUMMARY"):
             if any(x.get("name") == bad for x in suite.findall("testcase")):
                 raise Fail(f"unexpected testcase {bad}")
-        if suite.get("skipped") != "1" or suite.get("tests") != "1":
-            raise Fail(f"tests={suite.get('tests')} skipped={suite.get('skipped')}")
+        attrs_consistent(suite)
+        if suite.get("skipped") != "1" or suite.get("tests") != "1" or suite.get("errors") != "0":
+            raise Fail(f"tests={suite.get('tests')} skipped={suite.get('skipped')} errors={suite.get('errors')}")
 
 
 def c_strict_rejects(ctx: Ctx) -> None:
@@ -373,6 +405,12 @@ def c_nonstrict_ignores(ctx: Ctx) -> None:
 def c_strict_accepts(ctx: Ctx) -> None:
     with tempfile.TemporaryDirectory() as t:
         proc, _ = junit_run(ctx, Path(t), ["crafted/clean.log"], ["--strict"])
+        expect_rc(proc, 0)
+
+
+def c_strict_real(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        proc, _ = junit_run(ctx, Path(t), ["crafted/real_no_chatter.log"], ["--strict"])
         expect_rc(proc, 0)
 
 
@@ -440,9 +478,13 @@ def c_markdown(ctx: Ctx) -> None:
                 raise Fail(f"row {name}: status {r[-1]!r} != {status!r}")
         tot = ctx.expected["crafted/failing.log"]["totals"]
         assert isinstance(tot, dict)
-        want = [str(tot[k]) for k in ("total", "pass", "fail", "mir", "tsf", "ttf")]
-        if by["failing"][2:8] != want:
-            raise Fail(f"failing row numbers {by['failing'][2:8]} != {want}")
+        want = [str(tot[k]) for k in ("total", "pass", "fail", "mir", "tsf", "ttf", "na")]
+        if by["failing"][2:9] != want:
+            raise Fail(f"failing row numbers {by['failing'][2:9]} != {want}")
+        for name, rel in (("failing", "crafted/failing.log"), ("truncated", "crafted/truncated.log"),
+                          ("coverage-vxworks-no-shell", "real/coverage-vxworks-no-shell.log")):
+            if by[name][1] != str(ctx.expected[rel]["tests"]):
+                raise Fail(f"row {name}: segments {by[name][1]!r} != tests {ctx.expected[rel]['tests']}")
         if len(by) != 3:
             raise Fail(f"{len(by)} rows for 3 logs")
         sec = md_section(text, "Failures")
@@ -464,6 +506,37 @@ def c_markdown(ctx: Ctx) -> None:
             raise Fail("passing run lacks 'No failures.'")
         if "FAIL" in {r[-1] for r in md_rows(text2)[2:]}:
             raise Fail("passing run has FAIL status row")
+
+
+def c_markdown_na(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        (log,) = stage(tmp, ["real/osal_core_UT.log"])
+        md = tmp / "o.md"
+        expect_rc(ctx.run(["--markdown", str(md), str(log)], tmp), 0)
+        rows = md_rows(md.read_text())
+        by = {r[0]: r for r in rows[2:] if r}
+        r = by.get("osal_core_UT")
+        tot = ctx.expected["real/osal_core_UT.log"]["totals"]
+        assert isinstance(tot, dict)
+        want = [str(tot[k]) for k in ("total", "pass", "fail", "mir", "tsf", "ttf", "na")]
+        if r is None or r[2:9] != want:
+            raise Fail(f"row {r} lacks numbers {want}")
+
+
+def c_markdown_incomplete(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        (log,) = stage(tmp, ["crafted/truncated.log"])
+        md = tmp / "o.md"
+        expect_rc(ctx.run(["--markdown", str(md), str(log)], tmp), 1)
+        sec = md_section(md.read_text(), "Failures")
+        if sec is None:
+            raise Fail("no Failures section")
+        if "truncated: incomplete log" not in sec:
+            raise Fail(f"Failures section: {short(sec)!r}")
+        if "No failures." in sec:
+            raise Fail("'No failures.' present for an incomplete log")
 
 
 def c_readme(ctx: Ctx) -> None:
@@ -539,12 +612,24 @@ CHECKS: list[CheckSpec] = [
     CheckSpec("strict-accepts-recognized-lines",
               "With --strict, a log containing only lines recognized by the input grammar must still be accepted with exit 0.",
               c_strict_accepts),
+    CheckSpec("strict-accepts-real-log",
+              "With --strict, blank lines, the opening [BEGIN] UNIT TEST line and **BUG** diagnostic lines are recognized and ignored: a log made only of such lines and grammar lines must exit 0.",
+              c_strict_real),
+    CheckSpec("na-property",
+              "N/A counts must be recorded on the suite as <property name=\"na\" value=\"N\"/> inside <properties>, and N/A lines must not make a segment fail.",
+              c_na_property),
     CheckSpec("dir-ignores-non-log-entries",
               "For a directory PATH, only files ending in .log directly inside it are processed; other files and subdirectories are not.",
               c_dir_only_logs),
     CheckSpec("markdown-table-and-failures-section",
-              "The Markdown output must be a table with one row per log (suite name, segments, assertions total, pass, fail, MIR, TSF, TTF, status as pass, FAIL or INCOMPLETE), followed by a Failures section listing every failing assertion as 'suite / segment: FILE:LINE - TEXT', or the sentence 'No failures.'; it must use no raw HTML.",
+              "The Markdown output must be a table with one row per log (suite name, segments, assertions total, pass, fail, MIR, TSF, TTF, N/A, status as pass, FAIL or INCOMPLETE; segments equals the JUnit tests count), followed by a Failures section listing every failing assertion as 'suite / segment: FILE:LINE - TEXT', or the sentence 'No failures.'; it must use no raw HTML.",
               c_markdown),
+    CheckSpec("markdown-na-column",
+              "The Markdown table columns, in order, are suite, segments, assertions total, pass, fail, MIR, TSF, TTF, N/A and status; the N/A column must hold the log's N/A count.",
+              c_markdown_na),
+    CheckSpec("markdown-incomplete-log-line",
+              "In the Failures section, each incomplete log must get one line 'suite: incomplete log' (so 'No failures.' must not be printed for it), and the tool must exit 1.",
+              c_markdown_incomplete),
     CheckSpec("readme-usage-section",
               "tools/README.md must exist and contain a short usage section for utlog2junit.py covering its options.",
               c_readme),

@@ -2,16 +2,20 @@
  "real/bin-sem-test.log": {
   "complete": true,
   "tests": 2,
+  "segments": 2,
   "failures": 0,
   "skipped": 1,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 77,
    "pass": 77,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -31,16 +35,20 @@
  "real/condvar-test.log": {
   "complete": true,
   "tests": 4,
+  "segments": 4,
   "failures": 0,
   "skipped": 1,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 108,
    "pass": 108,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -72,16 +80,20 @@
  "real/coverage-cf-cf_chunk.log": {
   "complete": true,
   "tests": 5,
+  "segments": 5,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 143,
    "pass": 143,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -119,16 +131,20 @@
  "real/coverage-evs-ALL.log": {
   "complete": true,
   "tests": 16,
+  "segments": 16,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 2,
   "totals": {
    "total": 1402,
    "pass": 1400,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 2
   },
   "cases": [
    {
@@ -232,16 +248,20 @@
  "real/coverage-shared-heap.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 2,
    "pass": 2,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -255,16 +275,20 @@
  "real/coverage-time-ALL.log": {
   "complete": true,
   "tests": 17,
+  "segments": 17,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 17,
   "totals": {
    "total": 481,
    "pass": 464,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 17
   },
   "cases": [
    {
@@ -374,16 +398,20 @@
  "real/coverage-vxworks-no-shell.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 1,
    "pass": 1,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -397,16 +425,20 @@
  "real/osal_core_UT.log": {
   "complete": true,
   "tests": 50,
+  "segments": 50,
   "failures": 0,
   "skipped": 2,
+  "errors": 0,
   "mir": 6,
+  "na": 2,
   "totals": {
    "total": 230,
    "pass": 222,
    "fail": 0,
    "mir": 6,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 2
   },
   "cases": [
    {
@@ -714,16 +746,20 @@
  "real/osal_network_UT.log": {
   "complete": true,
   "tests": 3,
+  "segments": 3,
   "failures": 0,
   "skipped": 1,
+  "errors": 0,
   "mir": 1,
+  "na": 0,
   "totals": {
    "total": 4,
    "pass": 3,
    "fail": 0,
    "mir": 1,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -749,16 +785,20 @@
  "crafted/clean.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 1,
    "pass": 1,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -772,16 +812,20 @@
  "crafted/failing.log": {
   "complete": true,
   "tests": 2,
+  "segments": 2,
   "failures": 1,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 5,
    "pass": 3,
    "fail": 2,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -804,16 +848,20 @@
  "crafted/mir_only.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 2,
+  "na": 0,
   "totals": {
    "total": 3,
    "pass": 1,
    "fail": 0,
    "mir": 2,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -827,16 +875,20 @@
  "crafted/no_cases.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 1,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 0,
    "pass": 0,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -847,19 +899,344 @@
    }
   ]
  },
+ "crafted/real_no_chatter.log": {
+  "complete": true,
+  "tests": 50,
+  "segments": 50,
+  "failures": 0,
+  "skipped": 2,
+  "errors": 0,
+  "mir": 6,
+  "na": 2,
+  "totals": {
+   "total": 230,
+   "pass": 222,
+   "fail": 0,
+   "mir": 6,
+   "tsf": 0,
+   "ttf": 0,
+   "na": 2
+  },
+  "cases": [
+   {
+    "name": "OS_API_Init",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_RegisterEventHandler",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf_enable",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf_disable",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemFlush",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemTimedWait",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemTimedWait",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueuePut",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGet",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectFd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectSingle",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectMultiple",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "UT_os_init_task_misc",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskInstallDeleteHandler",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskExit",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskDelay",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskSetPriority",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetId",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskFindIdBySystemData",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_GetErrorName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_StatusToString",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_GetLocalTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SetLocalTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_HeapGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
  "crafted/truncated.log": {
   "complete": false,
-  "tests": 5,
+  "tests": 6,
+  "segments": 5,
   "failures": 0,
   "skipped": 0,
+  "errors": 1,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 143,
    "pass": 143,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -897,16 +1274,20 @@
  "crafted/tsf.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 1,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 2,
    "pass": 1,
    "fail": 0,
    "mir": 0,
    "tsf": 1,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {
@@ -922,16 +1303,20 @@
  "crafted/unknown_line.log": {
   "complete": true,
   "tests": 1,
+  "segments": 1,
   "failures": 0,
   "skipped": 0,
+  "errors": 0,
   "mir": 0,
+  "na": 0,
   "totals": {
    "total": 1,
    "pass": 1,
    "fail": 0,
    "mir": 0,
    "tsf": 0,
-   "ttf": 0
+   "ttf": 0,
+   "na": 0
   },
   "cases": [
    {

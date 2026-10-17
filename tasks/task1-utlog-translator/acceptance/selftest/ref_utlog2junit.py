@@ -66,7 +66,7 @@ def parse(path: Path) -> Log:
         if line.startswith("COMPLETE:"):
             log.complete = True
             continue
-        if line.strip() and line != "[BEGIN] UNIT TEST":
+        if line.strip() and line != "[BEGIN] UNIT TEST" and not line.startswith("**BUG**"):
             log.unknown += 1
     return log
 
@@ -87,6 +87,8 @@ def build_xml(logs: list[Log]) -> ET.Element:
         props = ET.SubElement(suite, "properties")
         ET.SubElement(props, "property", name="mir",
                       value=str(sum(s.counts["MIR"] for s in log.segments)))
+        ET.SubElement(props, "property", name="na",
+                      value=str(sum(s.counts["N/A"] for s in log.segments)))
         for s in cs:
             tc = ET.SubElement(suite, "testcase", classname=log.suite, name=s.name)
             if s.bad_lines:
@@ -114,21 +116,23 @@ def build_xml(logs: list[Log]) -> ET.Element:
 
 
 def build_md(logs: list[Log]) -> str:
-    out = ["| Suite | Segments | Total | Pass | Fail | MIR | TSF | TTF | Status |",
-           "|---|---|---|---|---|---|---|---|---|"]
+    out = ["| Suite | Segments | Total | Pass | Fail | MIR | TSF | TTF | N/A | Status |",
+           "|---|---|---|---|---|---|---|---|---|---|"]
     fails: list[str] = []
     for log in logs:
         c = {k: sum(s.counts[k] for s in log.segments) for k in KEYS}
         total = sum(c.values())
         bad = c["FAIL"] + c["TSF"] + c["TTF"]
         status = "INCOMPLETE" if not log.complete else ("FAIL" if bad else "pass")
-        out.append(f"| {log.suite} | {len(cases_of(log))} | {total} | {c['PASS']} | {c['FAIL']} "
-                   f"| {c['MIR']} | {c['TSF']} | {c['TTF']} | {status} |")
+        out.append(f"| {log.suite} | {len(cases_of(log)) + (0 if log.complete else 1)} | {total} | {c['PASS']} | {c['FAIL']} "
+                   f"| {c['MIR']} | {c['TSF']} | {c['TTF']} | {c['N/A']} | {status} |")
         for s in cases_of(log):
             for line in s.bad_lines:
                 m = RESULT_RE.match(line)
                 assert m is not None
                 fails.append(f"- {log.suite} / {s.name}: {m.group(2)}")
+        if not log.complete:
+            fails.append(f"- {log.suite}: incomplete log")
     out += ["", "## Failures", ""]
     out += fails if fails else ["No failures."]
     return "\n".join(out) + "\n"

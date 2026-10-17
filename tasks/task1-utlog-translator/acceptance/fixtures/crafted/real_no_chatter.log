@@ -1,0 +1,643 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 OS_API_Init
+[ PASS] 01.001 ut_oscore_misc_test.c:107 - OS_QueueCreate(&qId, "Queue A", qDepth, qSize, qFlags) (-1) not successful
+[ PASS] 01.002 ut_oscore_misc_test.c:108 - OS_BinSemCreate(&semIds[0], "BinSem 1", semInitValue, semOptions) (-1) not successful
+[ PASS] 01.003 ut_oscore_misc_test.c:109 - OS_CountSemCreate(&semIds[1], "CountSem 1", semInitValue, semOptions) (-1) not successful
+[ PASS] 01.004 ut_oscore_misc_test.c:110 - OS_MutSemCreate(&semIds[2], "MutexSem 1", semOptions) (-1) not successful
+[ PASS] 01.005 ut_oscore_misc_test.c:115 - OS_API_Init() (0) == OS_SUCCESS (0)
+[ PASS] 01.006 ut_oscore_misc_test.c:117 - OS_QueueCreate(&qId, "Queue A", qDepth, qSize, qFlags) (0) == OS_SUCCESS (0)
+[ PASS] 01.007 ut_oscore_misc_test.c:118 - OS_BinSemCreate(&semIds[0], "BinSem 1", semInitValue, semOptions) (0) == OS_SUCCESS (0)
+[ PASS] 01.008 ut_oscore_misc_test.c:119 - OS_CountSemCreate(&semIds[1], "CountSem 1", semInitValue, semOptions) (0) == OS_SUCCESS (0)
+[ PASS] 01.009 ut_oscore_misc_test.c:120 - OS_MutSemCreate(&semIds[2], "MutexSem 1", semOptions) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 OS_API_Init          TOTAL::9     PASS::9     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 OS_RegisterEventHandler
+[ PASS] 02.001 ut_oscore_misc_test.c:142 - OS_RegisterEventHandler(NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 02.002 ut_oscore_misc_test.c:146 - OS_RegisterEventHandler(UT_os_eventhandler) (0) == OS_SUCCESS (0)
+
+**BUG** OS_RegisterEventHandler():285:check '(handler) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 OS_RegisterEventHandler TOTAL::2     PASS::2     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 OS_printf
+[  MIR] 03.001 ut_oscore_misc_test.c:164 - OS_printf("OS_printf() - #1 Nominal [Seeing this text in stdout constitutes a pass for this MIR]\n")
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 OS_printf            TOTAL::1     PASS::0     FAIL::0     MIR::1     TSF::0     TTF::0   
+
+[BEGIN] 04 OS_printf_enable
+[  MIR] 04.001 ut_oscore_misc_test.c:184 - OS_printf("OS_printf_enable() - #1 Nominal [Seeing this text in stdout constitutes a pass for this MIR]\n")
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 04 OS_printf_enable     TOTAL::1     PASS::0     FAIL::0     MIR::1     TSF::0     TTF::0   
+
+[BEGIN] 05 OS_printf_disable
+[  MIR] 05.001 ut_oscore_misc_test.c:203 - OS_printf("OS_printf_disable() - #1 Nominal [Seeing this text in stdout constitutes a pass for this MIR]\n")
+[  MIR] 05.002 ut_oscore_misc_test.c:207 - OS_printf( "OS_printf_disable() - #1 Nominal [Seeing this text in stdout constitutes a failure for this MIR]\n")
+[  MIR] 05.003 ut_oscore_misc_test.c:212 - OS_printf("OS_printf_disable() - #1 Nominal [Seeing this text in stdout constitutes a pass for this MIR]\n")
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 05 OS_printf_disable    TOTAL::3     PASS::0     FAIL::0     MIR::3     TSF::0     TTF::0   
+
+[BEGIN] 06 OS_BinSemCreate
+[ PASS] 06.001 ut_oscore_binsem_test.c:76 - OS_BinSemCreate(NULL, "BinSem1", 1, 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_BinSemCreate():98:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_BinSemCreate():99:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 06.002 ut_oscore_binsem_test.c:79 - OS_BinSemCreate(&sem_ids[0], NULL, 1, 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 06.003 ut_oscore_binsem_test.c:84 - OS_BinSemCreate(&sem_ids[0], long_sem_name, 1, 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 06.004 ut_oscore_binsem_test.c:101 - OS_BinSemCreate(&sem_ids[OS_MAX_BIN_SEMAPHORES], "OneTooMany", 1, 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 06.005 ut_oscore_binsem_test.c:110 - OS_BinSemCreate(&sem_ids[0], "DUPLICATE", 1, 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 06.006 ut_oscore_binsem_test.c:117 - OS_BinSemCreate(&sem_ids[0], "Good", 1, 0) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 06 OS_BinSemCreate      TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 07 OS_BinSemDelete
+[ PASS] 07.001 ut_oscore_binsem_test.c:136 - OS_BinSemDelete(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 07.002 ut_oscore_binsem_test.c:137 - OS_BinSemDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 07.003 ut_oscore_binsem_test.c:142 - OS_BinSemDelete(bin_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 07 OS_BinSemDelete      TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 08 OS_BinSemFlush
+[ PASS] 08.001 ut_oscore_binsem_test.c:160 - OS_BinSemFlush(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 08.002 ut_oscore_binsem_test.c:161 - OS_BinSemFlush(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 08.003 ut_oscore_binsem_test.c:166 - OS_BinSemFlush(bin_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 08 OS_BinSemFlush       TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 09 OS_BinSemGive
+[ PASS] 09.001 ut_oscore_binsem_test.c:185 - OS_BinSemGive(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 09.002 ut_oscore_binsem_test.c:186 - OS_BinSemGive(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 09.003 ut_oscore_binsem_test.c:191 - OS_BinSemGive(bin_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 09 OS_BinSemGive        TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 10 OS_BinSemTake
+[ PASS] 10.001 ut_oscore_binsem_test.c:211 - OS_BinSemTake(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 10.002 ut_oscore_binsem_test.c:212 - OS_BinSemTake(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 10.003 ut_oscore_binsem_test.c:217 - OS_BinSemTake(bin_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 10 OS_BinSemTake        TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 11 OS_BinSemTimedWait
+[ PASS] 11.001 ut_oscore_binsem_test.c:236 - OS_BinSemTimedWait(UT_OBJID_INCORRECT, 1000) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 11.002 ut_oscore_binsem_test.c:237 - OS_BinSemTimedWait(OS_OBJECT_ID_UNDEFINED, 1000) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 11.003 ut_oscore_binsem_test.c:242 - OS_BinSemTimedWait(bin_sem_id, 1000) (-7) == OS_SEM_TIMEOUT (-7)
+[ PASS] 11.004 ut_oscore_binsem_test.c:249 - OS_BinSemTimedWait(bin_sem_id, 1000) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 11 OS_BinSemTimedWait   TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 12 OS_BinSemGetIdByName
+[ PASS] 12.001 ut_oscore_binsem_test.c:270 - OS_BinSemGetIdByName(NULL, "InvalidName") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 12.002 ut_oscore_binsem_test.c:273 - OS_BinSemGetIdByName(&bin_sem_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 12.003 ut_oscore_binsem_test.c:278 - OS_BinSemGetIdByName(&bin_sem_id, long_sem_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 12.004 ut_oscore_binsem_test.c:281 - OS_BinSemGetIdByName(&bin_sem_id, "NameNotFound") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+[ PASS] 12.005 ut_oscore_binsem_test.c:286 - OS_BinSemGetIdByName(&bin_sem_id, "GetIDByName") (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 12 OS_BinSemGetIdByName TOTAL::5     PASS::5     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 13 OS_CountSemCreate
+
+**BUG** OS_BinSemGetIdByName():238:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_BinSemGetIdByName():239:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_CountSemCreate():90:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 13.001 ut_oscore_countsem_test.c:78 - OS_CountSemCreate(NULL, "CountSem1", 1, 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_CountSemCreate():91:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 13.002 ut_oscore_countsem_test.c:83 - OS_CountSemCreate(&count_sem_ids[0], NULL, 1, 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 13.003 ut_oscore_countsem_test.c:90 - OS_CountSemCreate(&count_sem_ids[0], long_sem_name, 1, 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[  N/A] 13.004 ut_oscore_countsem_test.c:107 - #4 Initial-count-too-high
+[ PASS] 13.005 ut_oscore_countsem_test.c:120 - OS_CountSemCreate(&count_sem_ids[i], "OneTooMany", 1, 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 13.006 ut_oscore_countsem_test.c:137 - OS_CountSemCreate(&count_sem_ids[1], "DUPLICATE", 1, 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 13.007 ut_oscore_countsem_test.c:146 - OS_CountSemCreate(&count_sem_ids[0], "Good", 1, 0) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::1   
+[  END] 13 OS_CountSemCreate    TOTAL::7     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 14 OS_CountSemDelete
+[ PASS] 14.001 ut_oscore_countsem_test.c:167 - OS_CountSemDelete(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 14.002 ut_oscore_countsem_test.c:168 - OS_CountSemDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 14.003 ut_oscore_countsem_test.c:176 - OS_CountSemDelete(count_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 14 OS_CountSemDelete    TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 15 OS_CountSemGive
+[ PASS] 15.001 ut_oscore_countsem_test.c:196 - OS_CountSemGive(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 15.002 ut_oscore_countsem_test.c:197 - OS_CountSemGive(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 15.003 ut_oscore_countsem_test.c:205 - OS_CountSemGive(count_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 15 OS_CountSemGive      TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 16 OS_CountSemTake
+[ PASS] 16.001 ut_oscore_countsem_test.c:227 - OS_CountSemTake(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 16.002 ut_oscore_countsem_test.c:228 - OS_CountSemTake(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 16.003 ut_oscore_countsem_test.c:236 - OS_CountSemTake(count_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 16 OS_CountSemTake      TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 17 OS_CountSemTimedWait
+[ PASS] 17.001 ut_oscore_countsem_test.c:257 - OS_CountSemTimedWait(UT_OBJID_INCORRECT, 1000) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 17.002 ut_oscore_countsem_test.c:258 - OS_CountSemTimedWait(OS_OBJECT_ID_UNDEFINED, 1000) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 17.003 ut_oscore_countsem_test.c:268 - OS_CountSemTimedWait(count_sem_id, 1000) (-7) == OS_SEM_TIMEOUT (-7)
+[ PASS] 17.004 ut_oscore_countsem_test.c:279 - OS_CountSemTimedWait(count_sem_id, 1000) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 17 OS_CountSemTimedWait TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 18 OS_CountSemGetIdByName
+[ PASS] 18.001 ut_oscore_countsem_test.c:302 - OS_CountSemGetIdByName(NULL, "Name") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 18.002 ut_oscore_countsem_test.c:307 - OS_CountSemGetIdByName(&count_sem_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 18.003 ut_oscore_countsem_test.c:314 - OS_CountSemGetIdByName(&count_sem_id, long_sem_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 18.004 ut_oscore_countsem_test.c:319 - OS_CountSemGetIdByName(&count_sem_id, "NotFound") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+[ PASS] 18.005 ut_oscore_countsem_test.c:327 - OS_CountSemGetIdByName(&count_sem_id, "GetIDByName") (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 18 OS_CountSemGetIdByName TOTAL::5     PASS::5     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 19 OS_MutSemCreate
+[ PASS] 19.001 ut_oscore_mutex_test.c:77 - OS_MutSemCreate(NULL, "MutSem1", 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 19.002 ut_oscore_mutex_test.c:82 - OS_MutSemCreate(&mut_sem_id, NULL, 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 19.003 ut_oscore_mutex_test.c:89 - OS_MutSemCreate(&mut_sem_id, long_sem_name, 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+
+**BUG** OS_CountSemGetIdByName():209:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_CountSemGetIdByName():210:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_MutSemCreate():95:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_MutSemCreate():96:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 19.004 ut_oscore_mutex_test.c:101 - OS_MutSemCreate(&mut_sem_id, "OneTooMany", 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 19.005 ut_oscore_mutex_test.c:118 - OS_MutSemCreate(&mut_sem_id, "DUPLICATE", 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 19.006 ut_oscore_mutex_test.c:127 - OS_MutSemCreate(&mut_sem_id, "Good", 0) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 19 OS_MutSemCreate      TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 20 OS_MutSemDelete
+[ PASS] 20.001 ut_oscore_mutex_test.c:149 - OS_MutSemDelete(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 20.002 ut_oscore_mutex_test.c:150 - OS_MutSemDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 20.003 ut_oscore_mutex_test.c:157 - OS_MutSemDelete(mut_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 20 OS_MutSemDelete      TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 21 OS_MutSemGive
+[ PASS] 21.001 ut_oscore_mutex_test.c:177 - OS_MutSemGive(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 21.002 ut_oscore_mutex_test.c:178 - OS_MutSemGive(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 21.003 ut_oscore_mutex_test.c:187 - OS_MutSemGive(mut_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 21 OS_MutSemGive        TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 22 OS_MutSemTake
+[ PASS] 22.001 ut_oscore_mutex_test.c:210 - OS_MutSemTake(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 22.002 ut_oscore_mutex_test.c:211 - OS_MutSemTake(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 22.003 ut_oscore_mutex_test.c:218 - OS_MutSemTake(mut_sem_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 22 OS_MutSemTake        TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 23 OS_MutSemGetIdByName
+[ PASS] 23.001 ut_oscore_mutex_test.c:242 - OS_MutSemGetIdByName(NULL, "Name") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 23.002 ut_oscore_mutex_test.c:247 - OS_MutSemGetIdByName(&mut_sem_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 23.003 ut_oscore_mutex_test.c:254 - OS_MutSemGetIdByName(&mut_sem_id, long_sem_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 23.004 ut_oscore_mutex_test.c:259 - OS_MutSemGetIdByName(&mut_sem_id, "NotFound") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+[ PASS] 23.005 ut_oscore_mutex_test.c:266 - OS_MutSemGetIdByName(&mut_sem_id, "GetIDByName") (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 23 OS_MutSemGetIdByName TOTAL::5     PASS::5     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 24 OS_MutSemGetInfo
+[ PASS] 24.001 ut_oscore_mutex_test.c:287 - OS_MutSemGetInfo(UT_OBJID_INCORRECT, &mut_sem_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 24.002 ut_oscore_mutex_test.c:288 - OS_MutSemGetInfo(OS_OBJECT_ID_UNDEFINED, &mut_sem_prop) (-16) == OS_ERR_INVALID_ID (-16)
+
+**BUG** OS_MutSemGetIdByName():217:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_MutSemGetIdByName():218:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_MutSemGetInfo():238:check '(mut_prop) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 24.003 ut_oscore_mutex_test.c:295 - OS_MutSemGetInfo(mut_sem_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 24.004 ut_oscore_mutex_test.c:305 - OS_MutSemGetInfo(mut_sem_id, &mut_sem_prop) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 24 OS_MutSemGetInfo     TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 25 OS_QueueCreate
+[ PASS] 25.001 ut_oscore_queue_test.c:81 - OS_QueueCreate(NULL, "Queue1", OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_QueueCreate():95:check '(queue_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_QueueCreate():96:check '(queue_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 25.002 ut_oscore_queue_test.c:86 - OS_QueueCreate(&queue_id, NULL, OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 25.003 ut_oscore_queue_test.c:91 - OS_QueueCreate(&queue_id, "Queue1", OSAL_BLOCKCOUNT_C(10), 0, 0) (-40) == OS_ERR_INVALID_SIZE (-40)
+[ PASS] 25.004 ut_oscore_queue_test.c:93 - OS_QueueCreate(&queue_id, "Queue1", OSAL_BLOCKCOUNT_C(OS_QUEUE_MAX_DEPTH + 1), sizeof(uint32), 0) (-11) == OS_QUEUE_INVALID_SIZE (-11)
+[ PASS] 25.005 ut_oscore_queue_test.c:101 - OS_QueueCreate(&queue_id, long_queue_name, OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 25.006 ut_oscore_queue_test.c:114 - OS_QueueCreate(&queue_id, "OneTooMany", OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 25.007 ut_oscore_queue_test.c:131 - OS_QueueCreate(&queue_id, "DUPLICATE", OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 25.008 ut_oscore_queue_test.c:140 - OS_QueueCreate(&queue_id, "Good", OSAL_BLOCKCOUNT_C(10), sizeof(uint32), 0) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 25 OS_QueueCreate       TOTAL::8     PASS::8     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 26 OS_QueueDelete
+[ PASS] 26.001 ut_oscore_queue_test.c:161 - OS_QueueDelete(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 26.002 ut_oscore_queue_test.c:162 - OS_QueueDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 26.003 ut_oscore_queue_test.c:169 - OS_QueueDelete(queue_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 26 OS_QueueDelete       TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 27 OS_QueuePut
+[ PASS] 27.001 ut_oscore_queue_test.c:308 - OS_QueuePut(UT_OBJID_INCORRECT, (void *)&queue_data_out, sizeof(uint32), 0) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 27.002 ut_oscore_queue_test.c:309 - OS_QueuePut(OS_OBJECT_ID_UNDEFINED, (void *)&queue_data_out, sizeof(uint32), 0) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 27.003 ut_oscore_queue_test.c:317 - OS_QueuePut(queue_id, NULL, sizeof(uint32), 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 27.004 ut_oscore_queue_test.c:318 - OS_QueuePut(queue_id, &queue_data_out, sizeof(uint32) + 1, 0) (-11) == OS_QUEUE_INVALID_SIZE (-11)
+[ PASS] 27.005 ut_oscore_queue_test.c:319 - OS_QueuePut(queue_id, &queue_data_out, 0, 0) (-40) == OS_ERR_INVALID_SIZE (-40)
+
+**BUG** OS_QueuePut():197:check '(data) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 27.006 ut_oscore_queue_test.c:334 - OS_QueuePut(queue_id, &queue_data_out, sizeof(uint32), 0) (-9) == OS_QUEUE_FULL (-9)
+[ PASS] 27.007 ut_oscore_queue_test.c:351 - OS_QueuePut(queue_id, &queue_data_out, sizeof(uint32), 0) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 27 OS_QueuePut          TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 28 OS_QueueGet
+[ PASS] 28.001 ut_oscore_queue_test.c:195 - OS_QueueGet(UT_OBJID_INCORRECT, (void *)&queue_data_in, sizeof(uint32), &size_copied, OS_CHECK) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 28.002 ut_oscore_queue_test.c:197 - OS_QueueGet(OS_OBJECT_ID_UNDEFINED, (void *)&queue_data_in, sizeof(uint32), &size_copied, OS_CHECK) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 28.003 ut_oscore_queue_test.c:207 - OS_QueueGet(queue_id, NULL, sizeof(uint32), &size_copied, OS_CHECK) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_QueueGet():158:check '(data) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 28.004 ut_oscore_queue_test.c:208 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), NULL, OS_CHECK) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 28.005 ut_oscore_queue_test.c:209 - OS_QueueGet(queue_id, &queue_data_in, 0, &size_copied, OS_CHECK) (-40) == OS_ERR_INVALID_SIZE (-40)
+
+**BUG** OS_QueueGet():159:check '(size_copied) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 28.006 ut_oscore_queue_test.c:219 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), &data_size, OS_CHECK) (-8) == OS_QUEUE_EMPTY (-8)
+[ PASS] 28.007 ut_oscore_queue_test.c:229 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), &data_size, 2) (-10) == OS_QUEUE_TIMEOUT (-10)
+[ PASS] 28.008 ut_oscore_queue_test.c:243 - OS_QueueGet(queue_id, &queue_data_in, OSAL_SIZE_C(3), &data_size, OS_CHECK) (-11) == OS_QUEUE_INVALID_SIZE (-11)
+[ PASS] 28.009 ut_oscore_queue_test.c:257 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), &data_size, OS_PEND) (0) == OS_SUCCESS (0)
+[ PASS] 28.010 ut_oscore_queue_test.c:270 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), &data_size, 20) (0) == OS_SUCCESS (0)
+[ PASS] 28.011 ut_oscore_queue_test.c:283 - OS_QueueGet(queue_id, &queue_data_in, sizeof(uint32), &data_size, OS_CHECK) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 28 OS_QueueGet          TOTAL::11    PASS::11    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 29 OS_QueueGetIdByName
+[ PASS] 29.001 ut_oscore_queue_test.c:373 - OS_QueueGetIdByName(NULL, "Name") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 29.002 ut_oscore_queue_test.c:378 - OS_QueueGetIdByName(&queue_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 29.003 ut_oscore_queue_test.c:385 - OS_QueueGetIdByName(&queue_id, long_queue_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 29.004 ut_oscore_queue_test.c:390 - OS_QueueGetIdByName(&queue_id, "NameNotFound") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+[ PASS] 29.005 ut_oscore_queue_test.c:397 - OS_QueueGetIdByName(&queue_id, "GetIDByName") (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 29 OS_QueueGetIdByName  TOTAL::5     PASS::5     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+**BUG** OS_QueueGetIdByName():232:check '(queue_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_QueueGetIdByName():233:check '(queue_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+[BEGIN] 30 OS_QueueGetInfo
+[ PASS] 30.001 ut_oscore_queue_test.c:419 - OS_QueueGetInfo(UT_OBJID_INCORRECT, &queue_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 30.002 ut_oscore_queue_test.c:420 - OS_QueueGetInfo(OS_OBJECT_ID_UNDEFINED, &queue_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 30.003 ut_oscore_queue_test.c:427 - OS_QueueGetInfo(queue_id, NULL) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_QueueGetInfo():253:check '(queue_prop) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 30.004 ut_oscore_queue_test.c:436 - OS_QueueGetInfo(queue_id, &queue_prop) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 30 OS_QueueGetInfo      TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 31 OS_SelectFd
+[ PASS] 31.001 ut_oscore_select_test.c:97 - OS_SelectFdZero(&FdSet) (0) == OS_SUCCESS (0)
+[ PASS] 31.002 ut_oscore_select_test.c:102 - OS_SelectFdZero(NULL) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_SelectFdZero():133:check '(Set) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_SelectFdAdd():151:check '(Set) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 31.003 ut_oscore_select_test.c:103 - OS_SelectFdAdd(NULL, selecttest_fd) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 31.004 ut_oscore_select_test.c:104 - OS_SelectFdClear(NULL, selecttest_fd) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_SelectFdClear():179:check '(Set) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_SelectFdIsSet():207:check 'Set != NULL' FAILED --> false
+
+[ PASS] 31.005 ut_oscore_select_test.c:105 - OS_SelectFdIsSet(NULL, selecttest_fd) (0) == false (0)
+[ PASS] 31.006 ut_oscore_select_test.c:107 - OS_SelectFdAdd(&FdSet, invalid_fd) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 31.007 ut_oscore_select_test.c:108 - OS_SelectFdAdd(&FdSet, OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 31.008 ut_oscore_select_test.c:109 - OS_SelectFdClear(&FdSet, invalid_fd) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 31.009 ut_oscore_select_test.c:110 - OS_SelectFdClear(&FdSet, OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 31.010 ut_oscore_select_test.c:111 - OS_SelectFdIsSet(&FdSet, invalid_fd) (0) == false (0)
+[ PASS] 31.011 ut_oscore_select_test.c:112 - OS_SelectFdIsSet(&FdSet, OS_OBJECT_ID_UNDEFINED) (0) == false (0)
+[ PASS] 31.012 ut_oscore_select_test.c:114 - OS_SelectFdZero(&FdSet) (0) == OS_SUCCESS (0)
+[ PASS] 31.013 ut_oscore_select_test.c:115 - OS_SelectFdAdd(&FdSet, selecttest_fd) (0) == OS_SUCCESS (0)
+[ PASS] 31.014 ut_oscore_select_test.c:116 - OS_SelectFdIsSet(&FdSet, selecttest_fd) (1) == true (1)
+[ PASS] 31.015 ut_oscore_select_test.c:118 - OS_SelectFdZero(&FdSet) (0) == OS_SUCCESS (0)
+[ PASS] 31.016 ut_oscore_select_test.c:119 - OS_SelectFdAdd(&FdSet, selecttest_fd) (0) == OS_SUCCESS (0)
+[ PASS] 31.017 ut_oscore_select_test.c:120 - OS_SelectFdClear(&FdSet, selecttest_fd) (0) == OS_SUCCESS (0)
+[ PASS] 31.018 ut_oscore_select_test.c:121 - OS_SelectFdIsSet(&FdSet, selecttest_fd) (0) == false (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 31 OS_SelectFd          TOTAL::18    PASS::18    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 32 OS_SelectSingle
+[ PASS] 32.001 ut_oscore_select_test.c:135 - OS_SelectSingle(selecttest_fd, NULL, 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_SelectSingleAbs():63:check '(StateFlags) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 32.002 ut_oscore_select_test.c:138 - OS_SelectSingle(selecttest_fd, &StateFlags, 0) (0) == OS_SUCCESS (0)
+[ PASS] 32.003 ut_oscore_select_test.c:143 - StateFlags (0x8) & OS_STREAM_STATE_WRITABLE
+[ PASS] 32.004 ut_oscore_select_test.c:148 - OS_SelectSingle(selecttest_fd, &StateFlags, 1) (0) == OS_SUCCESS (0)
+[ PASS] 32.005 ut_oscore_select_test.c:150 - StateFlags (0x4) & OS_STREAM_STATE_READABLE
+[ PASS] 32.006 ut_oscore_select_test.c:154 - OS_SelectSingle(invalid_fd, &StateFlags, 0) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 32.007 ut_oscore_select_test.c:155 - OS_SelectSingle(OS_OBJECT_ID_UNDEFINED, &StateFlags, 0) (-16) == OS_ERR_INVALID_ID (-16)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 32 OS_SelectSingle      TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 33 OS_SelectMultiple
+[ PASS] 33.001 ut_oscore_select_test.c:171 - OS_SelectMultiple(NULL, &WriteSet, 1) (0) == OS_SUCCESS (0)
+[ PASS] 33.002 ut_oscore_select_test.c:176 - OS_SelectFdIsSet(&WriteSet, selecttest_fd)
+[ PASS] 33.003 ut_oscore_select_test.c:180 - OS_SelectMultiple(&ReadSet, NULL, 1) (0) == OS_SUCCESS (0)
+[ PASS] 33.004 ut_oscore_select_test.c:182 - !OS_SelectFdIsSet(&ReadSet, selecttest_fd)
+[ PASS] 33.005 ut_oscore_select_test.c:185 - OS_SelectMultiple(NULL, NULL, 1) (-16) == OS_ERR_INVALID_ID (-16)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 33 OS_SelectMultiple    TOTAL::5     PASS::5     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 34 UT_os_init_task_misc
+[  END] No test cases
+
+[BEGIN] 34 OS_TaskCreate
+[ PASS] 34.001 ut_oscore_task_test.c:113 - OS_TaskCreate(NULL, g_task_names[1], generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[1]), sizeof(g_task_stacks[1]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_TaskCreate():181:check '(task_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_TaskCreate():183:check '(task_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 34.002 ut_oscore_task_test.c:125 - OS_TaskCreate(&g_task_ids[2], NULL, generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[2]), sizeof(g_task_stacks[2]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 34.003 ut_oscore_task_test.c:137 - OS_TaskCreate(&g_task_ids[3], g_task_names[3], NULL, OSAL_STACKPTR_C(&g_task_stacks[3]), sizeof(g_task_stacks[3]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_TaskCreate():182:check '(function_pointer) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 34.004 ut_oscore_task_test.c:149 - OS_TaskCreate(&g_task_ids[3], g_task_names[3], generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[3]), 0, OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-40) == OS_ERR_INVALID_SIZE (-40)
+[ PASS] 34.005 ut_oscore_task_test.c:161 - OS_TaskCreate(&g_task_ids[4], g_long_task_name, generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[4]), sizeof(g_task_stacks[4]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK0, id: 10001
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK1, id: 10002
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK2, id: 10003
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK3, id: 10004
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK4, id: 10005
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK5, id: 10006
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK6, id: 10007
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK7, id: 10008
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK8, id: 10009
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK9, id: 1000a
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK10, id: 1000b
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK11, id: 1000c
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK12, id: 1000d
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK13, id: 1000e
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK14, id: 1000f
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK15, id: 10010
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK16, id: 10011
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK17, id: 10012
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK18, id: 10013
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK19, id: 10014
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK20, id: 10015
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK21, id: 10016
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK22, id: 10017
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK23, id: 10018
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK24, id: 10019
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK25, id: 1001a
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK26, id: 1001b
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK27, id: 1001c
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK28, id: 1001d
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK29, id: 1001e
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK30, id: 1001f
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK31, id: 10020
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK32, id: 10021
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK33, id: 10022
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK34, id: 10023
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK35, id: 10024
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK36, id: 10025
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK37, id: 10026
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK38, id: 10027
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK39, id: 10028
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK40, id: 10029
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK41, id: 1002a
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK42, id: 1002b
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK43, id: 1002c
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK44, id: 1002d
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK45, id: 1002e
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK46, id: 1002f
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK47, id: 10030
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK48, id: 10031
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK49, id: 10032
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK50, id: 10033
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK51, id: 10034
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK52, id: 10035
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK53, id: 10036
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK54, id: 10037
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK55, id: 10038
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK56, id: 10039
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK57, id: 1003a
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK58, id: 1003b
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK59, id: 1003c
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK60, id: 1003d
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK61, id: 1003e
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK62, id: 1003f
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: CREATE_TASK63, id: 10040
+[ PASS] 34.006 ut_oscore_task_test.c:179 - OS_TaskCreate(&g_task_ids[i], task_name, generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[i]), sizeof(g_task_stacks[i]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 34.007 ut_oscore_task_test.c:220 - OS_TaskCreate(&g_task_ids[8], g_task_names[7], generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[8]), sizeof(g_task_stacks[8]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: Create_DuplName, id: 10041
+[ PASS] 34.008 ut_oscore_task_test.c:239 - OS_TaskCreate(&g_task_ids[9], g_task_names[9], generic_test_task, OSAL_STACKPTR_C(&g_task_stacks[9]), sizeof(g_task_stacks[9]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: Create_Nominal, id: 10042
+[ PASS] 34.009 ut_oscore_task_test.c:250 - OS_TaskCreate(&g_task_ids[8], g_task_names[8], generic_test_task, NULL, sizeof(g_task_stacks[8]), OSAL_PRIORITY_C(UT_TASK_PRIORITY), 0) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: Create_OsErr, id: 10043
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 34 OS_TaskCreate        TOTAL::9     PASS::9     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 35 OS_TaskDelete
+[ PASS] 35.001 ut_oscore_task_test.c:279 - OS_TaskDelete(UT_OBJID_INCORRECT) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 35.002 ut_oscore_task_test.c:280 - OS_TaskDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: Delete_Nominal, id: 10044
+[ PASS] 35.003 ut_oscore_task_test.c:297 - OS_TaskDelete(g_task_ids[3]) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 35 OS_TaskDelete        TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 36 OS_TaskInstallDeleteHandler
+[ PASS] 36.001 ut_oscore_task_test.c:351 - OS_TaskInstallDeleteHandler(&delete_handler_callback) (-16) == OS_ERR_INVALID_ID (-16)
+[ INFO] ut_oscore_task_test.c:324:Starting DeleteTest Task: DelHandler_Nominal, id: 10045
+[ INFO] ut_oscore_task_test.c:310:Task delete callback...
+[ PASS] 36.002 ut_oscore_task_test.c:378 - OS_TaskInstallDeleteHandler() (0) == OS_SUCCESS
+[ PASS] 36.003 ut_oscore_task_test.c:381 - OS_TaskInstallDeleteHandler() callback invoked
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 36 OS_TaskInstallDeleteHandler TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 37 OS_TaskExit
+[ INFO] ut_oscore_task_test.c:402:Starting ExitTest Task: Exit_Nominal, id: 10046
+[ PASS] 37.001 ut_oscore_task_test.c:448 - OS_TaskGetInfo(g_task_ids[1], &task_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 37 OS_TaskExit          TOTAL::1     PASS::1     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 38 OS_TaskDelay
+[ PASS] 38.001 ut_oscore_task_test.c:481 - OS_TaskDelay(100) (0) == OS_SUCCESS (0)
+[ PASS] 38.002 ut_oscore_task_test.c:485 - Elapsed time 100 msec, expected 100
+[ PASS] 38.003 ut_oscore_task_test.c:490 - OS_TaskDelay(250) (0) == OS_SUCCESS (0)
+[ PASS] 38.004 ut_oscore_task_test.c:494 - Elapsed time 250 msec, expected 250
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 38 OS_TaskDelay         TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 39 OS_TaskSetPriority
+[ PASS] 39.001 ut_oscore_task_test.c:511 - OS_TaskSetPriority(UT_OBJID_INCORRECT, OSAL_PRIORITY_C(100)) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 39.002 ut_oscore_task_test.c:512 - OS_TaskSetPriority(OS_OBJECT_ID_UNDEFINED, OSAL_PRIORITY_C(100)) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 39.003 ut_oscore_task_test.c:525 - OS_TaskSetPriority(g_task_ids[4], OSAL_PRIORITY_C(UT_TASK_PRIORITY - 10)) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: SetPrio_Nominal, id: 10047
+[ PASS] 39.004 ut_oscore_task_test.c:530 - OS_TaskSetPriority(g_task_ids[4], OSAL_PRIORITY_C(UT_TASK_PRIORITY)) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 39 OS_TaskSetPriority   TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 40 OS_TaskGetId
+[ PASS] 40.001 ut_oscore_task_test.c:578 - OS_TaskGetId() (65608) == 65608
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 40 OS_TaskGetId         TOTAL::1     PASS::1     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 41 OS_TaskGetIdByName
+[ PASS] 41.001 ut_oscore_task_test.c:601 - OS_TaskGetIdByName(NULL, "Name") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 41.002 ut_oscore_task_test.c:606 - OS_TaskGetIdByName(&g_task_ids[2], NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 41.003 ut_oscore_task_test.c:611 - OS_TaskGetIdByName(&g_task_ids[3], g_long_task_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 41.004 ut_oscore_task_test.c:616 - OS_TaskGetIdByName(&g_task_ids[4], "NotFound") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+
+**BUG** OS_TaskGetIdByName():348:check '(task_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_TaskGetIdByName():349:check '(task_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 41.005 ut_oscore_task_test.c:630 - OS_TaskGetIdByName(&g_task_ids[6], g_task_names[5]) (0) == OS_SUCCESS (0)
+[ PASS] 41.006 ut_oscore_task_test.c:632 - OS_TaskGetIdByName() ID (65609) == 65609
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: GetIdByName_Nominal, id: 10049
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 41 OS_TaskGetIdByName   TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 42 OS_TaskGetInfo
+[ PASS] 42.001 ut_oscore_task_test.c:657 - OS_TaskGetInfo(UT_OBJID_INCORRECT, &task_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 42.002 ut_oscore_task_test.c:658 - OS_TaskGetInfo(OS_OBJECT_ID_UNDEFINED, &task_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 42.003 ut_oscore_task_test.c:672 - OS_TaskGetInfo(g_task_ids[2], NULL) (-2) == OS_INVALID_POINTER (-2)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: GetInfo_InvPtr, id: 1004a
+
+**BUG** OS_TaskGetInfo():370:check '(task_prop) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 42.004 ut_oscore_task_test.c:692 - OS_TaskGetInfo(g_task_ids[3], &task_prop) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_task_test.c:85:Starting GenericTask: GetInfo_Nominal, id: 1004b
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 42 OS_TaskGetInfo       TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 43 OS_TaskFindIdBySystemData
+[ PASS] 43.001 ut_oscore_task_test.c:719 - OS_TaskFindIdBySystemData(NULL, &sysdata, sizeof(sysdata)) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 43.002 ut_oscore_task_test.c:720 - OS_TaskFindIdBySystemData(&task_id, NULL, sizeof(sysdata)) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 43.003 ut_oscore_task_test.c:721 - OS_TaskFindIdBySystemData(&task_id, &sysdata, 0) (-2) == OS_INVALID_POINTER (-2)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 43 OS_TaskFindIdBySystemData TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 44 OS_GetErrorName
+[ PASS] 44.001 ut_oscore_misc_test.c:447 - OS_GetErrorName(OS_ERROR, NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 44.002 ut_oscore_misc_test.c:452 - OS_GetErrorName(12345, &errNames[0]) (-1) == OS_ERROR (-1)
+[ PASS] 44.003 ut_oscore_misc_test.c:457 - OS_GetErrorName(OS_ERR_NAME_TOO_LONG, &errNames[0]) (0) == OS_SUCCESS (0)
+[ PASS] 44.004 ut_oscore_misc_test.c:458 - OS_ERR_NAME_TOO_LONG == OS_ERR_NAME_TOO_LONG
+[ PASS] 44.005 ut_oscore_misc_test.c:460 - OS_GetErrorName(OS_ERR_NAME_TAKEN, &errNames[1]) (0) == OS_SUCCESS (0)
+[ PASS] 44.006 ut_oscore_misc_test.c:461 - OS_ERR_NAME_TAKEN == OS_ERR_NAME_TAKEN
+[ PASS] 44.007 ut_oscore_misc_test.c:463 - OS_GetErrorName(OS_ERR_NO_FREE_IDS, &errNames[2]) (0) == OS_SUCCESS (0)
+[ PASS] 44.008 ut_oscore_misc_test.c:464 - OS_ERR_NO_FREE_IDS == OS_ERR_NO_FREE_IDS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 44 OS_GetErrorName      TOTAL::8     PASS::8     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+**BUG** OS_TaskFindIdBySystemData():439:check '(task_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_GetErrorName():132:check '(err_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+[BEGIN] 45 OS_StatusToString
+[ PASS] 45.001 ut_oscore_misc_test.c:489 - OS_StatusToString(OS_SUCCESS, NULL) (0x0) == NULL (0x0)
+[ PASS] 45.002 ut_oscore_misc_test.c:479 - rtn_addr (0x7ffdb846bc2c) == status_string (0x7ffdb846bc2c)
+[ PASS] 45.003 ut_oscore_misc_test.c:480 - String: '0' == '0'
+[ PASS] 45.004 ut_oscore_misc_test.c:479 - rtn_addr (0x7ffdb846bc2c) == status_string (0x7ffdb846bc2c)
+[ PASS] 45.005 ut_oscore_misc_test.c:480 - String: '-1' == '-1'
+[ PASS] 45.006 ut_oscore_misc_test.c:479 - rtn_addr (0x7ffdb846bc2c) == status_string (0x7ffdb846bc2c)
+[ PASS] 45.007 ut_oscore_misc_test.c:480 - String: '2147483647' == '2147483647'
+[ PASS] 45.008 ut_oscore_misc_test.c:479 - rtn_addr (0x7ffdb846bc2c) == status_string (0x7ffdb846bc2c)
+[ PASS] 45.009 ut_oscore_misc_test.c:480 - String: '-2147483648' == '-2147483648'
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 45 OS_StatusToString    TOTAL::9     PASS::9     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 46 OS_GetLocalTime
+[ PASS] 46.001 ut_oscore_misc_test.c:266 - OS_GetLocalTime(NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 46.002 ut_oscore_misc_test.c:272 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+
+**BUG** OS_GetLocalTime():64:check '(time_struct) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_GetLocalTime():64:check '(time_struct) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ INFO] ut_oscore_misc_test.c:274:[Expecting output after API call to increase over time: 1792267084.802239]
+[ PASS] 46.003 ut_oscore_misc_test.c:272 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:274:[Expecting output after API call to increase over time: 1792267084.822316]
+[ PASS] 46.004 ut_oscore_misc_test.c:272 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:274:[Expecting output after API call to increase over time: 1792267084.842397]
+[ PASS] 46.005 ut_oscore_misc_test.c:272 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:274:[Expecting output after API call to increase over time: 1792267084.862464]
+[ PASS] 46.006 ut_oscore_misc_test.c:272 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:274:[Expecting output after API call to increase over time: 1792267084.882540]
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 46 OS_GetLocalTime      TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 47 OS_SetLocalTime
+[ PASS] 47.001 ut_oscore_misc_test.c:352 - OS_SetLocalTime(NULL) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 47.002 ut_oscore_misc_test.c:359 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:360:[Expecting output before API call to increase over time: 1792267084.902675]
+
+**BUG** OS_SetLocalTime():78:check '(time_struct) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_SetLocalTime():78:check '(time_struct) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 47.003 ut_oscore_misc_test.c:359 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:360:[Expecting output before API call to increase over time: 1792267084.922743]
+[ PASS] 47.004 ut_oscore_misc_test.c:359 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:360:[Expecting output before API call to increase over time: 1792267084.942848]
+[ PASS] 47.005 ut_oscore_misc_test.c:359 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:360:[Expecting output before API call to increase over time: 1792267084.963326]
+[ PASS] 47.006 ut_oscore_misc_test.c:359 - OS_GetLocalTime(&time_struct[i]) (0) == OS_SUCCESS (0)
+[ INFO] ut_oscore_misc_test.c:360:[Expecting output before API call to increase over time: 1792267084.983420]
+[  MIR] 47.007 ut_os_support.h:89 - OS_SetLocalTime(&time_struct[0]) value=-1
+[ INFO] ut_oscore_misc_test.c:378:Failed OS_SetLocalTime(), Check to see if your system has the required premission.
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 47 OS_SetLocalTime      TOTAL::7     PASS::6     FAIL::0     MIR::1     TSF::0     TTF::0   
+
+[BEGIN] 48 OS_HeapGetInfo
+[ PASS] 48.001 ut_oscore_misc_test.c:535 - OS_HeapGetInfo(NULL) (-2) == OS_INVALID_POINTER (-2)
+[  N/A] 48.002 ut_oscore_misc_test.c:540 - OS_HeapGetInfo(&heapProp) (-28) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::1   
+[  END] 48 OS_HeapGetInfo       TOTAL::2     PASS::1     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 49 Cleanup
+
+**BUG** OS_HeapGetInfo():50:check '(heap_prop) != NULL' FAILED --> OS_INVALID_POINTER
+
+[  END] No test cases
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::2   
+[  END] 48 SUMMARY              TOTAL::230   PASS::222   FAIL::0     MIR::6     TSF::0     TTF::0   
+COMPLETE: 48 tests Segment(s) executed
+
