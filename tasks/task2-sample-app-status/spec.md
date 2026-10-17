@@ -70,7 +70,12 @@ be downlinked through TO_LAB, be exercised by a CTF test, and be reported.
   transmit the status packet after the housekeeping packet. With the default
   divisor 2, the status packet goes out on cycles 2, 4, 6, and so on.
 - `RESET_COUNTERS` resets `ProcessCmdCount` and `HkCycleCount` to 0 in
-  addition to the existing counters. It does not change the divisor.
+  addition to the existing counters. It does not change the divisor. The
+  first SEND_HK after a reset is therefore cycle 1.
+- `SAMPLE_APP_Init` sets the divisor to the default, and no command can set
+  it to 0, so the emission rule never divides by zero after initialization.
+  The existing coverage tests must keep passing; some of them call handlers
+  on zero-initialized application data.
 - `ProcessCmdCount` increments once per PROCESS command that completes
   successfully (returns `CFE_SUCCESS`).
 - Add `SAMPLE_APP_STATUS_TLM_MID` to the TO_LAB subscription table
@@ -88,7 +93,8 @@ be downlinked through TO_LAB, be exercised by a CTF test, and be reported.
   gcov data the unit-test build produces, for example `gcov --json-format`
   on the coverage objects under `build-native_std`; lcov is not installed.
 - CTF: add command and telemetry definitions for SET_STATUS_RATE and the
-  status packet under `ctf/ccdd/json/` following `ctf/ccdd/README.md`, and
+  status packet under `ctf/ccdd/json/` following `ctf/ccdd/README.md`,
+  including the new message ID in the MID list file, and
   a test `ctf/tests/sample_app_status_rate.json` that sets divisor 1,
   confirms a status packet arrives with `StatusDivisor` 1, then sends
   divisor 0 and confirms `CommandErrorCounter` increments. Run it with
