@@ -38,13 +38,26 @@ Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 main agent and every subagent, default auto-compaction window,
 `promptCacheTtl` pinned to `1h` and `subagentPromptCacheTtl` to `5m`, same
 subagent roster (explorer, implementer, tester, debugger, reviewer)
-differing only in `model:`.
+differing only in `model:`. Built-in agents (Explore, Plan,
+general-purpose) stay available in A2-A9 and are forced onto the arm's
+subagent model with `CLAUDE_CODE_SUBAGENT_MODEL` and
+`CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` in the arm's settings. WebSearch,
+WebFetch and Skill stay available in every arm, because the experiment is
+meant to reflect practical agentic development. Tools no developer would
+invoke in this setting are denied everywhere: Workflow, SendMessage,
+ListAgents, RemoteTrigger, Cron*, ScheduleWakeup, EnterWorktree,
+ExitWorktree, PushNotification, EndConversation. A post-run validator
+records every subagent request's model and flags deviations; it never
+drops a run.
 
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
 
 Runs: 9 arms x 4 tasks x 3 repetitions = 108 runs, plus repair rounds.
-If budget bites, drop A7 and A9 first.
+Budget is not a constraint: a run that hits a subscription usage limit is
+dropped and rerun after the limit is raised. Run order is the plain
+arm x task x repetition product; the experiment is short enough that
+calendar drift is accepted.
 
 ## Experiment B: auto-compaction window
 
@@ -90,6 +103,13 @@ of layer 2 are recorded separately from layer 1.
 Feedback generation is deterministic: the same failure always yields the
 same message, so every arm receives identical feedback for identical faults.
 
+Faults caused by the agent's output never become infrastructure errors: a
+pack that crashes on the agent's files reports that check as failed, and an
+acceptance timeout is a failed round with its spend kept. Packs exit 2 only
+for problems detected before the agent's code is exercised. A usage-limit
+interruption records the attempt and its spend with status `usage_limit`
+and pauses the matrix.
+
 ## Isolation per run
 
 - `CLAUDE_CONFIG_DIR=/workspace/agent-experiments-arms/<arm>` with only that
@@ -116,8 +136,14 @@ same message, so every arm receives identical feedback for identical faults.
 - identity: run ID, arm, task, repetition, timestamps, model IDs, settings
 - outcome: acceptance pass/fail per round, rounds used, cap hit
 - cost: tokens by type (input, output, cache read, cache creation by TTL)
-  per model and per query source (main, subagent), computed USD at list
-  price under three scenarios: no cache, 5m TTL with simulated pauses, 1h TTL
+  per model and per query source (main, subagent); `billed` USD at list
+  price with every token at the rate it was actually billed (primary
+  figure); hypothetical main-agent scenarios no cache, 5m, 1h (subagents
+  always as recorded at 5m); a `uniform_1h` counterfactual repricing
+  subagent writes at the 1h rate; the difference to the CLI's self-reported
+  cost, recorded for information only (the CLI figure is not trusted)
+- provenance: `claude --version`, harness commit, spec and pack hashes,
+  template commit, arm config hash; leak check of transcripts for pack paths
 - behavior: turns, tool calls, subagent spawns by type and model, compaction
   events, wall time, API time
 - layer 2: rounds, tokens, cost, user rating
@@ -134,19 +160,39 @@ List prices (USD per million tokens):
 | Sonnet 4.6 | 3.00 | 0.30 | 3.75 | 6.00 | 15.00 |
 | Haiku 5.5 | 0.10 | 0.01 | 0.125 | 0.20 | 0.50 |
 
-Scenarios computed from the transcript's per-request usage:
+Scenarios for the main agent, computed from the transcript's per-request
+usage (subagent requests are always priced as recorded, at 5m):
+- billed: as recorded (primary).
 - none: cache read and cache creation tokens billed at input price.
-- 5m: as recorded, but at each simulated human pause longer than 5 minutes
-  the next request's cache-read tokens are rebilled as a 5m write.
-- 1h: as recorded with 1h write prices; pauses under 60 minutes keep hits.
+- 5m and 1h: cache expiry simulated per agent thread from the actual
+  request timestamps, so idle stretches during subagent work, builds and
+  acceptance runs turn 1h hits into 5m misses and vice versa.
 
-Simulated pauses are drawn from the user's real inter-prompt gap
-distribution (from `~/.claude/history.jsonl`) and inserted at the start of
-each resume round, since headless runs have no human pauses of their own.
+Human pauses are added offline as a probability of exceeding each TTL,
+measured from the user's own transcripts as the idle time between the last
+assistant entry and the next prompt (not prompt-to-prompt time, which
+includes agent work). This offline analysis tool is still to be written;
+transcripts with timestamps are archived per run so it can be applied later.
 
 ## Analysis
 
-Primary metric: cost per completed task (layer 1 pass), median and range
-over repetitions. Secondary: wall time, rounds, layer 2 cost. Report
-spawn counts and compaction counts alongside. Three repetitions is the
-minimum; top arms get additional repetitions.
+Primary metric: total billed spend over all attempts of an arm x task
+(passes, cap hits, usage-limit drops, errors) divided by the number of
+passes. Also reported: conditional median and range over passing runs,
+attempts, passes and attrition per arm, wall time, rounds, spawn counts by
+agent type and observed model, compaction counts, layer 2 cost.
+
+## Deferred items (recorded, not applied)
+
+- Sample size: three repetitions per cell cannot support per-cell
+  significance claims. Planned for the next iteration: pre-registered
+  contrasts, log billed cost with task fixed effects over the 4 x 2
+  (subagent model x delegation) factorial pooled across tasks, bootstrap
+  intervals, pass rate as a separate outcome, and more repetitions.
+- Run-order randomisation and parallel-slot mixing: declined for this
+  iteration; calendar and load drift accepted.
+- Server-side feature-flag identity per fresh config dir: accepted as noise.
+- Claude Code auto-update during the experiment: accepted; the version is
+  recorded per run.
+- Pack validation under heavy parallel load: not pursued; three slots on a
+  32-thread machine.
