@@ -101,6 +101,13 @@ same message, so every arm receives identical feedback for identical faults.
   never match across runs.
 - `--permission-mode bypassPermissions --permission-prompts none`, inside a
   per-run directory; a generous `--max-budget-usd` as a safety cap only.
+- Each claude invocation and each acceptance run executes in its own network
+  namespace, because cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234):
+  `pasta --config-net -t none -u none -T none -U none` with a nested
+  `unshare -U --map-user=<uid>` so the process keeps a normal uid (as fake
+  root, OSAL fails to create message queues) and pasta's loopback port
+  forwarding is off (it would divert traffic to host ports). Outbound API
+  access still works.
 - Up to 3 runs in parallel. Rate-limit retries are logged; throttled runs are
   rerun.
 
