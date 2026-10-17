@@ -57,7 +57,7 @@ echo "failed ids: $ids"
 for want in failing-log-exit-1 truncated-log-error-case truncated-log-exit-1 tsf-counted-as-failure; do
     case " $ids " in *" $want "*) ;; *) echo "SELFTEST FAIL: $want should fail"; status=1 ;; esac
 done
-for must_pass in strict-accepts-real-log na-property tool-exists usage-no-output-flag-exit-2 real-dir-exit-0 mir-property strict-rejects-unknown-exit-2; do
+for must_pass in duplicate-suite-names-use-path unreadable-input-exit-2 strict-accepts-real-log na-property tool-exists usage-no-output-flag-exit-2 real-dir-exit-0 mir-property strict-rejects-unknown-exit-2; do
     case " $ids " in *" $must_pass "*) echo "SELFTEST FAIL: $must_pass should pass"; status=1 ;; esac
 done
 
@@ -65,6 +65,13 @@ echo "== mode 3: missing tool"
 mkdir -p "$work/none"
 bash "$pack/run.sh" "$work/none" "$work/none.json"; rc=$?
 echo "run.sh exit: $rc; failed: $(failed_ids "$work/none.json" | wc -w) of $(python3 -c 'import json,sys; print(len(json.load(open(sys.argv[1]))["checks"]))' "$work/none.json")"
+[ "$rc" -eq 1 ] || { echo "SELFTEST FAIL: expected exit 1"; status=1; }
+
+echo "== mode 4: tool emitting garbage must fail checks, not abort the pack"
+sed -e 's/suite.set(k, str(v))/suite.set(k, "x")/' "$here/ref_utlog2junit.py" > "$work/garbage.py"
+make_repo "$work/gar" "$work/garbage.py"
+bash "$pack/run.sh" "$work/gar" "$work/gar.json"; rc=$?
+echo "run.sh exit: $rc; failed ids: $(failed_ids "$work/gar.json")"
 [ "$rc" -eq 1 ] || { echo "SELFTEST FAIL: expected exit 1"; status=1; }
 
 [ "$status" -eq 0 ] && echo "SELFTEST OK" || echo "SELFTEST FAILED"

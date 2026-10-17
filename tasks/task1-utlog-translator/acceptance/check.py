@@ -9,11 +9,13 @@ error (fixtures missing, bad arguments).
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import traceback
 import xml.etree.ElementTree as ET
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -462,7 +464,7 @@ def c_markdown(ctx: Ctx) -> None:
         expect_rc(proc, 1)
         if not md.is_file():
             raise Fail("markdown not written")
-        text = md.read_text()
+        text = md.read_text(errors="replace")
         if re.search(r"</?[A-Za-z][^>]*>", text):
             raise Fail("raw HTML in markdown")
         rows = md_rows(text)
@@ -501,7 +503,7 @@ def c_markdown(ctx: Ctx) -> None:
         md2 = tmp / "b.md"
         proc = ctx.run(["--markdown", str(md2), *map(str, logs)], tmp)
         expect_rc(proc, 0)
-        text2 = md2.read_text()
+        text2 = md2.read_text(errors="replace")
         if "No failures." not in text2:
             raise Fail("passing run lacks 'No failures.'")
         if "FAIL" in {r[-1] for r in md_rows(text2)[2:]}:
@@ -514,7 +516,7 @@ def c_markdown_na(ctx: Ctx) -> None:
         (log,) = stage(tmp, ["real/osal_core_UT.log"])
         md = tmp / "o.md"
         expect_rc(ctx.run(["--markdown", str(md), str(log)], tmp), 0)
-        rows = md_rows(md.read_text())
+        rows = md_rows(md.read_text(errors="replace"))
         by = {r[0]: r for r in rows[2:] if r}
         r = by.get("osal_core_UT")
         tot = ctx.expected["real/osal_core_UT.log"]["totals"]
@@ -530,13 +532,56 @@ def c_markdown_incomplete(ctx: Ctx) -> None:
         (log,) = stage(tmp, ["crafted/truncated.log"])
         md = tmp / "o.md"
         expect_rc(ctx.run(["--markdown", str(md), str(log)], tmp), 1)
-        sec = md_section(md.read_text(), "Failures")
+        sec = md_section(md.read_text(errors="replace"), "Failures")
         if sec is None:
             raise Fail("no Failures section")
         if "truncated: incomplete log" not in sec:
             raise Fail(f"Failures section: {short(sec)!r}")
         if "No failures." in sec:
             raise Fail("'No failures.' present for an incomplete log")
+
+
+def c_duplicate_names(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        for d in ("a", "b"):
+            stage(tmp / d, ["real/coverage-shared-heap.log"])
+        out = tmp / "o.xml"
+        proc = ctx.run(["--junit", str(out), "a/coverage-shared-heap.log",
+                        "b/coverage-shared-heap.log"], tmp)
+        expect_rc(proc, 0)
+        names = [s.get("name") for s in load_xml(out).findall("testsuite")]
+        want = ["a/coverage-shared-heap", "b/coverage-shared-heap"]
+        if names != want:
+            raise Fail(f"suite names {names} != {want}")
+
+
+def c_unreadable(ctx: Ctx) -> None:
+    with tempfile.TemporaryDirectory() as t:
+        tmp = Path(t)
+        (good,) = stage(tmp / "g", ["real/coverage-shared-heap.log"])
+        out = tmp / "o.xml"
+        scenarios: list[tuple[str, Path]] = [("missing path", tmp / "nope.log")]
+        dir_as_log = tmp / "dir.log"
+        dir_as_log.mkdir()
+        scenarios.append(("empty directory named .log", dir_as_log))
+        locked = tmp / "locked.log"
+        shutil.copy2(good, locked)
+        locked.chmod(0)
+        try:
+            with open(locked, "rb"):
+                pass
+        except OSError:
+            scenarios.append(("file without read permission", locked))
+        try:
+            for label, bad in scenarios:
+                proc = ctx.run(["--junit", str(out), str(good), str(bad)], tmp)
+                if proc.returncode != 2:
+                    raise Fail(f"{label}: exit {proc.returncode}, wanted 2")
+                if not proc.stderr.strip():
+                    raise Fail(f"{label}: nothing on stderr")
+        finally:
+            locked.chmod(0o644)
 
 
 def c_readme(ctx: Ctx) -> None:
@@ -630,6 +675,12 @@ CHECKS: list[CheckSpec] = [
     CheckSpec("markdown-incomplete-log-line",
               "In the Failures section, each incomplete log must get one line 'suite: incomplete log' (so 'No failures.' must not be printed for it), and the tool must exit 1.",
               c_markdown_incomplete),
+    CheckSpec("duplicate-suite-names-use-path",
+              "When two inputs would produce the same suite name, each path as given (without .log) must be used as the suite name instead.",
+              c_duplicate_names),
+    CheckSpec("unreadable-input-exit-2",
+              "Unreadable input (a path that does not exist, cannot be read, or yields no logs) is an error: the tool must exit 2 with a message on stderr, even when other inputs are fine.",
+              c_unreadable),
     CheckSpec("readme-usage-section",
               "tools/README.md must exist and contain a short usage section for utlog2junit.py covering its options.",
               c_readme),
@@ -637,6 +688,15 @@ CHECKS: list[CheckSpec] = [
               "Unit tests under tools/tests must run with 'python3 -m unittest discover tools/tests' from the repository root, pass (exit 0), and number at least five.",
               c_unit_tests),
 ]
+
+
+def preflight(ctx: Ctx) -> None:
+    for key in ctx.expected:
+        Ctx.fixture(key)
+    for rel in ("crafted/empty_dir", "crafted/clean.log", "crafted/unknown_line.log"):
+        Ctx.fixture(rel)
+    if not real_names():
+        raise InfraError("no real fixtures")
 
 
 def main(argv: list[str]) -> int:
@@ -650,19 +710,25 @@ def main(argv: list[str]) -> int:
         return 2
     ids = [c.check_id for c in CHECKS]
     assert len(set(ids)) == len(ids) and all(ID_RE.match(i) for i in ids)
+    # Everything that can go wrong in the pack itself is detected before the
+    # agent's tool runs; after that, any exception belongs to the check.
     try:
         ctx = Ctx(repo)
-        results = []
-        for spec in CHECKS:
-            try:
-                spec.fn(ctx)
-                results.append({"id": spec.check_id, "passed": True, "feedback": "", "detail": ""})
-            except Fail as exc:
-                results.append({"id": spec.check_id, "passed": False,
-                                "feedback": spec.feedback, "detail": short(str(exc))})
-    except (InfraError, OSError, json.JSONDecodeError) as exc:
+        preflight(ctx)
+    except (InfraError, OSError, json.JSONDecodeError, KeyError) as exc:
         print(f"infrastructure error: {exc}", file=sys.stderr)
         return 2
+    results = []
+    for spec in CHECKS:
+        try:
+            spec.fn(ctx)
+            results.append({"id": spec.check_id, "passed": True, "feedback": "", "detail": ""})
+        except Fail as exc:
+            results.append({"id": spec.check_id, "passed": False,
+                            "feedback": spec.feedback, "detail": short(str(exc))})
+        except Exception:  # agent output can break any parser; fail only this check
+            results.append({"id": spec.check_id, "passed": False, "feedback": spec.feedback,
+                            "detail": "unexpected error:\n" + short(traceback.format_exc(), 2000)})
     passed = all(r["passed"] for r in results)
     out.write_text(json.dumps({"passed": passed, "checks": results}, indent=1) + "\n")
     return 0 if passed else 1

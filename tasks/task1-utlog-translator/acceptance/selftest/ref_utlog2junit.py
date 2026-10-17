@@ -169,6 +169,13 @@ def main(argv: list[str]) -> int:
     except OSError as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
+    counts: dict[str, int] = {}
+    for lg in logs:
+        counts[lg.suite] = counts.get(lg.suite, 0) + 1
+    for lg, f in zip(logs, files):
+        if counts[lg.suite] > 1:
+            raw = str(f)
+            lg.suite = raw[:-4] if raw.endswith(".log") else raw
     if ns.strict and any(lg.unknown for lg in logs):
         print("error: unrecognized line in strict mode", file=sys.stderr)
         return 2
