@@ -36,7 +36,9 @@ DEFAULT_TASKS_DIR = REPO_ROOT / "tasks"
 DEFAULT_GAPS = Path(__file__).resolve().parent / "gaps.json"
 TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
 SCRUBBED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
-PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "--")
+# Loopback port forwarding is disabled in all four directions so that the
+# namespace's traffic can never reach another session's cFS on the host.
+PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "-t", "none", "-u", "none", "-T", "none", "-U", "none", "--")
 STRAY_PROCESS_NAMES = frozenset({"core-cpu1"})
 SCHEMA_VERSION = 1
 STATUSES = ("running", "completed", "infra_error", "cli_error", "error")
@@ -100,19 +102,27 @@ class RunConfig:
 
 
 def wrap_netns(cmd: Sequence[str]) -> list[str]:
-    """Run cmd in a private network namespace. pasta cannot exec the program
-    directly, so the command goes through `sh -c` with shell quoting."""
-    return [*PASTA_PREFIX, "sh", "-c", shlex.join(cmd)]
+    """Run cmd in a private network namespace as the harness user.
+
+    pasta cannot exec the program directly, so the command goes through
+    `sh -c`. The inner `unshare -U` maps the harness uid/gid back, so the
+    command is not fake root (OSAL skips its message-queue depth adaptation
+    for uid 0 and cFS then fails to boot). Two quoting layers are applied.
+    """
+    inner = shlex.join(cmd)
+    middle = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
+              f"sh -c {shlex.quote(inner)}")
+    return [*PASTA_PREFIX, "sh", "-c", middle]
 
 
 def check_netns() -> None:
-    """Fail clearly unless pasta can start a command."""
-    probe = [*PASTA_PREFIX, "sh", "-c", "true"]
+    """Fail clearly unless the full wrapper can run a command as the harness uid."""
+    probe = wrap_netns(["sh", "-c", f'test "$(id -u)" = {os.getuid()}'])
     try:
         proc = subprocess.run(probe, capture_output=True, text=True, check=False, timeout=60)
     except (OSError, subprocess.TimeoutExpired) as exc:
         raise RunError(f"network namespace self-check failed ({shlex.join(probe)}): {exc}; "
-                       "install pasta or pass --no-netns") from exc
+                       "install pasta and unshare or pass --no-netns") from exc
     if proc.returncode != 0:
         raise RunError(f"network namespace self-check failed ({shlex.join(probe)} exited "
                        f"{proc.returncode}): {proc.stderr.strip()}; fix pasta or pass --no-netns")
@@ -122,7 +132,6 @@ def child_env(config_dir: Path, base: dict[str, str] | None = None) -> dict[str,
     """Environment for claude and the acceptance pack: subscription auth only."""
     env = {k: v for k, v in (os.environ if base is None else base).items() if k not in SCRUBBED_ENV}
     env["CLAUDE_CONFIG_DIR"] = str(config_dir)
-    env["IS_SANDBOX"] = "1"  # claude refuses bypassPermissions as root otherwise
     return env
 
 
@@ -423,7 +432,7 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
-    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} IS_SANDBOX=1 {TOKEN_ENV}=<token>"
+    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>"
     wrap = wrap_netns if cfg.netns else list
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
         wrap(build_claude_command(cfg, run_id, prompt, None, cfg.max_budget_usd))))

@@ -57,15 +57,27 @@ The process exits 0 only for `completed`.
 
 cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234), so every claude
 invocation and every acceptance `run.sh` runs inside its own network namespace:
-`pasta --config-net --quiet -- sh -c '<command>'` (pasta must be installed;
-outbound HTTPS still works). `run.py` self-checks pasta at startup and fails
-clearly if it cannot start a command. Inside the namespace the process is root,
-so `IS_SANDBOX=1` is set (Claude Code refuses bypassPermissions as root
-otherwise). `--no-netns` disables the wrapper for debugging; do not run
-concurrent cFS runs with it. `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are
-removed from the child environment so runs bill to the subscription token only.
-After each claude call and each acceptance run, leftover `core-cpu1` processes
-whose cwd is under the run directory are killed (found by scanning `/proc`).
+
+    pasta --config-net --quiet -t none -u none -T none -U none -- sh -c 'unshare -U --map-user=<uid> --map-group=<gid> sh -c "<command>"'
+
+pasta and unshare must be installed; outbound HTTPS still works. Two details
+matter, each learned from a failure:
+
+- The inner `unshare -U --map-user/--map-group` maps the harness uid/gid back.
+  Without it the process is fake root in the user namespace, OSAL skips its
+  unprivileged message-queue depth adaptation, and cFS fails to boot with
+  `OS_QueueCreate` EINVAL. Because the uid is not 0, `IS_SANDBOX` is not needed.
+- The four `none` port options disable pasta's default loopback port
+  forwarding. With forwarding on, the namespace's UDP traffic was diverted to
+  host ports and reached other sessions' cFS instances.
+
+`run.py` self-checks the full wrapper at startup (it must run
+`test "$(id -u)" = <uid>`) and fails clearly otherwise. `--no-netns` disables
+the wrapper for debugging; do not run concurrent cFS runs with it.
+`ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are removed from the child
+environment so runs bill to the subscription token only. After each claude
+call and each acceptance run, leftover `core-cpu1` processes whose cwd is under
+the run directory are killed (found by scanning `/proc`).
 
 ## 5. A matrix
 

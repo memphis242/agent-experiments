@@ -153,21 +153,28 @@ class EndToEndTest(unittest.TestCase):
 
 
 class NetnsTest(unittest.TestCase):
-    def test_wrap_quotes_through_sh(self):
+    def test_wrap_quotes_through_both_layers(self):
         import shlex
-        cmd = ["claude", "-p", "it's a \"test\" $HOME; rm -rf /", "--x", "a b"]
+        cmd = ["claude", "-p", "it's a \"test\" $HOME; `rm -rf /` \\ x", "--x", "a b"]
         wrapped = run.wrap_netns(cmd)
-        self.assertEqual(wrapped[:6], ["pasta", "--config-net", "--quiet", "--", "sh", "-c"])
-        self.assertEqual(len(wrapped), 7)
-        self.assertEqual(shlex.split(wrapped[6]), cmd)
+        self.assertEqual(wrapped[:12], ["pasta", "--config-net", "--quiet", "-t", "none", "-u", "none",
+                                        "-T", "none", "-U", "none", "--"])
+        self.assertEqual(wrapped[12:14], ["sh", "-c"])
+        self.assertEqual(len(wrapped), 15)
+        middle = shlex.split(wrapped[14])  # layer 1: what the outer sh runs
+        self.assertEqual(middle[:2], ["unshare", "-U"])
+        self.assertEqual(middle[2:4], [f"--map-user={os.getuid()}", f"--map-group={os.getgid()}"])
+        self.assertEqual(middle[4:6], ["sh", "-c"])
+        self.assertEqual(shlex.split(middle[6]), cmd)  # layer 2: the original argv
 
     def test_child_env_scrubs_and_sets(self):
         base = {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDE_CODE_OAUTH_TOKEN": "o", "PATH": "/bin"}
         env = run.child_env(Path("/cfg"), base)
         self.assertNotIn("ANTHROPIC_API_KEY", env)
         self.assertNotIn("ANTHROPIC_AUTH_TOKEN", env)
-        self.assertEqual((env["CLAUDE_CODE_OAUTH_TOKEN"], env["IS_SANDBOX"], env["CLAUDE_CONFIG_DIR"]),
-                         ("o", "1", "/cfg"))
+        self.assertEqual((env["CLAUDE_CODE_OAUTH_TOKEN"], env["CLAUDE_CONFIG_DIR"]),
+                         ("o", "/cfg"))
+        self.assertNotIn("IS_SANDBOX", env)
         self.assertIn("ANTHROPIC_API_KEY", base)  # input is not mutated
 
     def test_kill_strays_ignores_other_names_and_dirs(self):
