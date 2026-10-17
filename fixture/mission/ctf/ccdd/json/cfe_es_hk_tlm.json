@@ -1,0 +1,352 @@
+{
+  "tlm_mid_name": "CFE_ES_HK_TLM_MID",
+  "tlm_description": "cFE ES housekeeping telemetry",
+  "tlm_data_type": "CFE_ES_HousekeepingTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "CFE_ES_HousekeepingTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "CommandCounter",
+          "description": "Count of valid commands received",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CommandErrorCounter",
+          "description": "Count of rejected commands",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CFECoreChecksum",
+          "description": "Checksum of cFE core code",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CFEMajorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CFEMinorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CFERevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CFEMissionRevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "OSALMajorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "OSALMinorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "OSALRevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "OSALMissionRevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PSPMajorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PSPMinorVersion",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PSPRevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PSPMissionRevision",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "SysLogBytesUsed",
+          "description": "Bytes used in the system log",
+          "data_type": "uint64",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "SysLogSize",
+          "description": "Total size of the system log",
+          "data_type": "uint64",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "SysLogEntries",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "SysLogMode",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ERLogIndex",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ERLogEntries",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "RegisteredCoreApps",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "RegisteredExternalApps",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "RegisteredTasks",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "RegisteredLibs",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ResetType",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ResetSubtype",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ProcessorResets",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MaxProcessorResets",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "BootSource",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfState",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfMode",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfTriggerCount",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfFilterMask",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "16",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfTriggerMask",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "16",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfDataStart",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfDataEnd",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfDataCount",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PerfDataToWrite",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "HeapBytesFree",
+          "description": "",
+          "data_type": "uint64",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "HeapBlocksFree",
+          "description": "",
+          "data_type": "uint64",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "HeapMaxBlockSize",
+          "description": "",
+          "data_type": "uint64",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

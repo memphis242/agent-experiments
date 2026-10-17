@@ -1,0 +1,45 @@
+{
+  "cmd_mid_name": "TO_LAB_CMD_MID",
+  "cmd_description": "TO_LAB commands",
+  "cmd_codes": [
+    {
+      "cc_name": "TO_LAB_NOOP_CC",
+      "cc_value": "0",
+      "cc_description": "No-operation; increments the command counter and emits an informational event.",
+      "cc_data_type": "TO_LAB_NoopCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "TO_LAB_RESET_STATUS_CC",
+      "cc_value": "1",
+      "cc_description": "Resets the command and error counters.",
+      "cc_data_type": "TO_LAB_ResetCountersCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "TO_LAB_OUTPUT_ENABLE_CC",
+      "cc_value": "6",
+      "cc_description": "Starts telemetry output to dest_IP.",
+      "cc_data_type": "TO_LAB_EnableOutputCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "TO_LAB_EnableOutput_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "dest_IP",
+              "description": "Destination IPv4 address, NUL padded",
+              "data_type": "char",
+              "array_size": "16",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

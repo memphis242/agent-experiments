@@ -1,0 +1,31 @@
+{
+  "cmd_mid_name": "HK_SEND_COMBINED_PKT_MID",
+  "cmd_description": "Requests a combined telemetry packet",
+  "cmd_codes": [
+    {
+      "cc_name": "HK_SEND_COMBINED_PKT_CC",
+      "cc_value": "0",
+      "cc_description": "Send the combined packet named by OutMsgToSend.",
+      "cc_data_type": "HK_SendCombinedPktCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "HK_SendCombinedPkt_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "OutMsgToSend",
+              "description": "MsgId of the combined packet to send",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

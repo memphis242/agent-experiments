@@ -1,0 +1,13 @@
+{
+  "cmd_mid_name": "HK_SEND_HK_MID",
+  "cmd_description": "Requests HK application housekeeping telemetry",
+  "cmd_codes": [
+    {
+      "cc_name": "HK_SEND_HK_CC",
+      "cc_value": "0",
+      "cc_description": "Send housekeeping packet.",
+      "cc_data_type": "HK_SendHkCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

@@ -1,0 +1,68 @@
+{
+  "cmd_mid_name": "SAMPLE_APP_CMD_MID",
+  "cmd_description": "SAMPLE_APP commands",
+  "cmd_codes": [
+    {
+      "cc_name": "SAMPLE_APP_NOOP_CC",
+      "cc_value": "0",
+      "cc_description": "No-operation; increments the command counter and emits an informational event.",
+      "cc_data_type": "SAMPLE_APP_NoopCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "SAMPLE_APP_RESET_COUNTERS_CC",
+      "cc_value": "1",
+      "cc_description": "Resets the command and error counters.",
+      "cc_data_type": "SAMPLE_APP_ResetCountersCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "SAMPLE_APP_PROCESS_CC",
+      "cc_value": "2",
+      "cc_description": "Runs the sample processing function.",
+      "cc_data_type": "SAMPLE_APP_ProcessCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "SAMPLE_APP_DISPLAY_PARAM_CC",
+      "cc_value": "3",
+      "cc_description": "Emits an event echoing the payload values.",
+      "cc_data_type": "SAMPLE_APP_DisplayParamCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "SAMPLE_APP_DisplayParam_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "ValU32",
+              "description": "32 bit unsigned integer value",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "ValI16",
+              "description": "16 bit signed integer value",
+              "data_type": "int16",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "ValStr",
+              "description": "An example string",
+              "data_type": "char",
+              "array_size": "10",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

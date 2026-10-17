@@ -1,0 +1,20 @@
+{
+  "cmd_mid_name": "CI_LAB_CMD_MID",
+  "cmd_description": "CI_LAB commands",
+  "cmd_codes": [
+    {
+      "cc_name": "CI_LAB_NOOP_CC",
+      "cc_value": "0",
+      "cc_description": "No-operation; increments the command counter and emits an informational event.",
+      "cc_data_type": "CI_LAB_NoopCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "CI_LAB_RESET_COUNTERS_CC",
+      "cc_value": "1",
+      "cc_description": "Resets the command and error counters.",
+      "cc_data_type": "CI_LAB_ResetCountersCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

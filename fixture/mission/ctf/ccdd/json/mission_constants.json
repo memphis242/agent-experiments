@@ -1,0 +1,22 @@
+[
+  {
+    "constant_name": "CFE_MISSION_ES_MAX_APPLICATIONS",
+    "constant_value": "16"
+  },
+  {
+    "constant_name": "CFE_MISSION_MAX_API_LEN",
+    "constant_value": "20"
+  },
+  {
+    "constant_name": "CFE_MISSION_EVS_MAX_MESSAGE_LENGTH",
+    "constant_value": "122"
+  },
+  {
+    "constant_name": "CFE_MISSION_ES_PERF_MAX_IDS",
+    "constant_value": "128"
+  },
+  {
+    "constant_name": "SAMPLE_APP_MISSION_STRING_VAL_LEN",
+    "constant_value": "10"
+  }
+]

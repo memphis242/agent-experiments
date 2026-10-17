@@ -1,0 +1,13 @@
+{
+  "cmd_mid_name": "CFE_ES_SEND_HK_MID",
+  "cmd_description": "Requests cFE ES housekeeping telemetry",
+  "cmd_codes": [
+    {
+      "cc_name": "CFE_ES_SEND_HK_CC",
+      "cc_value": "0",
+      "cc_description": "Send housekeeping packet.",
+      "cc_data_type": "CFE_ES_SendHkCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

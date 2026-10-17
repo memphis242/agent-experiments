@@ -1,0 +1,64 @@
+{
+  "tlm_mid_name": "HK_HK_TLM_MID",
+  "tlm_description": "HK application housekeeping telemetry",
+  "tlm_data_type": "HK_HkPacket_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "HK_HkTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "CommandCounter",
+          "description": "Count of valid commands received",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CommandErrorCounter",
+          "description": "Count of rejected commands",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "Padding",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CombinedPacketsSent",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MissingDataCtr",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MemPoolHandle",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

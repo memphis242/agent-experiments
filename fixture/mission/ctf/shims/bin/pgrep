@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# CTF finds a running cFS with `sh -c 'pgrep -f "core-cpu1 ..."'`. When /bin/sh is
+# bash (Fedora, Arch, ...), that sh stays alive as pgrep's parent and its own
+# command line contains the pattern, so pgrep always reports a match and CTF
+# refuses to start cFS ("already started"). This wrapper drops the calling
+# process and its ancestors from pgrep's answer; everything else is unchanged.
+# Put this directory first on PATH (run_ctf.sh does).
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_ancestors.sh
+. "$HERE/_ancestors.sh"
+REAL="$(PATH="${PATH#"$HERE":}" command -v pgrep)" || { echo "pgrep shim: real pgrep not found" >&2; exit 127; }
+SKIP="$(ancestors)"
+STATUS=1
+while IFS= read -r line; do
+  pid="${line%% *}"
+  if ! grep -qx -- "$pid" <<<"$SKIP"; then echo "$line"; STATUS=0; fi
+done < <("$REAL" "$@")
+exit "$STATUS"

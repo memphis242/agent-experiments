@@ -1,0 +1,32 @@
+{
+  "tlm_mid_name": "TO_LAB_HK_TLM_MID",
+  "tlm_description": "TO_LAB housekeeping telemetry",
+  "tlm_data_type": "TO_LAB_HkTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "TO_LAB_HkTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "CommandCounter",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CommandErrorCounter",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

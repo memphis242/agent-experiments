@@ -1,0 +1,153 @@
+{
+  "tlm_mid_name": "CFE_EVS_HK_TLM_MID",
+  "tlm_description": "cFE EVS housekeeping telemetry",
+  "tlm_data_type": "CFE_EVS_HousekeepingTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "CFE_EVS_HousekeepingTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "CommandCounter",
+          "description": "Count of valid commands received",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CommandErrorCounter",
+          "description": "Count of rejected commands",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MessageFormatMode",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MessageTruncCounter",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "UnregisteredAppCounter",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "OutputPort",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "LogFullFlag",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "LogMode",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "MessageSendCounter",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "LogOverflowCounter",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "LogEnabled",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "Padding",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "3",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "AppData",
+          "description": "Per-application event statistics",
+          "data_type": "CFE_EVS_AppTlmData_t",
+          "array_size": "16",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "AppID",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "AppMessageSentCounter",
+              "description": "",
+              "data_type": "uint16",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "AppEnableStatus",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "AppMessageSquelchedCounter",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

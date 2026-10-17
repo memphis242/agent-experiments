@@ -66,7 +66,9 @@ git -C "${STAGE}" add -f -A
 #    entries inside the overlay (e.g. a cloned framework) are removed so the
 #    result stays a single repository; the overlay's own .gitignore files are
 #    honored when staging it.
-cp -a "${HERE}/mission/." "${STAGE}/"
+# Overlay the mission files, excluding per-checkout artifacts that are
+# recreated by ctf/setup_ctf.sh in every run.
+rsync -a --exclude=/ctf/CTF --exclude=/ctf/venv --exclude=/ctf/results "${HERE}/mission/" "${STAGE}/"
 find "${STAGE}" -name .git -not -path "${STAGE}/.git" -prune -exec rm -rf {} +
 git -C "${STAGE}" add -A
 git -C "${STAGE}" \

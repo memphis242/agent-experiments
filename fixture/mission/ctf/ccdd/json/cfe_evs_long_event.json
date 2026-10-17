@@ -1,0 +1,81 @@
+{
+  "tlm_mid_name": "CFE_EVS_LONG_EVENT_MSG_MID",
+  "tlm_description": "cFE EVS long-format event message",
+  "tlm_data_type": "CFE_EVS_LongEventTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "CFE_EVS_LongEventTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "PacketID",
+          "description": "Event source",
+          "data_type": "CFE_EVS_PacketID_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "AppName",
+              "description": "",
+              "data_type": "char",
+              "array_size": "20",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "EventID",
+              "description": "",
+              "data_type": "uint16",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "EventType",
+              "description": "",
+              "data_type": "uint16",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "SpacecraftID",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "ProcessorID",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        },
+        {
+          "name": "Message",
+          "description": "Event text",
+          "data_type": "char",
+          "array_size": "122",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "Padding",
+          "description": "",
+          "data_type": "uint8",
+          "array_size": "2",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

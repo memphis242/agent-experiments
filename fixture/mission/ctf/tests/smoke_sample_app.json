@@ -1,0 +1,167 @@
+{
+    "test_script_number": "SMOKE-SAMPLE-APP",
+    "test_script_name": "smoke_sample_app.json",
+    "owner": "mission",
+    "description": "Starts cFS, enables TO_LAB output, and exercises SAMPLE_APP NOOP and RESET_COUNTERS through housekeeping telemetry and events.",
+    "requirements": {
+        "SAMPLE_APP": "NOOP increments the command counter and emits an event; RESET_COUNTERS zeroes it"
+    },
+    "ctf_options": {
+        "verify_timeout": 10
+    },
+    "test_setup": "",
+    "environment": {},
+    "functions": {},
+    "tests": [
+        {
+            "test_number": "SMOKE-1",
+            "description": "Boot cFS and enable telemetry output",
+            "instructions": [
+                {
+                    "instruction": "RegisterCfs",
+                    "data": {"target": ["mission"]},
+                    "wait": 1
+                },
+                {
+                    "instruction": "StartCfs",
+                    "data": {"target": ["mission"]},
+                    "wait": 10
+                },
+                {
+                    "description": "TO_LAB starts sending telemetry to this host",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "TO_LAB_CMD_MID",
+                        "cc": "TO_LAB_OUTPUT_ENABLE_CC",
+                        "args": {"Payload": {"dest_IP": "127.0.0.1"}}
+                    },
+                    "wait": 2
+                }
+            ]
+        },
+        {
+            "test_number": "SMOKE-2",
+            "description": "NOOP increments the SAMPLE_APP command counter and emits an event",
+            "instructions": [
+                {
+                    "description": "Known baseline: counters at 0",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_CMD_MID",
+                        "cc": "SAMPLE_APP_RESET_COUNTERS_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_CMD_MID",
+                        "cc": "SAMPLE_APP_NOOP_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "SAMPLE_APP",
+                                "event_id": 3,
+                                "event_str": "SAMPLE: NOOP command .*",
+                                "is_regex": true
+                            }
+                        ]
+                    },
+                    "wait": 1
+                },
+                {
+                    "description": "Drop packets older than the NOOP, then ask for fresh housekeeping",
+                    "instruction": "ClearTlmPacket",
+                    "data": {"target": "mission", "mid": "SAMPLE_APP_HK_TLM_MID"},
+                    "wait": 0
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_SEND_HK_MID",
+                        "cc": "SAMPLE_APP_SEND_HK_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_HK_TLM_MID",
+                        "args": [
+                            {"compare": "==", "variable": "Payload.CommandCounter", "value": 1},
+                            {"compare": "==", "variable": "Payload.CommandErrorCounter", "value": 0}
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "SMOKE-3",
+            "description": "RESET_COUNTERS returns the command counter to 0",
+            "instructions": [
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_CMD_MID",
+                        "cc": "SAMPLE_APP_RESET_COUNTERS_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {"target": "mission", "mid": "SAMPLE_APP_HK_TLM_MID"},
+                    "wait": 0
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_SEND_HK_MID",
+                        "cc": "SAMPLE_APP_SEND_HK_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_HK_TLM_MID",
+                        "args": [
+                            {"compare": "==", "variable": "Payload.CommandCounter", "value": 0}
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "SMOKE-4",
+            "description": "Stop cFS",
+            "instructions": [
+                {
+                    "instruction": "ShutdownCfs",
+                    "data": {"target": "mission"},
+                    "wait": 1
+                }
+            ]
+        }
+    ]
+}

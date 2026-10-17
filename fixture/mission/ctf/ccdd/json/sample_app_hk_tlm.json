@@ -1,0 +1,32 @@
+{
+  "tlm_mid_name": "SAMPLE_APP_HK_TLM_MID",
+  "tlm_description": "SAMPLE_APP housekeeping telemetry",
+  "tlm_data_type": "SAMPLE_APP_HkTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "SAMPLE_APP_HkTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "CommandCounter",
+          "description": "Count of valid commands received",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "CommandErrorCounter",
+          "description": "Count of rejected commands",
+          "data_type": "uint8",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# See pgrep in this directory. CTF stops cFS with `sh -c 'pkill -fe -9 "core-cpu1 ..."'`;
+# with bash as /bin/sh the real pkill also SIGKILLs that sh (its command line contains
+# the pattern), so CTF sees exit status -9 and reports the shutdown as failed. This
+# wrapper signals only matching processes that are not the caller or its ancestors.
+# Supports the forms CTF uses: [-f|-fe|-x] [-<signal-number>] PATTERN, and passes -P through.
+set -u
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=_ancestors.sh
+. "$HERE/_ancestors.sh"
+REAL="$(PATH="${PATH#"$HERE":}" command -v pkill)" || { echo "pkill shim: real pkill not found" >&2; exit 127; }
+for a in "$@"; do [ "$a" = "-P" ] && exec "$REAL" "$@"; done
+
+SIG=15; PGREP_OPTS=(); ECHO=0
+while [ $# -gt 1 ]; do
+  case "$1" in
+    -[0-9]*) SIG="${1#-}" ;;
+    -[a-zA-Z]*) opts="${1#-}"
+      case "$opts" in *f*) PGREP_OPTS+=(-f) ;; esac
+      case "$opts" in *x*) PGREP_OPTS+=(-x) ;; esac
+      case "$opts" in *e*) ECHO=1 ;; esac ;;
+    *) break ;;
+  esac
+  shift
+done
+PATTERN="$1"
+REALPGREP="$(PATH="${PATH#"$HERE":}" command -v pgrep)"
+SKIP="$(ancestors)"
+STATUS=1
+for pid in $("$REALPGREP" "${PGREP_OPTS[@]}" -- "$PATTERN"); do
+  grep -qx -- "$pid" <<<"$SKIP" && continue
+  if kill "-$SIG" "$pid" 2>/dev/null; then
+    [ "$ECHO" = 1 ] && echo "killed (pid $pid)"
+    STATUS=0
+  fi
+done
+exit "$STATUS"

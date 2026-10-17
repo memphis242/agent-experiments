@@ -1,0 +1,282 @@
+{
+    "test_script_number": "SMOKE-HOUSEKEEPING",
+    "test_script_name": "smoke_housekeeping.json",
+    "owner": "mission",
+    "description": "Exercises the cFE ES, cFE EVS and HK application definitions: NOOP is counted in each housekeeping packet.",
+    "requirements": {
+        "CFE": "ES, EVS and HK count valid commands in housekeeping"
+    },
+    "ctf_options": {
+        "verify_timeout": 10
+    },
+    "test_setup": "",
+    "environment": {},
+    "functions": {},
+    "tests": [
+        {
+            "test_number": "HK-BOOT",
+            "description": "Boot cFS and enable telemetry output",
+            "instructions": [
+                {
+                    "instruction": "RegisterCfs",
+                    "data": {
+                        "target": [
+                            "mission"
+                        ]
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "StartCfs",
+                    "data": {
+                        "target": [
+                            "mission"
+                        ]
+                    },
+                    "wait": 10
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "TO_LAB_CMD_MID",
+                        "cc": "TO_LAB_OUTPUT_ENABLE_CC",
+                        "args": {
+                            "Payload": {
+                                "dest_IP": "127.0.0.1"
+                            }
+                        }
+                    },
+                    "wait": 2
+                }
+            ]
+        },
+        {
+            "test_number": "HK-ES",
+            "description": "HK-ES NOOP is counted in its housekeeping telemetry",
+            "instructions": [
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_ES_CMD_MID",
+                        "cc": "CFE_ES_RESET_COUNTERS_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_ES_CMD_MID",
+                        "cc": "CFE_ES_NOOP_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_ES_HK_TLM_MID"
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_ES_SEND_HK_MID",
+                        "cc": "CFE_ES_SEND_HK_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_ES_HK_TLM_MID",
+                        "args": [
+                            {
+                                "compare": "==",
+                                "variable": "Payload.CommandCounter",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "HK-EVS",
+            "description": "HK-EVS NOOP is counted in its housekeeping telemetry",
+            "instructions": [
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_EVS_CMD_MID",
+                        "cc": "CFE_EVS_RESET_COUNTERS_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_EVS_CMD_MID",
+                        "cc": "CFE_EVS_NOOP_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_EVS_HK_TLM_MID"
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_EVS_SEND_HK_MID",
+                        "cc": "CFE_EVS_SEND_HK_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "CFE_EVS_HK_TLM_MID",
+                        "args": [
+                            {
+                                "compare": "==",
+                                "variable": "Payload.CommandCounter",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "HK-HKAPP",
+            "description": "HK-HKAPP NOOP is counted in its housekeeping telemetry",
+            "instructions": [
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "HK_CMD_MID",
+                        "cc": "HK_RESET_COUNTERS_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "HK_CMD_MID",
+                        "cc": "HK_NOOP_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {
+                        "target": "mission",
+                        "mid": "HK_HK_TLM_MID"
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "HK_SEND_HK_MID",
+                        "cc": "HK_SEND_HK_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "HK_HK_TLM_MID",
+                        "args": [
+                            {
+                                "compare": "==",
+                                "variable": "Payload.CommandCounter",
+                                "value": 1
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "HK-DISPLAY-PARAM",
+            "description": "Command payload encoding: DISPLAY_PARAM echoes its fields in an event",
+            "instructions": [
+                {
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "SAMPLE_APP_CMD_MID",
+                        "cc": "SAMPLE_APP_DISPLAY_PARAM_CC",
+                        "args": {
+                            "Payload": {
+                                "ValU32": 123456,
+                                "ValI16": -7,
+                                "ValStr": "ctf"
+                            }
+                        }
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "SAMPLE_APP",
+                                "event_id": 8,
+                                "event_str": "SAMPLE_APP: ValU32=123456, ValI16=-7, ValStr=ctf",
+                                "is_regex": false
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "HK-STOP",
+            "description": "Stop cFS",
+            "instructions": [
+                {
+                    "instruction": "ShutdownCfs",
+                    "data": {
+                        "target": "mission"
+                    },
+                    "wait": 1
+                }
+            ]
+        }
+    ]
+}
