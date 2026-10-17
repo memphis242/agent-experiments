@@ -198,25 +198,28 @@ static const T_Event_t *T_LastEvent(uint16 EventID)
     return NULL;
 }
 
-/* True when the text holds a maximal run of hex digits whose value is Value. */
+/* True when the text holds "0x" followed by hex digits whose value is Value. */
 static bool T_TextHasHexValue(const char *Text, uint32 Value)
 {
     const char *p = Text;
 
     while (*p != '\0')
     {
-        if ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F'))
+        if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
         {
-            unsigned long V = 0;
+            unsigned long V      = 0;
+            uint32        Digits = 0;
 
+            p += 2;
             while ((*p >= '0' && *p <= '9') || (*p >= 'a' && *p <= 'f') || (*p >= 'A' && *p <= 'F'))
             {
                 unsigned int D = (*p <= '9') ? (unsigned int)(*p - '0') : (unsigned int)((*p | 0x20) - 'a' + 10);
 
                 V = (V << 4) | D;
+                Digits++;
                 p++;
             }
-            if (V == (unsigned long)Value)
+            if (Digits > 0 && V == (unsigned long)Value)
             {
                 return true;
             }
@@ -804,6 +807,52 @@ static void T_MakeBStale(void)
     }
 }
 
+static void Test_T05b_RaiseLower(void)
+{
+    HK_HkTlm_Payload_t Hk;
+
+    T_MakeBStale();
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_STALE_EID), 1);
+
+    /* Raising the threshold has no effect until the next combined send, which then reports fresh. */
+    T_SetStaleCycles(10);
+    Hk = T_RequestHk();
+    UtAssert_UINT32_EQ(Hk.StaleInputCount, 1);
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 0);
+
+    T_Arrive(T_IN_A);
+    T_Send(T_OUT1);
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 1);
+    T_Check_ListedEvent(HK_INPUT_FRESH_EID, T_IN_B, T_OUT1, "threshold raised");
+    Hk = T_RequestHk();
+    UtAssert_UINT32_EQ(Hk.StaleInputCount, 0);
+    UtAssert_UINT32_EQ(Hk.StaleTransitionCtr, 1);
+
+    /* An arrival of an entry that is no longer stale is silent. */
+    T_Arrive(T_IN_B);
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 1);
+
+    /* Lowering the threshold below the missed count makes it stale at the next send, not before. */
+    T_Arrive(T_IN_A);
+    T_Send(T_OUT1); /* B present */
+    T_Arrive(T_IN_A);
+    T_Send(T_OUT1); /* B miss 1 */
+    T_Arrive(T_IN_A);
+    T_Send(T_OUT1); /* B miss 2 */
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_STALE_EID), 1);
+    T_SetStaleCycles(1);
+    Hk = T_RequestHk();
+    UtAssert_UINT32_EQ(Hk.StaleInputCount, 0);
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_STALE_EID), 1);
+    T_Arrive(T_IN_A);
+    T_Send(T_OUT1);
+    UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_STALE_EID), 2);
+    T_Check_ListedEvent(HK_INPUT_STALE_EID, T_IN_B, T_OUT1, "threshold lowered");
+    Hk = T_RequestHk();
+    UtAssert_UINT32_EQ(Hk.StaleInputCount, 1);
+    UtAssert_UINT32_EQ(Hk.StaleTransitionCtr, 2);
+}
+
 static void Test_T06_FreshOnce(void)
 {
     HK_HkTlm_Payload_t Hk;
@@ -1114,6 +1163,7 @@ void UtTest_Setup(void)
     UtTest_Add(Test_T04c_Consecutive, Hidden_Setup, Hidden_Teardown, "T04c_Consecutive");
     UtTest_Add(Test_T04d_ThresholdOne, Hidden_Setup, Hidden_Teardown, "T04d_ThresholdOne");
     UtTest_Add(Test_T05_LazyThreshold, Hidden_Setup, Hidden_Teardown, "T05_LazyThreshold");
+    UtTest_Add(Test_T05b_RaiseLower, Hidden_Setup, Hidden_Teardown, "T05b_RaiseLower");
     UtTest_Add(Test_T06_FreshOnce, Hidden_Setup, Hidden_Teardown, "T06_FreshOnce");
     UtTest_Add(Test_T06b_StaleAgain, Hidden_Setup, Hidden_Teardown, "T06b_StaleAgain");
     UtTest_Add(Test_T07_ReportNone, Hidden_Setup, Hidden_Teardown, "T07_ReportNone");

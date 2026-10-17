@@ -7,7 +7,7 @@ set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 template="${1:-/workspace/agent-experiments-fixture/mission-template}"
 base="${HK_SELFTEST_TMPDIR:-/workspace/tmp-acceptance}"
-mkdir -p "$base" 2>/dev/null || base="${TMPDIR:-/tmp}"
+mkdir -p "$base" || { echo "selftest: cannot create $base" >&2; exit 2; }
 tmp="$(mktemp -d "$base/selftest.XXXXXX")" || { echo "selftest: cannot create scratch directory" >&2; exit 2; }
 trap 'rm -rf "$tmp"' EXIT
 

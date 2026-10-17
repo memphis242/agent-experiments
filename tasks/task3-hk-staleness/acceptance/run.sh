@@ -14,14 +14,14 @@ command -v python3 >/dev/null || { echo "python3 not found" >&2; exit 2; }
 [ -f "$here/baseline_coverage.json" ] || { echo "baseline coverage missing" >&2; exit 2; }
 [ -f "$here/hidden_tests/hk_hidden_tests.c" ] || { echo "hidden unit test missing" >&2; exit 2; }
 
-# Scratch space for the copy of the repository: prefer the scratch SSD (the tree and its build are large).
-if [ -z "${HK_ACCEPT_TMPDIR:-}" ]; then
-    if [ -d /workspace ] && [ -w /workspace ]; then
-        mkdir -p /workspace/tmp-acceptance 2>/dev/null && HK_ACCEPT_TMPDIR=/workspace/tmp-acceptance
-    fi
-fi
-export HK_ACCEPT_TMPDIR="${HK_ACCEPT_TMPDIR:-${TMPDIR:-/tmp}}"
-mkdir -p "$HK_ACCEPT_TMPDIR"
+# Scratch space for the copy of the repository: always under /workspace (the tree and its build are large).
+HK_ACCEPT_TMPDIR="${HK_ACCEPT_TMPDIR:-/workspace/tmp-acceptance}"
+case "$HK_ACCEPT_TMPDIR" in
+    /workspace/*) ;;
+    *) echo "HK_ACCEPT_TMPDIR must be under /workspace" >&2; exit 2 ;;
+esac
+export HK_ACCEPT_TMPDIR
+mkdir -p "$HK_ACCEPT_TMPDIR" 2>/dev/null || { echo "cannot create $HK_ACCEPT_TMPDIR" >&2; exit 2; }
 work="$(mktemp -d "$HK_ACCEPT_TMPDIR/run.XXXXXX")" || { echo "cannot create scratch directory" >&2; exit 2; }
 export HK_ACCEPT_TMPDIR="$work"
 

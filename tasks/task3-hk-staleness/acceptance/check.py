@@ -33,7 +33,7 @@ from pathlib import Path
 PACK = Path(__file__).resolve().parent
 BASELINE_FILE = PACK / "baseline_coverage.json"
 HIDDEN_TEST = PACK / "hidden_tests" / "hk_hidden_tests.c"
-EXPECTED_HIDDEN_TESTS = 17
+EXPECTED_HIDDEN_TESTS = 18
 
 TOTAL_BUDGET_S = 25 * 60
 BUDGET_RESERVE_S = 60
@@ -117,6 +117,8 @@ def run_cmd(args: list[str], cwd: Path, timeout: float, env: dict[str, str] | No
     full_env = dict(os.environ)
     full_env.pop("MAKEFLAGS", None)
     full_env.pop("MFLAGS", None)
+    for secret in ("CLAUDE_CODE_OAUTH_TOKEN", "ANTHROPIC_API_KEY"):
+        full_env.pop(secret, None)
     if env:
         full_env.update(env)
     try:
@@ -284,7 +286,7 @@ def build_command(mid: int, cc: int, payload: bytes = b"") -> bytes:
 
 
 def hex_tokens(text: str) -> set[int]:
-    return {int(tok, 16) for tok in re.findall(r"[0-9A-Fa-f]+", text)}
+    return {int(tok, 16) for tok in re.findall(r"0[xX]([0-9A-Fa-f]+)", text)}
 
 
 def await_free_ports(timeout: float) -> None:
@@ -741,11 +743,17 @@ class Scenario:
 
 
 def scenario(ctx: Ctx) -> Scenario:
+    """Run the UDP scenario; a scenario with any failure is repeated once on a fresh cFS boot."""
     sc = ctx.cache.get("scenario")
     if sc is None:
         sc = Scenario(ctx)
-        ctx.cache["scenario"] = sc
         sc.run()
+        if (sc.startup_error is not None or sc.errors) and ctx.remaining() > 240:
+            first = sc
+            sc = Scenario(ctx)
+            sc.run()
+            sc.notes["first_attempt_errors"] = f"{first.startup_error!r} {first.errors}"
+        ctx.cache["scenario"] = sc
     return sc  # type: ignore[return-value]
 
 
@@ -828,7 +836,7 @@ HIDDEN_AREAS: dict[str, str] = {
     "T03": "SET_STALE_CYCLES rejecting 0 (event 39, CommandErrorCounter, threshold unchanged)",
     "T04": "the stale transition (exactly one event 40 naming both message IDs in hex, consecutive missed "
            "cycles counted per copy table entry, StaleInputCount, StaleTransitionCtr)",
-    "T05": "a changed threshold taking effect at the next combined send, not immediately",
+    "T05": "a changed threshold taking effect at the next combined send, not immediately, in both directions (raising makes a stale entry fresh with event 41, lowering makes it stale with event 40)",
     "T06": "the fresh transition (exactly one event 41 naming both message IDs, missed cycles restarting)",
     "T07": "the REPORT_STALE packet contents (counts, copy table order, invalid unused slots, 16 entry limit)",
     "T08": "RESET_COUNTERS zeroing StaleTransitionCtr only",
@@ -1126,12 +1134,12 @@ def evaluate(ctx: Ctx) -> list[Result]:
     for spec in CHECKS:
         assert ID_RE.match(spec.check_id), spec.check_id
         if ctx.remaining() < 5:
-            results.append(Result(spec.check_id, False, spec.feedback + " (not evaluated: time budget exhausted)",
-                                  "time budget exhausted"))
-            continue
+            raise InfraError(f"time budget exhausted before check {spec.check_id} could run")
         try:
             spec.fn(ctx)
             results.append(Result(spec.check_id, True, "", ""))
+        except InfraError:
+            raise
         except HiddenFail as exc:
             fb = exc.feedback or spec.feedback
             results.append(Result(spec.check_id, False, fb, str(exc)))
@@ -1142,6 +1150,11 @@ def evaluate(ctx: Ctx) -> list[Result]:
                 if isinstance(sc, Scenario):
                     detail += f" | notes={sc.notes}"
             results.append(Result(spec.check_id, False, spec.feedback, detail))
+        except Exception:  # noqa: BLE001 - the agent's code produced something the check did not anticipate
+            results.append(Result(spec.check_id, False, spec.feedback,
+                                  "unexpected exception in the check:\n" + traceback.format_exc()))
+    if ctx.remaining() < 0:
+        raise InfraError("time budget exhausted")
     return results
 
 
@@ -1164,13 +1177,20 @@ def write_out(path: Path, results: list[Result]) -> None:
     path.write_text(json.dumps(doc, indent=2) + "\n")
 
 
-def pick_scratch_parent() -> Path | None:
+SCRATCH_ROOT = Path("/workspace/tmp-acceptance")
+
+
+def pick_scratch_parent() -> Path:
+    """Scratch space always lives under /workspace (HK_ACCEPT_TMPDIR, which run.sh sets, must be there too)."""
     env = os.environ.get("HK_ACCEPT_TMPDIR")
-    if env:
-        p = Path(env)
+    p = Path(env) if env else SCRATCH_ROOT
+    try:
         p.mkdir(parents=True, exist_ok=True)
-        return p
-    return None
+    except OSError as exc:
+        raise InfraError(f"cannot create scratch directory {p}: {exc}") from exc
+    if not str(p.resolve()).startswith("/workspace/"):
+        raise InfraError(f"scratch directory {p} is not under /workspace")
+    return p
 
 
 def measure_baseline(repo: Path, out: Path) -> int:
