@@ -57,7 +57,7 @@ class ModelPrice:
 
 PRICES: Mapping[str, ModelPrice] = MappingProxyType({
     "claude-opus-5-5": ModelPrice(4.00, 0.20, 5.00, 8.00, 20.00),
-    "claude-sonnet-5-5": ModelPrice(2.00, 0.20, 2.50, 4.00, 10.00),
+    "claude-sonnet-5-5": ModelPrice(2.00, 0.10, 2.50, 4.00, 10.00),
     "claude-sonnet-5": ModelPrice(2.00, 0.20, 2.50, 4.00, 10.00),
     "claude-sonnet-4-6": ModelPrice(3.00, 0.30, 3.75, 6.00, 15.00),
     "claude-haiku-5-5": ModelPrice(0.10, 0.01, 0.125, 0.20, 0.50),
