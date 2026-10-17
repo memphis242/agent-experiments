@@ -88,7 +88,6 @@ class RunConfig:
     tasks_dir: Path
     gaps_path: Path
     max_rounds: int
-    max_budget_usd: float
     acceptance_timeout_s: float
     cli_timeout_s: float | None
     seed: int
@@ -97,7 +96,7 @@ class RunConfig:
     netns: bool = True
 
     def __post_init__(self) -> None:
-        assert self.rep >= 1 and self.max_rounds >= 1 and self.max_budget_usd > 0
+        assert self.rep >= 1 and self.max_rounds >= 1
         arms.get_arm(self.arm)
 
 
@@ -163,8 +162,7 @@ def make_run_id(arm: str, task: str, rep: int, now: datetime) -> str:
     return f"{arm}-{task}-r{rep}-{now.astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
 
-def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: str | None,
-                         remaining_budget_usd: float) -> list[str]:
+def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: str | None) -> list[str]:
     """argv for the initial call (session_id None) or a resume. The variadic
     --disallowedTools flag goes last so it cannot swallow the message."""
     arm = arms.get_arm(cfg.arm)
@@ -176,8 +174,7 @@ def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: 
             "--permission-mode", "bypassPermissions",
             "--permission-prompts", "none",
             "--output-format", "json",
-            "--append-system-prompt", f"Run ID: {run_id}",
-            "--max-budget-usd", f"{remaining_budget_usd:.2f}"]
+            "--append-system-prompt", f"Run ID: {run_id}"]
     if cfg.autocompact is not None:
         cmd += ["--autocompact", str(cfg.autocompact)]
     if arm.subagent_model is None:
@@ -249,7 +246,6 @@ class Runner:
         self.repo = run_dir / "repo"
         self.session_ids: list[str] = []
         self.resume_indices: list[int] = []
-        self.spent_usd = 0.0
         self.record: dict[str, Any] = {}
 
     def init_record(self, started: datetime) -> None:
@@ -273,7 +269,7 @@ class Runner:
             "delegation": arm.delegation,
             "settings": settings, "config_sha256": config_hash,
             "autocompact": self.cfg.autocompact,
-            "max_rounds": self.cfg.max_rounds, "max_budget_usd": self.cfg.max_budget_usd,
+            "max_rounds": self.cfg.max_rounds,
             "session_ids": [], "resume_request_indices": [],
             "rounds": [], "passed": False, "rounds_used": 0, "cap_hit": False,
             "error": None, "cost": None, "behavior": None, "totals": None,
@@ -288,8 +284,7 @@ class Runner:
 
     # -- claude invocation -------------------------------------------------
     def invoke(self, message: str, session_id: str | None, round_no: int) -> dict[str, Any]:
-        remaining = self.cfg.max_budget_usd - self.spent_usd
-        cmd = build_claude_command(self.cfg, self.run_id, message, session_id, remaining)
+        cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
         env = child_env(self.arm_root)
         if self.cfg.netns:
             cmd = wrap_netns(cmd)
@@ -360,9 +355,6 @@ class Runner:
         if not pack_src.is_dir():
             raise RunError(f"acceptance pack not found: {pack_src}")
         for round_no in range(1, self.cfg.max_rounds + 1):
-            if self.cfg.max_budget_usd - self.spent_usd <= 0:
-                self.record.update(status="completed", error="budget exhausted", cap_hit=True)
-                return
             entry: dict[str, Any] = {"round": round_no, "kind": "initial" if session_id is None else "resume",
                                      "started_at": _iso(_utc_now()), "message": message}
             t0 = time.monotonic()
@@ -381,7 +373,6 @@ class Runner:
             session_id = str(result["session_id"])
             if not self.session_ids or self.session_ids[-1] != session_id:
                 self.session_ids.append(session_id)
-            self.spent_usd += float(result.get("total_cost_usd") or 0.0)
             self.record["rounds"].append(entry)
             self.record["rounds_used"] = round_no
             self.analyze()
@@ -439,13 +430,13 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>"
     wrap = wrap_netns if cfg.netns else list
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
-        wrap(build_claude_command(cfg, run_id, prompt, None, cfg.max_budget_usd))))
+        wrap(build_claude_command(cfg, run_id, prompt, None))))
     print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails:")
     print(shlex.join(wrap(
         ["bash", f"{run_dir}/acceptance/run.sh", str(repo), f"{run_dir}/acceptance-result-roundN.json"])))
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
         wrap(
-            build_claude_command(cfg, run_id, sample_feedback, "<session_id>", cfg.max_budget_usd))))
+            build_claude_command(cfg, run_id, sample_feedback, "<session_id>"))))
 
 
 def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfig]:
@@ -461,7 +452,6 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--gaps", type=Path, default=DEFAULT_GAPS, help="gaps.json from gaps.py")
     p.add_argument("--max-rounds", type=int, default=5,
                    help="agent invocations in total: the initial one plus up to N-1 repair resumes (default 5)")
-    p.add_argument("--max-budget-usd", type=float, default=150.0)
     p.add_argument("--acceptance-timeout", type=float, default=1800.0)
     p.add_argument("--cli-timeout", type=float, default=None, help="seconds per claude invocation (default: none)")
     p.add_argument("--seed", type=int, default=0, help="seed for simulated pause sampling")
@@ -470,8 +460,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
                    help="do not isolate claude and the acceptance pack in a pasta network namespace (debugging)")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
-    if a.rep < 1 or a.max_rounds < 1 or a.max_budget_usd <= 0:
-        p.error("--rep and --max-rounds must be >= 1 and --max-budget-usd > 0")
+    if a.rep < 1 or a.max_rounds < 1:
+        p.error("--rep and --max-rounds must be >= 1")
     if a.autocompact is not None and a.autocompact < 100_000:
         p.error("--autocompact must be at least 100000")
     try:
@@ -479,7 +469,7 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     except RunError as exc:
         p.error(str(exc))
     cfg = RunConfig(a.arm, short, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
-                    a.gaps, a.max_rounds, a.max_budget_usd, a.acceptance_timeout, a.cli_timeout, a.seed,
+                    a.gaps, a.max_rounds, a.acceptance_timeout, a.cli_timeout, a.seed,
                     a.claude_bin, directory, not a.no_netns)
     return a, cfg
 

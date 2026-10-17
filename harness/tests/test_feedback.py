@@ -193,9 +193,10 @@ class CommandTest(unittest.TestCase):
     def test_flags(self):
         _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--autocompact", "100000"])
         self.assertEqual((cfg.task, cfg.task_dir), ("task1", "task1-utlog-translator"))
-        cmd = run.build_claude_command(cfg, "RID", "hi", "sess", 10.0)
+        cmd = run.build_claude_command(cfg, "RID", "hi", "sess")
         self.assertEqual(cmd[:5], ["claude", "-p", "--resume", "sess", "hi"])
         self.assertIn("Run ID: RID", cmd)
+        self.assertNotIn("--max-budget-usd", cmd)
         self.assertEqual(cmd[-2:], ["--disallowedTools", "Agent"])
         self.assertEqual(cmd[cmd.index("--autocompact") + 1], "100000")
 

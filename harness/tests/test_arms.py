@@ -39,14 +39,14 @@ class ArmsTest(unittest.TestCase):
             s = json.loads((root / "settings.json").read_text())
             self.assertEqual(s["model"], "claude-opus-5-5")
             self.assertEqual(s["effortLevel"], "high")
-            self.assertEqual((s["promptCacheTtl"], s["subagentPromptCacheTtl"]), ("1h", "1h"))
+            self.assertEqual((s["promptCacheTtl"], s["subagentPromptCacheTtl"]), ("1h", "5m"))
             self.assertIs(s["autoMemoryEnabled"], False)
             if sub_model is None:
                 self.assertEqual(s["permissions"]["deny"], ["Agent"])
                 self.assertFalse((root / "agents").exists())
             else:
                 self.assertNotIn("permissions", s)
-                self.assertEqual(s["modelSettings"][sub_model]["effortLevel"], "medium" if "sonnet" in sub_model else "high")
+                self.assertEqual(s["modelSettings"][sub_model]["effortLevel"], "high")
                 names = sorted(p.stem for p in (root / "agents").glob("*.md"))
                 self.assertEqual(names, sorted(arms.SUBAGENT_NAMES))
                 self.assertEqual(set(arms.agent_models(root).values()), {sub_model})

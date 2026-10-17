@@ -34,11 +34,11 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A9 | Opus 5.5 | Sonnet 4.6 | conservative |
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
-`claude-sonnet-5`, `claude-sonnet-4-6`), effort pinned per model
-(Opus `high`, Sonnet `medium`; Sonnet 4.6 has no `xhigh`), default
-auto-compaction window, `promptCacheTtl` and `subagentPromptCacheTtl` both
-pinned to `1h`, same subagent roster (explorer, implementer, tester,
-debugger, reviewer) differing only in `model:`.
+`claude-sonnet-5`, `claude-sonnet-4-6`), effort pinned to `high` for the
+main agent and every subagent, default auto-compaction window,
+`promptCacheTtl` pinned to `1h` and `subagentPromptCacheTtl` to `5m`, same
+subagent roster (explorer, implementer, tester, debugger, reviewer)
+differing only in `model:`.
 
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
@@ -100,7 +100,7 @@ same message, so every arm receives identical feedback for identical faults.
 - Unique run ID appended via `--append-system-prompt` so cache prefixes
   never match across runs.
 - `--permission-mode bypassPermissions --permission-prompts none`, inside a
-  per-run directory; a generous `--max-budget-usd` as a safety cap only.
+  per-run directory. Runs are never stopped on cost.
 - Each claude invocation and each acceptance run executes in its own network
   namespace, because cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234):
   `pasta --config-net -t none -u none -T none -U none` with a nested

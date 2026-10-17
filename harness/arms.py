@@ -25,16 +25,17 @@ SONNET_55 = "claude-sonnet-5-5"
 SONNET_5 = "claude-sonnet-5"
 SONNET_46 = "claude-sonnet-4-6"
 
-# Effort is pinned per model; Sonnet 4.6 has no xhigh so every Sonnet uses medium.
+# Effort is pinned to high for every model, main agent and subagents alike.
 EFFORT_BY_MODEL: Mapping[str, str] = MappingProxyType({
     OPUS_55: "high",
-    SONNET_55: "medium",
-    SONNET_5: "medium",
-    SONNET_46: "medium",
+    SONNET_55: "high",
+    SONNET_5: "high",
+    SONNET_46: "high",
 })
 
 SUBAGENT_NAMES: tuple[str, ...] = ("explorer", "implementer", "tester", "debugger", "reviewer")
 PROMPT_CACHE_TTL = "1h"
+SUBAGENT_PROMPT_CACHE_TTL = "5m"
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,7 @@ def build_settings(arm: ArmSpec) -> dict[str, object]:
         "effortLevel": EFFORT_BY_MODEL[MAIN_MODEL],
         "modelSettings": model_settings,
         "promptCacheTtl": PROMPT_CACHE_TTL,
-        "subagentPromptCacheTtl": PROMPT_CACHE_TTL,
+        "subagentPromptCacheTtl": SUBAGENT_PROMPT_CACHE_TTL,
         "autoMemoryEnabled": False,
     }
     if arm.subagent_model is None:

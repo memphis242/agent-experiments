@@ -34,8 +34,7 @@ human pauses at resume rounds for the 5m and 1h cost scenarios. Without it,
     python harness/run.py --arm A4 --task task2 --rep 1 --dry-run   # print commands only
 
 Options: `--autocompact N` (at least 100000), `--template`, `--runs-dir`
-(default `/workspace/agent-experiments-runs`), `--max-rounds 5` (agent invocations in total: the initial one plus up to 4 repair resumes),
-`--max-budget-usd 150` (a total across rounds; each call gets the remainder),
+(default `/workspace/agent-experiments-runs`), `--max-rounds 5` (agent invocations in total: the initial one plus up to 4 repair resumes). There is no dollar cap: runs are never stopped on cost, and cost is only recorded.
 `--acceptance-timeout`, `--cli-timeout`, `--seed`.
 
 `--task` takes `task1`..`task4` or the full directory name (`task1-utlog-translator`, `task2-sample-app-status`, `task3-hk-staleness`, `task4-stor-app`); run IDs and `run.json` use the short form.
