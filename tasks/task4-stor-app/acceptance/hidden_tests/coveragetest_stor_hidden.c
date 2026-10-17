@@ -1646,6 +1646,9 @@ static void Test_RolloverAndNaming(void)
     for (i = 0; i < 9; i++) send_tlm(T_MID_B, 240, (uint32)i);
     nb = mid_files(T_MID_B, idx, 8);
     UtAssert_True(nb == 3, "%d files for the second MID, expected 3", nb);
+    UtAssert_True(exists_file("/cf/stor/tlm/tlm_08E1_00000000.bin") && exists_file("/cf/stor/tlm/tlm_08E1_00000001.bin") &&
+                      exists_file("/cf/stor/tlm/tlm_08E1_00000002.bin"),
+                  "sequence numbers are per MID: the second MID starts at 0");
     if (nb == 3)
         UtAssert_True(mf[idx[0]].size == 1024 && mf[idx[1]].size == 1024 && mf[idx[2]].size == 304, "exact-fit sizes %u/%u/%u",
                       (unsigned)mf[idx[0]].size, (unsigned)mf[idx[1]].size, (unsigned)mf[idx[2]].size);
@@ -1657,7 +1660,8 @@ static void Test_RolloverAndNaming(void)
     if (get_hk(&h)) UtAssert_UINT32_EQ(h.open, 0);
     send_tlm(T_MID_A, 300, 20);
     nb = mid_files(T_MID_A, idx, 8);
-    UtAssert_True(nb == 5, "a packet after CLOSE_FILES opens a new file (%d files for the first MID)", nb);
+    UtAssert_True(nb == 5 && exists_file("/cf/stor/tlm/tlm_08E0_00000004.bin"),
+                  "a packet after CLOSE_FILES opens the next sequence number (%d files for the first MID)", nb);
 }
 
 static void Test_SequenceAndScan(void)
@@ -1667,6 +1671,7 @@ static void Test_SequenceAndScan(void)
     tbl_default(&t);
     tbl_sizes(&t, 65536, 1048576, 1024, 100);
     tbl_entry(&t, 0, T_MID_A, 10, 1);
+    tbl_entry(&t, 1, T_MID_B, 10, 1);
     mf_mkdir_p("/cf/stor/tlm");
     mf_mkdir_p("/cf/stor/files/x");
     mf_put("/cf/stor/tlm/tlm_08E0_00000007.bin", 1000, 1);
@@ -1681,8 +1686,10 @@ static void Test_SequenceAndScan(void)
         UtAssert_True(h.fused == 1000, "FileBytesUsed %u initialized from the existing files (1000)", h.fused);
     }
     send_tlm(T_MID_A, 300, 0);
-    UtAssert_True(exists_file("/cf/stor/tlm/tlm_08E0_00000008.bin"), "sequence continues from the highest existing sequence plus one");
-    if (get_hk(&h)) UtAssert_True(h.used == 1500 + 64 + 300, "TelemetryBytesUsed %u after one packet", h.used);
+    UtAssert_True(exists_file("/cf/stor/tlm/tlm_08E0_00000008.bin"), "sequence continues from the highest existing sequence of the MID plus one");
+    send_tlm(T_MID_B, 300, 0);
+    UtAssert_True(exists_file("/cf/stor/tlm/tlm_08E1_00000004.bin"), "sequence numbers are per MID");
+    if (get_hk(&h)) UtAssert_True(h.used == 1500 + 2 * (64 + 300), "TelemetryBytesUsed %u after two packets", h.used);
 }
 
 /* Purge: A (priority 5), B (200), C (100); quota 16384, threshold 50 percent (8192), files of 964 bytes. */
@@ -1808,6 +1815,7 @@ static void Test_QuotaDrop(void)
     UtAssert_True(h.dropped > 0, "PacketsDropped %u after the quota was reached", h.dropped);
     UtAssert_True(h.used <= 4096 && 4096 - h.used < 64 + 300, "TelemetryBytesUsed %u at the quota", h.used);
     UtAssert_True(h.stored + h.dropped == 20, "stored %u + dropped %u == 20", h.stored, h.dropped);
+    UtAssert_True(h.stored == 12, "the new file's header counts against the quota: stored %u, expected 12", h.stored);
     UtAssert_True(h.purged == 0, "nothing purged with a 100 percent threshold");
     UtAssert_True(count_ev(EID_QUOTA, 0) == 1, "event 13 emitted once for many drops (%d)", count_ev(EID_QUOTA, 0));
     UtAssert_True(last_ev_type(EID_QUOTA) == CFE_EVS_EventType_ERROR, "event 13 is ERROR");
@@ -1888,6 +1896,48 @@ static void Test_CommandErrors(void)
     send_tlm(T_MID_UNKNOWN, 100, 0);
     UtAssert_True(count_ev(EID_MID_ERR, 0) == 1, "a packet with an unknown message ID emits event 5 (%d)", count_ev(EID_MID_ERR, 0));
     UtAssert_True(last_ev_type(EID_MID_ERR) == CFE_EVS_EventType_ERROR, "event 5 is ERROR");
+}
+
+static void Test_CommandCounters(void)
+{
+    hk_t a, b;
+    est_t e[MAX_ENT];
+    int n = 0;
+    uint8 extra[4] = {0};
+    tbl_t t;
+    tbl_default(&t);
+    tbl_sizes(&t, 262144, 4096, 16384, 80);
+    tbl_entry(&t, 0, T_MID_A, 10, 1);
+    if (!boot(&t)) return;
+    mf_put("/cf/src.bin", 100, 5);
+    mf_put("/cf/big.bin", 6000, 5);
+    get_hk(&a);
+    send_simple(CC_NOOP);
+    cmd_param(CC_SET_PRI, T_MID_A, 7);
+    cmd_param(CC_SET_DEC, T_MID_A, 2);
+    cmd_thr(60);
+    cmd_add("/cf/src.bin", "x.bin");
+    cmd_path(CC_LIST_DIR, "");
+    send_simple(CC_LIST_ALL);
+    get_stats(e, &n);
+    send_simple(CC_CLOSE);
+    cmd_path(CC_DEL_FILE, "x.bin");
+    get_hk(&b);
+    UtAssert_True((uint8)(b.cc - a.cc) == 10 && b.cec == a.cec, "ten accepted commands: CommandCounter %u -> %u, errors %u -> %u", a.cc,
+                  b.cc, a.cec, b.cec);
+    a = b;
+    send_simple(88);
+    send_cmd(T_CMD_MID, CC_NOOP, extra, 4);
+    cmd_param(CC_SET_PRI, 0x0FFF, 1);
+    cmd_thr(0);
+    cmd_add("/cf/missing.bin", "y.bin");
+    cmd_add("/cf/src.bin", "../y.bin");
+    cmd_add("/cf/big.bin", "z.bin");
+    cmd_path(CC_DEL_FILE, "nothing");
+    cmd_path(CC_LIST_DIR, "nothing");
+    get_hk(&b);
+    UtAssert_True(b.cc == a.cc && (uint8)(b.cec - a.cec) == 9, "nine rejected commands: CommandCounter %u -> %u, errors %u -> %u", a.cc, b.cc,
+                  a.cec, b.cec);
 }
 
 static void Test_ResetCounters(void)
@@ -2181,17 +2231,18 @@ void UtTest_Setup(void)
     sem_init(&sem_test, 0, 0);
     UtAssert_True(sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes", (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
     UtAssert_True(sizeof(CFE_FS_Header_t) == FS_HDR, "file header is %u bytes", (unsigned)sizeof(CFE_FS_Header_t));
-    UtTest_Add(Test_StartupAndHousekeeping, Setup, Teardown, "Startup, subscriptions, housekeeping");
+    UtTest_Add(Test_StartupAndHousekeeping, Setup, Teardown, "Startup and housekeeping");
     UtTest_Add(Test_StartupErrors, Setup, Teardown, "Startup error events");
     UtTest_Add(Test_TableValidation, Setup, Teardown, "Table validation");
     UtTest_Add(Test_DecimationAndStats, Setup, Teardown, "Decimation and statistics");
-    UtTest_Add(Test_RolloverAndNaming, Setup, Teardown, "Packet file naming, header and roll-over");
-    UtTest_Add(Test_SequenceAndScan, Setup, Teardown, "Startup scan and sequence continuation");
+    UtTest_Add(Test_RolloverAndNaming, Setup, Teardown, "Packet files and roll-over");
+    UtTest_Add(Test_SequenceAndScan, Setup, Teardown, "Startup scan and sequence");
     UtTest_Add(Test_PurgeOrder, Setup, Teardown, "Purge order");
-    UtTest_Add(Test_PurgePriorityChange, Setup, Teardown, "Purge order after run-time priority change");
+    UtTest_Add(Test_PurgePriorityChange, Setup, Teardown, "Purge after priority change");
     UtTest_Add(Test_QuotaDrop, Setup, Teardown, "Telemetry quota drops");
     UtTest_Add(Test_SetParamCommands, Setup, Teardown, "Parameter commands");
     UtTest_Add(Test_CommandErrors, Setup, Teardown, "Command errors");
+    UtTest_Add(Test_CommandCounters, Setup, Teardown, "Command counters");
     UtTest_Add(Test_ResetCounters, Setup, Teardown, "Reset counters");
     UtTest_Add(Test_FileAddDelete, Setup, Teardown, "File add and delete");
     UtTest_Add(Test_PathRejection, Setup, Teardown, "Path rejection");

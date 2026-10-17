@@ -1,0 +1,13 @@
+{
+  "cmd_mid_name": "STOR_SEND_HK_MID",
+  "cmd_description": "Requests STOR housekeeping",
+  "cmd_codes": [
+    {
+      "cc_name": "STOR_SEND_HK_CC",
+      "cc_value": "0",
+      "cc_description": "",
+      "cc_data_type": "STOR_SendHkCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

@@ -1,0 +1,239 @@
+{
+  "cmd_mid_name": "STOR_CMD_MID",
+  "cmd_description": "STOR commands",
+  "cmd_codes": [
+    {
+      "cc_name": "STOR_NOOP_CC",
+      "cc_value": "0",
+      "cc_description": "No-operation",
+      "cc_data_type": "STOR_NoopCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "STOR_RESET_COUNTERS_CC",
+      "cc_value": "1",
+      "cc_description": "Reset counters",
+      "cc_data_type": "STOR_ResetCountersCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "STOR_SET_PRIORITY_CC",
+      "cc_value": "2",
+      "cc_description": "Set run-time priority of an entry",
+      "cc_data_type": "STOR_SetPriorityCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_SetPriority_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "MsgId",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Priority",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Spare",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "3",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_SET_DECIMATION_CC",
+      "cc_value": "3",
+      "cc_description": "Set run-time decimation of an entry",
+      "cc_data_type": "STOR_SetDecimationCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_SetDecimation_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "MsgId",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Decimation",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Spare",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "3",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_SET_PURGE_THRESHOLD_CC",
+      "cc_value": "4",
+      "cc_description": "Set purge threshold percent",
+      "cc_data_type": "STOR_SetPurgeThresholdCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_SetPurgeThreshold_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "Percent",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Spare",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "3",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_ADD_FILE_CC",
+      "cc_value": "5",
+      "cc_description": "Copy a file into the file area",
+      "cc_data_type": "STOR_AddFileCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_AddFile_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "SourcePath",
+              "description": "",
+              "data_type": "char",
+              "array_size": "64",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "DestPath",
+              "description": "",
+              "data_type": "char",
+              "array_size": "64",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_DELETE_FILE_CC",
+      "cc_value": "6",
+      "cc_description": "Delete a file from the file area",
+      "cc_data_type": "STOR_DeleteFileCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_DeleteFile_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "Path",
+              "description": "",
+              "data_type": "char",
+              "array_size": "64",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_LIST_DIR_CC",
+      "cc_value": "7",
+      "cc_description": "List one directory",
+      "cc_data_type": "STOR_ListDirCmd_t",
+      "cc_parameters": [
+        {
+          "name": "Payload",
+          "description": "",
+          "data_type": "STOR_ListDir_Payload_t",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "Path",
+              "description": "",
+              "data_type": "char",
+              "array_size": "64",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "cc_name": "STOR_LIST_ALL_CC",
+      "cc_value": "8",
+      "cc_description": "List every file",
+      "cc_data_type": "STOR_ListAllCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "STOR_SEND_STATS_CC",
+      "cc_value": "9",
+      "cc_description": "Send statistics",
+      "cc_data_type": "STOR_SendStatsCmd_t",
+      "cc_parameters": []
+    },
+    {
+      "cc_name": "STOR_CLOSE_FILES_CC",
+      "cc_value": "10",
+      "cc_description": "Close open packet files",
+      "cc_data_type": "STOR_CloseFilesCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

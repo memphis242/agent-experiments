@@ -1,0 +1,89 @@
+{
+  "tlm_mid_name": "STOR_STATS_TLM_MID",
+  "tlm_description": "STOR per-entry statistics",
+  "tlm_data_type": "STOR_StatsTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "STOR_Stats_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "Entries",
+          "description": "",
+          "data_type": "STOR_EntryStats_t",
+          "array_size": "32",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "MsgId",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Priority",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Decimation",
+              "description": "",
+              "data_type": "uint8",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Spare",
+              "description": "",
+              "data_type": "uint16",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Received",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Stored",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Decimated",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Dropped",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

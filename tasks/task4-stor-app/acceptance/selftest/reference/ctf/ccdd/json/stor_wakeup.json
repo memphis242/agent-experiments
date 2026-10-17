@@ -1,0 +1,13 @@
+{
+  "cmd_mid_name": "STOR_WAKEUP_MID",
+  "cmd_description": "STOR wakeup",
+  "cmd_codes": [
+    {
+      "cc_name": "STOR_WAKEUP_CC",
+      "cc_value": "0",
+      "cc_description": "",
+      "cc_data_type": "STOR_SendHkCmd_t",
+      "cc_parameters": []
+    }
+  ]
+}

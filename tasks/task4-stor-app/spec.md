@@ -87,13 +87,19 @@ runtime copies of priority, decimation and threshold to the table values.
   entry's open packet file. Packet files are named
   `<TelemetryRoot>/tlm_<MMMM>_<NNNNNNNN>.bin`, where MMMM is the four-digit
   upper-case hex MID value and NNNNNNNN the zero-padded decimal sequence,
-  starting at 0 at app start and continuing from the highest existing
-  sequence found at startup plus one. Each file starts with a
+  per MID, starting at 0 on a clean directory and continuing from the
+  highest existing sequence found for that MID at startup plus one. These
+  names are 21 characters, longer than OSAL's default 20-character file name
+  limit, so set `OSAL_CONFIG_MAX_FILE_NAME` to 32 in
+  `sample_defs/default_osconfig.cmake`. Each file starts with a
   `CFE_FS_Header_t` written with `CFE_FS_WriteHeader`, sub type
   `STOR_FILE_SUBTYPE` = 0x5354, description "STOR packet file".
 - Roll over: if appending would make the file exceed `MaxPacketFileBytes`,
   close it and open the next sequence before writing.
-- Quota: if storing the packet would make `TelemetryBytesUsed` exceed
+- `TelemetryBytesUsed` is the total size on disk of the packet files,
+  headers included.
+- Quota: if storing the packet (including the file header when a new file
+  would be created) would make `TelemetryBytesUsed` exceed
   `TelemetryQuotaBytes` after purging, the packet is dropped: `Dropped`++
   for the entry, `PacketsDropped`++, and event `STOR_TLM_QUOTA_ERR_EID`
   once per entry until it successfully stores again.
@@ -130,7 +136,8 @@ runtime copies of priority, decimation and threshold to the table values.
   and size 0, in `OS_DirectoryRead` order.
 - `LIST_ALL` (no payload): list every regular file under `FileRoot`
   recursively, names as paths relative to `FileRoot`, in depth-first
-  directory order.
+  pre-order: a directory's files in `OS_DirectoryRead` order, descending
+  into each subdirectory at its position.
 - Listing output: one or more `STOR_ListTlm_t` packets:
 
   ```c
@@ -170,7 +177,9 @@ runtime copies of priority, decimation and threshold to the table values.
 | 9 | SEND_STATS | none |
 | 10 | CLOSE_FILES | none |
 
-Command types are named `STOR_<Name>Cmd_t` in CamelCase
+Every accepted command increments `CommandCounter`; every rejected one
+increments `CommandErrorCounter` and sends the named error event, and
+nothing else changes. Command types are named `STOR_<Name>Cmd_t` in CamelCase
 (`STOR_NoopCmd_t`, `STOR_SetPriorityCmd_t`, `STOR_AddFileCmd_t`, ...),
 payloads `STOR_<Name>_Payload_t`. SET_PRIORITY and SET_DECIMATION reject
 value 0 or an unknown MsgId (`STOR_SET_PARAM_ERR_EID`); success
@@ -225,7 +234,12 @@ INFORMATION, except PURGE_INF which is DEBUG.
 ## Mission integration
 
 - Add `stor` to `MISSION_GLOBAL_APPLIST` in `sample_defs/targets.cmake` so it
-  starts on cpu1 (follow how `hk` is listed and started).
+  starts on cpu1. Follow how `hk` is wired everywhere it appears under
+  `sample_defs/`, including `CFS_APP_STARTUP_ORDER` in
+  `generate_startup.cmake` and the include list in `cpu1/install_custom.cmake`
+  and `cpu2/install_custom.cmake` (the default table references
+  `SAMPLE_APP_HK_TLM_MID`, so the table build needs sample_app's include
+  directory).
 - `sample_defs/tables/sch_lab_table.c`: `STOR_SEND_HK_MID` every 4.9 s,
   `STOR_WAKEUP_MID` every 1.0 s.
 - `sample_defs/tables/to_lab_sub.c`: `STOR_HK_TLM_MID`, `STOR_LIST_TLM_MID`,

@@ -80,7 +80,14 @@ EVENT_RE = re.compile(rb"EVS Port\d+ \S+ \d+/\d+/STOR (\d+): ?(.*)")
 
 
 class Fail(Exception):
-    """A check did not hold; the message is the experimenter detail."""
+    """A check did not hold; the message is the experimenter detail.
+
+    `feedback`, when given, replaces the check's standard feedback text.
+    """
+
+    def __init__(self, message: str = "", feedback: str | None = None) -> None:
+        super().__init__(message)
+        self.feedback = feedback
 
 
 class InfraError(Exception):
@@ -389,6 +396,10 @@ class Cfs:
             self.rx.close()
             self.rx = None
         self.running = False
+
+    def restore_table(self) -> None:
+        """Put the table image the build installed back in /cf (sessions may have replaced it)."""
+        (self.cf / "stor_tbl.tbl").write_bytes(self.pristine_table)
 
     def start(self, table: TableSpec | None = None, wipe: bool = True,
               seed: dict[str, bytes] | None = None) -> None:

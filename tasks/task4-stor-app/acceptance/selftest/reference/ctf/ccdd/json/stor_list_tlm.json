@@ -1,0 +1,81 @@
+{
+  "tlm_mid_name": "STOR_LIST_TLM_MID",
+  "tlm_description": "STOR listing",
+  "tlm_data_type": "STOR_ListTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "STOR_List_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "TotalEntries",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "PacketIndex",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "EntriesInPacket",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "Spare",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "Entries",
+          "description": "",
+          "data_type": "STOR_ListEntry_t",
+          "array_size": "4",
+          "bit_length": "0",
+          "parameters": [
+            {
+              "name": "Name",
+              "description": "",
+              "data_type": "char",
+              "array_size": "64",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Size",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            },
+            {
+              "name": "Spare",
+              "description": "",
+              "data_type": "uint32",
+              "array_size": "0",
+              "bit_length": "0",
+              "parameters": []
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,291 @@
+{
+    "test_script_number": "STOR-BASIC",
+    "test_script_name": "stor_basic.json",
+    "owner": "mission",
+    "description": "Starts cFS and exercises STOR: NOOP, a rejected SET_PRIORITY, ADD_FILE, LIST_ALL, DELETE_FILE and SEND_STATS.",
+    "requirements": {
+        "STOR": "Commands are accepted or rejected as specified, the file area lists what was added, and statistics count received packets"
+    },
+    "ctf_options": {
+        "verify_timeout": 10
+    },
+    "test_setup": "",
+    "environment": {},
+    "functions": {},
+    "tests": [
+        {
+            "test_number": "STOR-1",
+            "description": "Boot cFS and enable telemetry output",
+            "instructions": [
+                {
+                    "instruction": "RegisterCfs",
+                    "data": {
+                        "target": [
+                            "mission"
+                        ]
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "StartCfs",
+                    "data": {
+                        "target": [
+                            "mission"
+                        ]
+                    },
+                    "wait": 10
+                },
+                {
+                    "description": "TO_LAB starts sending telemetry to this host",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "TO_LAB_CMD_MID",
+                        "cc": "TO_LAB_OUTPUT_ENABLE_CC",
+                        "args": {
+                            "Payload": {
+                                "dest_IP": "127.0.0.1"
+                            }
+                        }
+                    },
+                    "wait": 2
+                }
+            ]
+        },
+        {
+            "test_number": "STOR-2",
+            "description": "NOOP is accepted",
+            "instructions": [
+                {
+                    "description": "NOOP",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_NOOP_CC",
+                        "args": {}
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "STOR",
+                                "event_id": 3,
+                                "event_str": "STOR: NOOP command.*",
+                                "is_regex": true
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "STOR-3",
+            "description": "SET_PRIORITY on an unknown MID is rejected",
+            "instructions": [
+                {
+                    "description": "Unknown MID",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_SET_PRIORITY_CC",
+                        "args": {
+                            "Payload": {
+                                "MsgId": 4095,
+                                "Priority": 5
+                            }
+                        }
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "STOR",
+                                "event_id": 17,
+                                "event_str": "STOR: bad parameter.*",
+                                "is_regex": true
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "STOR-4",
+            "description": "ADD_FILE, LIST_ALL and DELETE_FILE",
+            "instructions": [
+                {
+                    "description": "Copy the table file",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_ADD_FILE_CC",
+                        "args": {
+                            "Payload": {
+                                "SourcePath": "/cf/stor_tbl.tbl",
+                                "DestPath": "t/copy.tbl"
+                            }
+                        }
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "STOR",
+                                "event_id": 22,
+                                "event_str": "STOR: added .*",
+                                "is_regex": true
+                            }
+                        ]
+                    },
+                    "wait": 1
+                },
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_LIST_TLM_MID"
+                    },
+                    "wait": 0
+                },
+                {
+                    "description": "List everything",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_LIST_ALL_CC",
+                        "args": {}
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_LIST_TLM_MID",
+                        "args": [
+                            {
+                                "compare": "==",
+                                "variable": "Payload.TotalEntries",
+                                "value": 1
+                            },
+                            {
+                                "compare": "streq",
+                                "variable": "Payload.Entries[0].Name",
+                                "value": "t/copy.tbl"
+                            }
+                        ],
+                        "backward": 3.0
+                    },
+                    "wait": 1
+                },
+                {
+                    "description": "Delete it",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_DELETE_FILE_CC",
+                        "args": {
+                            "Payload": {
+                                "Path": "t/copy.tbl"
+                            }
+                        }
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "CheckEvent",
+                    "data": {
+                        "target": "mission",
+                        "args": [
+                            {
+                                "app_name": "STOR",
+                                "event_id": 24,
+                                "event_str": "STOR: deleted .*",
+                                "is_regex": true
+                            }
+                        ]
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "STOR-5",
+            "description": "SEND_STATS shows received EVS housekeeping",
+            "instructions": [
+                {
+                    "instruction": "ClearTlmPacket",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_STATS_TLM_MID"
+                    },
+                    "wait": 6
+                },
+                {
+                    "description": "Statistics",
+                    "instruction": "SendCfsCommand",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_CMD_MID",
+                        "cc": "STOR_SEND_STATS_CC",
+                        "args": {}
+                    },
+                    "wait": 0
+                },
+                {
+                    "instruction": "CheckTlmValue",
+                    "data": {
+                        "target": "mission",
+                        "mid": "STOR_STATS_TLM_MID",
+                        "args": [
+                            {
+                                "compare": "==",
+                                "variable": "Payload.Entries[0].MsgId",
+                                "value": 2049
+                            },
+                            {
+                                "compare": ">",
+                                "variable": "Payload.Entries[0].Received",
+                                "value": 0
+                            }
+                        ],
+                        "backward": 3.0
+                    },
+                    "wait": 1
+                }
+            ]
+        },
+        {
+            "test_number": "STOR-6",
+            "description": "Stop cFS",
+            "instructions": [
+                {
+                    "instruction": "ShutdownCfs",
+                    "data": {
+                        "target": "mission"
+                    },
+                    "wait": 1
+                }
+            ]
+        }
+    ]
+}

@@ -13,6 +13,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -64,8 +65,9 @@ class Ctx:
         self.build_ok: bool | None = None
         self.build_log = ""
         self.warnings: list[str] = []
+        self.coverage: dict[str, tuple[int, int]] = {}
         self.prepared = False
-        self.runtest_done = False
+        self.runtest_proc: subprocess.CompletedProcess[str] | None = None
         self.cfs: sl.Cfs | None = None
         self.session_key: str | None = None
         self.pristine_table: bytes | None = None
@@ -207,6 +209,10 @@ def c_app_registered(ctx: Ctx) -> None:
             if "MISSION_GLOBAL_APPLIST" in code and "STATIC" not in code and re.search(r"(?<![\w-])stor(?![\w-])", code):
                 listed = True
     p.check(listed, "stor is not in MISSION_GLOBAL_APPLIST in sample_defs/targets.cmake")
+    osc = t / "sample_defs" / "default_osconfig.cmake"
+    m = re.search(r"^\s*set\(\s*OSAL_CONFIG_MAX_FILE_NAME\s+(\d+)\s*\)", osc.read_text(errors="replace") if osc.is_file() else "", re.M)
+    p.check(m is not None and int(m.group(1)) >= 32,
+            "OSAL_CONFIG_MAX_FILE_NAME is not set to 32 in sample_defs/default_osconfig.cmake")
     sch = t / "sample_defs" / "tables" / "sch_lab_table.c"
     if sch.is_file():
         s = strip_c_comments(sch.read_text(errors="replace"))
@@ -236,15 +242,28 @@ def c_build_no_warnings(ctx: Ctx) -> None:
         raise Fail(f"{len(ctx.warnings)} compiler warnings, first: {ctx.warnings[0]}")
 
 
+def run_unit_tests(ctx: Ctx) -> subprocess.CompletedProcess[str]:
+    """Run the whole unit test suite once; later callers reuse the outcome."""
+    if ctx.runtest_proc is None:
+        ctx.runtest_proc = ctx.sh(["make", JOBS, "native_std.runtest"], 600)
+    return ctx.runtest_proc
+
+
 def c_unit_tests_pass(ctx: Ctx) -> None:
+    ctx.build()
+    proc = run_unit_tests(ctx)
+    if proc.returncode != 0:
+        tail = (proc.stdout + proc.stderr)[-900:]
+        raise Fail(f"make native_std.runtest exited {proc.returncode}: {tail}")
+
+
+def c_stor_coverage_tests(ctx: Ctx) -> None:
     ctx.build()
     srcs = sorted((ctx.stor / "fsw" / "src").glob("*.c"))
     if not srcs:
         raise Fail("apps/stor has no sources")
-    proc = ctx.sh(["make", JOBS, "native_std.runtest"], 600)
-    ctx.runtest_done = True
+    run_unit_tests(ctx)
     p = Problems()
-    p.check(proc.returncode == 0, f"runtest exit {proc.returncode}: " + (proc.stdout + proc.stderr)[-700:])
     logs = sorted((ctx.tree / "build-native_std" / "test-results").glob("coverage-stor-*.log"))
     p.check(bool(logs), "no coverage-stor-*.log was produced")
     names = {l.name for l in logs}
@@ -262,23 +281,47 @@ def c_unit_tests_pass(ctx: Ctx) -> None:
     p.raise_if()
 
 
-def parse_lcov(text: str) -> dict[str, tuple[int, int]]:
-    """Map source path -> (lines found, lines hit) from an lcov tracefile."""
-    out: dict[str, tuple[int, int]] = {}
-    sf = ""
-    lf = lh = 0
-    for line in text.splitlines():
-        if line.startswith("SF:"):
-            sf, lf, lh = line[3:].strip(), 0, 0
-        elif line.startswith("LF:"):
-            lf = int(line[3:])
-        elif line.startswith("LH:"):
-            lh = int(line[3:])
-        elif line.startswith("end_of_record") and sf:
-            f0, h0 = out.get(sf, (0, 0))
-            out[sf] = (f0 + lf, h0 + lh)
-            sf = ""
-    return out
+def gcov_line_coverage(tree: Path) -> dict[str, tuple[int, int]]:
+    """Per STOR source file: (executed lines, instrumented lines), from the coverage test objects."""
+    base = tree / "build-native_std" / "native"
+    result: dict[str, tuple[int, int]] = {}
+    gcdas = sorted(base.rglob("coverage-stor-*-object.dir/**/*.gcda"))
+    if not gcdas:
+        raise Fail("no coverage data (.gcda) found for the STOR sources after running the unit tests")
+    src_dir = (tree / "apps" / "stor" / "fsw" / "src").resolve()
+    for gcda in gcdas:
+        proc = subprocess.run(["gcov", "--json-format", "--stdout", gcda.name], cwd=gcda.parent, text=True,
+                              errors="replace", capture_output=True, timeout=120)
+        if proc.returncode != 0:
+            raise InfraError(f"gcov failed on {gcda}: {(proc.stdout + proc.stderr)[-400:]}")
+        out = proc.stdout
+        dec = json.JSONDecoder()
+        pos = 0
+        while pos < len(out):  # gcov may print several JSON documents
+            while pos < len(out) and out[pos].isspace():
+                pos += 1
+            if pos >= len(out):
+                break
+            doc, pos = dec.raw_decode(out, pos)
+            for f in doc.get("files", []):
+                path = Path(f["file"])
+                if not path.is_absolute():
+                    path = gcda.parent / path
+                try:
+                    path = path.resolve()
+                except OSError:
+                    continue
+                if path.parent != src_dir or path.suffix != ".c":
+                    continue
+                counts: dict[int, int] = {}
+                for ln in f.get("lines", []):
+                    n = int(ln["line_number"])
+                    counts[n] = max(counts.get(n, 0), int(ln["count"]))
+                hit = sum(1 for c in counts.values() if c > 0)
+                prev = result.get(path.name, (0, 0))
+                if prev[1] == 0 or hit * prev[1] > prev[0] * len(counts):
+                    result[path.name] = (hit, len(counts))
+    return result
 
 
 def c_coverage_threshold(ctx: Ctx) -> None:
@@ -286,28 +329,23 @@ def c_coverage_threshold(ctx: Ctx) -> None:
     srcs = sorted((ctx.stor / "fsw" / "src").glob("*.c"))
     if not srcs:
         raise Fail("apps/stor has no sources")
-    if not ctx.runtest_done:
-        ctx.sh(["make", JOBS, "native_std.runtest"], 600)
-        ctx.runtest_done = True
-    proc = ctx.sh(["make", JOBS, "native_std.lcov"], 600)
-    info = ctx.tree / "build-native_std" / "native" / "coverage_basic.info"
-    if proc.returncode != 0 or not info.is_file():
-        raise InfraError("`make native_std.lcov` failed or wrote no tracefile: " + (proc.stdout + proc.stderr)[-800:])
-    cov = parse_lcov(info.read_text(errors="replace"))
+    if run_unit_tests(ctx).returncode != 0:
+        raise Fail("make native_std.runtest does not pass, so there is no coverage data")
+    cov = gcov_line_coverage(ctx.tree)
+    ctx.coverage = cov
     p = Problems()
     for s in srcs:
-        rel = f"apps/stor/fsw/src/{s.name}"
-        hit = [v for k, v in cov.items() if k.replace("\\", "/").endswith("/" + rel) or k == rel]
-        if not hit:
-            if "eds" in s.stem:
-                continue
-            p.check(False, f"{rel}: no coverage data")
+        if "eds" in s.stem:
             continue
-        lf = sum(h[0] for h in hit)
-        lh = sum(h[1] for h in hit)
-        pct = 100.0 if lf == 0 else 100.0 * lh / lf
-        p.check(pct >= SOURCE_PCT_MIN, f"{rel}: {pct:.1f}% of {lf} lines covered (< {SOURCE_PCT_MIN}%)")
+        got = cov.get(s.name)
+        if got is None:
+            p.check(False, f"apps/stor/fsw/src/{s.name}: no coverage data")
+            continue
+        hit, total = got
+        pct = 100.0 if total == 0 else 100.0 * hit / total
+        p.check(pct >= SOURCE_PCT_MIN, f"{s.name}: {hit}/{total} lines = {pct:.1f}% (< {SOURCE_PCT_MIN}%)")
     p.raise_if()
+    print("coverage: " + ", ".join(f"{n} {h}/{t}" for n, (h, t) in sorted(cov.items())), flush=True)
 
 
 def c_default_table_contents(ctx: Ctx) -> None:
@@ -512,6 +550,7 @@ def c_rollover(ctx: Ctx) -> None:
     cfs.inject(sl.INJ_B, 9, 240)
     bf = [f for f in cfs.packet_files() if f.mid == sl.INJ_B]
     p.check([f.size for f in bf] == [1024, 1024, 304], f"exact-fit file sizes {[f.size for f in bf]} != [1024, 1024, 304]")
+    p.check([f.seq for f in bf] == [0, 1, 2], f"sequence numbers are per MID: second MID has {[f.seq for f in bf]}, expected [0, 1, 2]")
     p.check(all(f.size <= 1024 for f in cfs.packet_files()), "a packet file exceeds MaxPacketFileBytes")
     mark = cfs.log_mark()
     cfs.cmd(sl.CC_CLOSE_FILES)
@@ -528,7 +567,7 @@ def c_idle_file_close(ctx: Ctx) -> None:
     t_write = time.monotonic()
     hk = cfs.hk()
     p.check(hk.open_files == 1, f"OpenPacketFiles {hk.open_files} after one packet")
-    time.sleep(max(0.0, 5.0 - (time.monotonic() - t_write)))
+    time.sleep(max(0.0, 8.0 - (time.monotonic() - t_write)))
     hk = cfs.hk()
     p.check(hk.open_files == 1, f"file closed after only {time.monotonic() - t_write:.1f} s idle")
     time.sleep(max(0.0, 13.0 - (time.monotonic() - t_write)))
@@ -642,6 +681,7 @@ def c_quota_drop(ctx: Ctx) -> None:
     p.check(hk.telemetry_used <= quota, f"TelemetryBytesUsed {hk.telemetry_used} exceeds the quota {quota}")
     p.check(quota - hk.telemetry_used < 64 + PKT, f"only {hk.telemetry_used} of {quota} bytes used when dropping began")
     p.check(hk.packets_stored + hk.packets_dropped == 30, f"stored {hk.packets_stored} + dropped {hk.packets_dropped} != 30")
+    p.check(hk.packets_stored == 22, f"the new file's header counts against the quota: {hk.packets_stored} stored, expected 22")
     p.check(hk.files_purged == 0 and hk.purge_cycles == 0, "files were purged although the threshold is 100 percent")
     p.check(hk.telemetry_used == disk_sum(cfs), f"TelemetryBytesUsed {hk.telemetry_used} != bytes on disk {disk_sum(cfs)}")
     if st is not None:
@@ -671,7 +711,7 @@ def c_quota_drop(ctx: Ctx) -> None:
 def c_restart_scan(ctx: Ctx) -> None:
     seed = {"stor/tlm/tlm_08E0_00000007.bin": bytes(1000), "stor/tlm/tlm_08E1_00000003.bin": bytes(500),
             "stor/files/x/y.bin": bytes(700), "stor/files/z.bin": bytes(300)}
-    cfs = ctx.session("restart", quiet_table(), seed=seed)
+    cfs = ctx.session("restart", quiet_table(entries=((sl.INJ_A, 10, 1), (sl.INJ_B, 10, 1))), seed=seed)
     p = Problems()
     hk = cfs.hk()
     p.check(hk.telemetry_used == 1500, f"TelemetryBytesUsed {hk.telemetry_used} != 1500 (sizes of the existing packet files)")
@@ -679,8 +719,11 @@ def c_restart_scan(ctx: Ctx) -> None:
     cfs.inject(sl.INJ_A, 1, 300)
     names = sorted(f.path.name for f in cfs.packet_files())
     p.check("tlm_08E0_00000008.bin" in names, f"no tlm_08E0_00000008.bin after restart; files {names}")
+    cfs.inject(sl.INJ_B, 1, 300)
+    names = sorted(f.path.name for f in cfs.packet_files())
+    p.check("tlm_08E1_00000004.bin" in names, f"sequence numbers are per MID: no tlm_08E1_00000004.bin; files {names}")
     hk = cfs.hk()
-    p.check(hk.telemetry_used == 1500 + 64 + 300, f"TelemetryBytesUsed {hk.telemetry_used} != {1500 + 64 + 300} after one packet")
+    p.check(hk.telemetry_used == 1500 + 2 * (64 + 300), f"TelemetryBytesUsed {hk.telemetry_used} != {1500 + 2 * (64 + 300)} after two packets")
     p.raise_if()
 
 
@@ -760,6 +803,7 @@ def c_file_add_list_delete(ctx: Ctx) -> None:
     cfs = ctx.session("files-a")
     p = Problems()
     size = small_file_source(ctx, cfs)
+    hk_start = cfs.hk()
     # Empty file area.
     pk = cfs.listing(sl.CC_LIST_ALL)
     p.check(len(pk) == 1 and pk[0].total == 0 and pk[0].count == 0, f"LIST_ALL of an empty file area: {pk}")
@@ -815,6 +859,11 @@ def c_file_add_list_delete(ctx: Ctx) -> None:
     c = cfs.hk()
     p.check(len(cfs.events(mark, 23)) == 2, "deleting a missing file and a directory did not each produce event 23")
     p.check(c.command_error_counter == b.command_error_counter + 2, "failed deletes did not each count as command errors")
+    # accepted: 2 empty listings, 6 adds, 4 listings, 1 delete
+    p.check((c.command_counter - hk_start.command_counter) % 256 == 13,
+            f"CommandCounter rose by {(c.command_counter - hk_start.command_counter) % 256}, expected 13 accepted commands "
+            f"(file commands and listings each count)")
+    p.check(c.command_error_counter - hk_start.command_error_counter == 3, "rejected commands (missing directory, two failed deletes) not counted")
     p.check((cfs.files_dir / "a").is_dir(), "DELETE_FILE removed a directory")
     p.raise_if()
 
@@ -1004,10 +1053,12 @@ def c_ctf_test_passes(ctx: Ctx) -> None:
     flat = json.dumps(doc)
     for w in REQUIRED_CTF_WORDS:
         p.check(w in flat, f"the CTF test does not exercise {w}")
-    p.check("CFE_EVS_HK_TLM_MID" in flat or "0x0801" in flat, "the CTF test does not check the CFE_EVS_HK_TLM_MID statistics entry")
+    p.check(("CFE_EVS_HK_TLM_MID" in flat or "0x0801" in flat.lower() or "2049" in flat) and "Received" in flat,
+            "the CTF test does not check the Received count of the CFE_EVS_HK_TLM_MID statistics entry")
     p.raise_if()
     if ctx.cfs is not None:
         ctx.cfs.stop()
+        ctx.cfs.restore_table()
         ctx.session_key = None
     shutil.rmtree(ctx.tree / "build-native_std" / "exe" / "cpu1" / "cf" / "stor", ignore_errors=True)
     env = dict(os.environ, CFS_ROOT=str(ctx.tree), CTF_RESULTS_DIR=str(ctx.work / "ctf-results"))
@@ -1044,6 +1095,8 @@ def c_report_present(ctx: Ctx) -> None:
 
 def c_hidden_coverage_test(ctx: Ctx) -> None:
     ctx.build()
+    if not list((ctx.stor / "fsw" / "src").glob("*.c")):
+        raise Fail("apps/stor has no sources")
     from hidden_glue import run_hidden  # type: ignore[import-not-found]
     run_hidden(ctx, PACK)
 
@@ -1057,7 +1110,7 @@ CHECKS: list[CheckSpec] = [
               "STOR must exist as a new application in apps/stor (fsw/src, fsw/inc, fsw/tables, config and unit-test, with "
               "STOR_AppMain as the entry point and stor_topicids.h, stor_eventids.h, stor_fcncodes.h, "
               "config/default_stor_tbldefs.h and fsw/tables/stor_tbl.c), listed in MISSION_GLOBAL_APPLIST in "
-              "sample_defs/targets.cmake, scheduled in sample_defs/tables/sch_lab_table.c (STOR_SEND_HK_MID every 4.9 s "
+              "sample_defs/targets.cmake, with OSAL_CONFIG_MAX_FILE_NAME set to 32 in sample_defs/default_osconfig.cmake (packet file names are 21 characters), scheduled in sample_defs/tables/sch_lab_table.c (STOR_SEND_HK_MID every 4.9 s "
               "and STOR_WAKEUP_MID every 1.0 s) and forwarded by sample_defs/tables/to_lab_sub.c (STOR_HK_TLM_MID, "
               "STOR_LIST_TLM_MID, STOR_STATS_TLM_MID).", c_app_registered),
     CheckSpec("build-no-warnings",
@@ -1065,10 +1118,14 @@ CHECKS: list[CheckSpec] = [
               "compiler warnings, including the STOR sources, tables and the registrations in sample_defs.",
               c_build_no_warnings),
     CheckSpec("unit-tests-pass",
-              "make native_std.runtest must pass, with one coverage test per STOR source module in "
-              "apps/stor/unit-test/coveragetest and no failing assertion in any STOR coverage test.", c_unit_tests_pass),
+              "make native_std.runtest must pass: every unit test of the mission, including those of STOR, builds and "
+              "succeeds.", c_unit_tests_pass),
+    CheckSpec("stor-coverage-tests",
+              "apps/stor/unit-test/coveragetest must hold one coverage test per STOR source module "
+              "(coveragetest_<module>.c), built and run by make native_std.runtest, each producing a "
+              "coverage-stor-<module> result with passing assertions and none failing.", c_stor_coverage_tests),
     CheckSpec("coverage-threshold",
-              "Line coverage of every STOR source file in apps/stor/fsw/src, as reported by make native_std.lcov, must be "
+              "Line coverage of every STOR source file in apps/stor/fsw/src, as measured with gcov from the unit-test build, must be "
               "at least 95 percent.", c_coverage_threshold),
     CheckSpec("hidden-coverage-test",
               "STOR must behave as specified when driven only through its entry point STOR_AppMain with messages on the "
@@ -1168,7 +1225,8 @@ assert all(ID_RE.match(c.check_id) for c in CHECKS)
 
 # Execution order: static checks and the build first, then the live scenarios, then the hidden test.
 RUN_ORDER = [
-    "app-registered", "build-no-warnings", "unit-tests-pass", "coverage-threshold", "default-table-contents",
+    "app-registered", "build-no-warnings", "unit-tests-pass", "stor-coverage-tests", "coverage-threshold",
+    "default-table-contents",
     "scheduled-housekeeping", "startup-and-hk", "decimation-and-stats", "packet-file-naming-and-header", "rollover",
     "idle-file-close", "purge-order", "quota-drop", "restart-scan", "set-param-errors", "file-add-list-delete",
     "file-path-rejection", "file-exists-rejection", "file-quota-rejection", "reset-counters", "ccdd-definitions",
@@ -1189,18 +1247,12 @@ def main(argv: list[str]) -> int:
     if not (repo / "Makefile").is_file() or not (repo / "tools" / "run_cfs.sh").is_file():
         print(f"{repo} is not a cFS mission tree", file=sys.stderr)
         return 2
-    for tool in ("make", "cmake", "gcc"):
+    for tool in ("make", "cmake", "gcc", "gcov"):
         if shutil.which(tool) is None:
             print(f"required tool {tool} not found", file=sys.stderr)
             return 2
-    stor_sources = list((repo / "apps" / "stor" / "fsw" / "src").glob("*.c"))
-    if stor_sources:
-        missing = [t for t in ("lcov", "genhtml") if shutil.which(t) is None]
-        if missing:
-            print(f"infrastructure error: {', '.join(missing)} not installed; the coverage-threshold check needs "
-                  f"lcov and genhtml on PATH (make native_std.lcov)", file=sys.stderr)
-            return 2
     deadline = time.monotonic() + TOTAL_BUDGET_S
+    signal.signal(signal.SIGTERM, lambda *_: sys.exit(2))  # run the cleanup below when timed out
     base = os.environ.get("STOR_PACK_TMP") or tempfile.gettempdir()
     work = Path(tempfile.mkdtemp(prefix="stor-pack-", dir=base))
     ctx = Ctx(repo, work, deadline)
@@ -1219,7 +1271,7 @@ def main(argv: list[str]) -> int:
                 spec.fn(ctx)
                 results[cid] = {"id": cid, "passed": True, "feedback": "", "detail": f"{time.monotonic() - t0:.0f} s"}
             except Fail as exc:
-                results[cid] = {"id": cid, "passed": False, "feedback": spec.feedback,
+                results[cid] = {"id": cid, "passed": False, "feedback": exc.feedback or spec.feedback,
                                 "detail": f"{exc} ({time.monotonic() - t0:.0f} s)"}
             except InfraError as exc:
                 infra = f"{cid}: {exc}"
