@@ -1027,17 +1027,28 @@ def c_ctf(ctx: Ctx) -> None:
     results.mkdir(exist_ok=True)
     env = {"CFS_ROOT": str(ctx.work), "CFS_RUN_DIR": str(ctx.work / "build-native_std" / "exe" / "cpu1"),
            "CTF_RESULTS_DIR": str(results)}
-    rc, out = run_cmd(["bash", str(runner), str(script)], ctx.repo / "ctf", min(900, ctx.remaining()), env)
-    for pid_dir in Path("/proc").glob("[0-9]*"):
-        try:
-            if (pid_dir / "cwd").resolve() == (ctx.work / "build-native_std" / "exe" / "cpu1").resolve():
-                os.kill(int(pid_dir.name), signal.SIGKILL)
-        except (OSError, ValueError):
-            continue
+    cfs_dir = (ctx.work / "build-native_std" / "exe" / "cpu1").resolve()
+
+    def attempt() -> tuple[int, str]:
+        rc, out = run_cmd(["bash", str(runner), str(script)], ctx.repo / "ctf", min(900, ctx.remaining()), env)
+        for pid_dir in Path("/proc").glob("[0-9]*"):
+            try:
+                if (pid_dir / "cwd").resolve() == cfs_dir:
+                    os.kill(int(pid_dir.name), signal.SIGKILL)
+            except (OSError, ValueError):
+                continue
+        return rc, out
+
+    rc, out = attempt()
+    if rc != 0 and "CTF is not set up" in out:
+        raise InfraError("CTF is not set up in the repository under test: " + short(out, 300))
+    first = ""
+    if rc != 0 and ctx.remaining() > 240:
+        first = f"first attempt: exit {rc}: " + short(out[-1500:], 1800) + "\n"
+        await_free_ports(PORT_WAIT_S)
+        rc, out = attempt()
     if rc != 0:
-        if "CTF is not set up" in out:
-            raise InfraError("CTF is not set up in the repository under test: " + short(out, 300))
-        raise Fail(f"run_ctf.sh exit {rc}: " + short(out[-1500:], 1800))
+        raise Fail(first + f"run_ctf.sh exit {rc}: " + short(out[-1500:], 1800))
 
 
 def c_report_doc(ctx: Ctx) -> None:
