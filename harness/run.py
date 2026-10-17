@@ -15,6 +15,7 @@ import os
 import re
 import shlex
 import shutil
+import signal
 import subprocess
 import sys
 import time
@@ -34,6 +35,9 @@ DEFAULT_RUNS_DIR = Path("/workspace/agent-experiments-runs")
 DEFAULT_TASKS_DIR = REPO_ROOT / "tasks"
 DEFAULT_GAPS = Path(__file__).resolve().parent / "gaps.json"
 TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
+SCRUBBED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "--")
+STRAY_PROCESS_NAMES = frozenset({"core-cpu1"})
 SCHEMA_VERSION = 1
 STATUSES = ("running", "completed", "infra_error", "cli_error", "error")
 
@@ -88,10 +92,58 @@ class RunConfig:
     seed: int
     claude_bin: str
     task_dir: str = ""
+    netns: bool = True
 
     def __post_init__(self) -> None:
         assert self.rep >= 1 and self.max_rounds >= 1 and self.max_budget_usd > 0
         arms.get_arm(self.arm)
+
+
+def wrap_netns(cmd: Sequence[str]) -> list[str]:
+    """Run cmd in a private network namespace. pasta cannot exec the program
+    directly, so the command goes through `sh -c` with shell quoting."""
+    return [*PASTA_PREFIX, "sh", "-c", shlex.join(cmd)]
+
+
+def check_netns() -> None:
+    """Fail clearly unless pasta can start a command."""
+    probe = [*PASTA_PREFIX, "sh", "-c", "true"]
+    try:
+        proc = subprocess.run(probe, capture_output=True, text=True, check=False, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise RunError(f"network namespace self-check failed ({shlex.join(probe)}): {exc}; "
+                       "install pasta or pass --no-netns") from exc
+    if proc.returncode != 0:
+        raise RunError(f"network namespace self-check failed ({shlex.join(probe)} exited "
+                       f"{proc.returncode}): {proc.stderr.strip()}; fix pasta or pass --no-netns")
+
+
+def child_env(config_dir: Path, base: dict[str, str] | None = None) -> dict[str, str]:
+    """Environment for claude and the acceptance pack: subscription auth only."""
+    env = {k: v for k, v in (os.environ if base is None else base).items() if k not in SCRUBBED_ENV}
+    env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+    env["IS_SANDBOX"] = "1"  # claude refuses bypassPermissions as root otherwise
+    return env
+
+
+def kill_stray_processes(run_dir: Path, names: frozenset[str] = STRAY_PROCESS_NAMES) -> list[int]:
+    """SIGKILL processes named in `names` whose cwd is under run_dir (found via /proc)."""
+    root = run_dir.resolve()
+    killed: list[int] = []
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit() or int(proc.name) == os.getpid():
+            continue
+        try:
+            if (proc / "comm").read_text().strip() not in names:
+                continue
+            cwd = Path(os.readlink(proc / "cwd"))
+            if cwd != root and root not in cwd.parents:
+                continue
+            os.kill(int(proc.name), signal.SIGKILL)
+            killed.append(int(proc.name))
+        except OSError:
+            continue  # exited meanwhile or not ours
+    return killed
 
 
 def make_run_id(arm: str, task: str, rep: int, now: datetime) -> str:
@@ -225,7 +277,9 @@ class Runner:
     def invoke(self, message: str, session_id: str | None, round_no: int) -> dict[str, Any]:
         remaining = self.cfg.max_budget_usd - self.spent_usd
         cmd = build_claude_command(self.cfg, self.run_id, message, session_id, remaining)
-        env = {**os.environ, "CLAUDE_CONFIG_DIR": str(self.arm_root)}
+        env = child_env(self.arm_root)
+        if self.cfg.netns:
+            cmd = wrap_netns(cmd)
         try:
             proc = subprocess.run(cmd, cwd=self.repo, env=env, capture_output=True, text=True,
                                   timeout=self.cfg.cli_timeout_s, check=False)
@@ -233,6 +287,8 @@ class Runner:
             raise RunError(f"claude exceeded --cli-timeout of {self.cfg.cli_timeout_s} s in round {round_no}") from None
         except OSError as exc:
             raise RunError(f"cannot execute {self.cfg.claude_bin!r}: {exc}") from exc
+        finally:
+            kill_stray_processes(self.run_dir)
         (self.run_dir / f"cli-round{round_no}.stdout.json").write_text(proc.stdout, encoding="utf-8")
         (self.run_dir / f"cli-round{round_no}.stderr.txt").write_text(proc.stderr, encoding="utf-8")
         result = parse_cli_result(proc.stdout)
@@ -325,7 +381,12 @@ class Runner:
             mains, _ = self.transcripts()
             next_index = cost.main_request_count(mains)
             try:
-                outcome = acceptance.run_pack(pack_src, self.run_dir, self.repo, round_no, self.cfg.acceptance_timeout_s)
+                try:
+                    outcome = acceptance.run_pack(
+                        pack_src, self.run_dir, self.repo, round_no, self.cfg.acceptance_timeout_s,
+                        wrap=wrap_netns if self.cfg.netns else None, env=child_env(self.arm_root))
+                finally:
+                    kill_stray_processes(self.run_dir)
             except acceptance.ContractError as exc:
                 entry["acceptance"] = None
                 entry["acceptance_error"] = str(exc)
@@ -362,13 +423,16 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
-    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>"
+    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} IS_SANDBOX=1 {TOKEN_ENV}=<token>"
+    wrap = wrap_netns if cfg.netns else list
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
-        build_claude_command(cfg, run_id, prompt, None, cfg.max_budget_usd)))
+        wrap(build_claude_command(cfg, run_id, prompt, None, cfg.max_budget_usd))))
     print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails:")
-    print(f"bash {run_dir}/acceptance/run.sh {repo} {run_dir}/acceptance-result-roundN.json")
+    print(shlex.join(wrap(
+        ["bash", f"{run_dir}/acceptance/run.sh", str(repo), f"{run_dir}/acceptance-result-roundN.json"])))
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
-        build_claude_command(cfg, run_id, sample_feedback, "<session_id>", cfg.max_budget_usd)))
+        wrap(
+            build_claude_command(cfg, run_id, sample_feedback, "<session_id>", cfg.max_budget_usd))))
 
 
 def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfig]:
@@ -389,6 +453,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--cli-timeout", type=float, default=None, help="seconds per claude invocation (default: none)")
     p.add_argument("--seed", type=int, default=0, help="seed for simulated pause sampling")
     p.add_argument("--claude-bin", default="claude")
+    p.add_argument("--no-netns", action="store_true",
+                   help="do not isolate claude and the acceptance pack in a pasta network namespace (debugging)")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
     if a.rep < 1 or a.max_rounds < 1 or a.max_budget_usd <= 0:
@@ -401,7 +467,7 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
         p.error(str(exc))
     cfg = RunConfig(a.arm, short, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
                     a.gaps, a.max_rounds, a.max_budget_usd, a.acceptance_timeout, a.cli_timeout, a.seed,
-                    a.claude_bin, directory)
+                    a.claude_bin, directory, not a.no_netns)
     return a, cfg
 
 
@@ -420,6 +486,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 0
         if not os.environ.get(TOKEN_ENV):
             raise RunError(f"{TOKEN_ENV} is not set; create one with `claude setup-token`")
+        if cfg.netns:
+            check_netns()
         if not cfg.template.is_dir():
             raise RunError(f"mission template not found: {cfg.template}; run fixture/build-template.sh")
         run_dir.mkdir(parents=True)

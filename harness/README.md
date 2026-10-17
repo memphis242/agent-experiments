@@ -53,10 +53,24 @@ or the round cap was hit), `infra_error` (acceptance pack fault), `cli_error`
 (claude failed, for example rate limiting; rerun), or `error`.
 The process exits 0 only for `completed`.
 
+## Network isolation
+
+cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234), so every claude
+invocation and every acceptance `run.sh` runs inside its own network namespace:
+`pasta --config-net --quiet -- sh -c '<command>'` (pasta must be installed;
+outbound HTTPS still works). `run.py` self-checks pasta at startup and fails
+clearly if it cannot start a command. Inside the namespace the process is root,
+so `IS_SANDBOX=1` is set (Claude Code refuses bypassPermissions as root
+otherwise). `--no-netns` disables the wrapper for debugging; do not run
+concurrent cFS runs with it. `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are
+removed from the child environment so runs bill to the subscription token only.
+After each claude call and each acceptance run, leftover `core-cpu1` processes
+whose cwd is under the run directory are killed (found by scanning `/proc`).
+
 ## 5. A matrix
 
     python harness/matrix.py --reps 3 --parallel 3          # all arms x task1..task4
-    python harness/matrix.py --tasks task1 task2 --reps 3 --parallel 3
+    python harness/matrix.py --tasks task1 task2 --reps 3 --parallel 3      # 3 is the default; needs pasta (see Network isolation)
     python harness/matrix.py --arms A4 A5 --tasks task3 --reps 3 --runs-dir /workspace/agent-experiments-runs-b -- --autocompact 200000
 
 Cells whose run ID prefix already has a `run.json` with status `completed` are

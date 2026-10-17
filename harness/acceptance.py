@@ -7,10 +7,11 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Callable, Sequence
 
 EXIT_PASS, EXIT_FAIL, EXIT_INFRA = 0, 1, 2
 CHECK_ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -94,7 +95,9 @@ def compose_feedback(failures: Sequence[Check]) -> str:
     return FEEDBACK_PREAMBLE + "\n\n" + "\n".join(items) + "\n"
 
 
-def run_pack(pack_src: Path, run_dir: Path, repo: Path, round_no: int, timeout_s: float) -> AcceptanceResult:
+def run_pack(pack_src: Path, run_dir: Path, repo: Path, round_no: int, timeout_s: float,
+             wrap: Callable[[list[str]], list[str]] | None = None,
+             env: dict[str, str] | None = None) -> AcceptanceResult:
     """Copy the pack outside the repo, execute it, and validate its result file."""
     pack = run_dir / "acceptance"
     if pack.exists():
@@ -109,7 +112,8 @@ def run_pack(pack_src: Path, run_dir: Path, repo: Path, round_no: int, timeout_s
     out_json = run_dir / f"acceptance-result-round{round_no}.json"
     out_json.unlink(missing_ok=True)
     try:
-        proc = subprocess.run(["bash", str(script), str(repo), str(out_json)], cwd=pack,
+        cmd = ["bash", str(script), str(repo), str(out_json)]
+        proc = subprocess.run(wrap(cmd) if wrap else cmd, cwd=pack, env=env if env is not None else os.environ.copy(),
                               capture_output=True, text=True, timeout=timeout_s, check=False)
     except subprocess.TimeoutExpired:
         raise AcceptanceInfraError(f"acceptance run.sh exceeded {timeout_s:.0f} s") from None

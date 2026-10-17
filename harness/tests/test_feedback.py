@@ -106,7 +106,7 @@ class EndToEndTest(unittest.TestCase):
             rc = run.main(["--arm", "A4", "--task", "t1", "--rep", "1", "--template", str(template),
                            "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
                            "--tasks-dir", str(root / "tasks"), "--claude-bin", str(fake),
-                           "--gaps", str(root / "missing.json")])
+                           "--gaps", str(root / "missing.json"), "--no-netns"])
             self.assertEqual(rc, 0)
             (run_dir,) = (root / "runs").iterdir()
             rec = json.loads((run_dir / "run.json").read_text())
@@ -144,12 +144,35 @@ class EndToEndTest(unittest.TestCase):
             os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = "x"
             rc = run.main(["--arm", "A1", "--task", "task9", "--rep", "1", "--template", str(template),
                            "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
-                           "--tasks-dir", str(root / "tasks"), "--claude-bin", "/nonexistent"])
+                           "--tasks-dir", str(root / "tasks"), "--claude-bin", "/nonexistent", "--no-netns"])
             self.assertEqual(rc, 1)
             (run_dir,) = (root / "runs").iterdir()
             rec = json.loads((run_dir / "run.json").read_text())
             self.assertEqual(rec["status"], "infra_error")
             self.assertEqual((rec["task"], rec["task_dir"]), ("task9", "task9-demo"))
+
+
+class NetnsTest(unittest.TestCase):
+    def test_wrap_quotes_through_sh(self):
+        import shlex
+        cmd = ["claude", "-p", "it's a \"test\" $HOME; rm -rf /", "--x", "a b"]
+        wrapped = run.wrap_netns(cmd)
+        self.assertEqual(wrapped[:6], ["pasta", "--config-net", "--quiet", "--", "sh", "-c"])
+        self.assertEqual(len(wrapped), 7)
+        self.assertEqual(shlex.split(wrapped[6]), cmd)
+
+    def test_child_env_scrubs_and_sets(self):
+        base = {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDE_CODE_OAUTH_TOKEN": "o", "PATH": "/bin"}
+        env = run.child_env(Path("/cfg"), base)
+        self.assertNotIn("ANTHROPIC_API_KEY", env)
+        self.assertNotIn("ANTHROPIC_AUTH_TOKEN", env)
+        self.assertEqual((env["CLAUDE_CODE_OAUTH_TOKEN"], env["IS_SANDBOX"], env["CLAUDE_CONFIG_DIR"]),
+                         ("o", "1", "/cfg"))
+        self.assertIn("ANTHROPIC_API_KEY", base)  # input is not mutated
+
+    def test_kill_strays_ignores_other_names_and_dirs(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(run.kill_stray_processes(Path(tmp)), [])
 
 
 class CommandTest(unittest.TestCase):
