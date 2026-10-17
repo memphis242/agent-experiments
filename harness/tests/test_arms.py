@@ -41,11 +41,19 @@ class ArmsTest(unittest.TestCase):
             self.assertEqual(s["effortLevel"], "high")
             self.assertEqual((s["promptCacheTtl"], s["subagentPromptCacheTtl"]), ("1h", "5m"))
             self.assertIs(s["autoMemoryEnabled"], False)
+            deny = s["permissions"]["deny"]
+            for tool in arms.DENIED_TOOLS:
+                self.assertIn(tool, deny)
+            for kept in ("Skill", "WebSearch", "WebFetch"):
+                self.assertNotIn(kept, deny)
             if sub_model is None:
-                self.assertEqual(s["permissions"]["deny"], ["Agent"])
+                self.assertIn("Agent", deny)
+                self.assertNotIn("env", s)
                 self.assertFalse((root / "agents").exists())
             else:
-                self.assertNotIn("permissions", s)
+                self.assertNotIn("Agent", deny)
+                self.assertEqual(s["env"], {"CLAUDE_CODE_SUBAGENT_MODEL": sub_model,
+                                            "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"})
                 self.assertEqual(s["modelSettings"][sub_model]["effortLevel"], "high")
                 names = sorted(p.stem for p in (root / "agents").glob("*.md"))
                 self.assertEqual(names, sorted(arms.SUBAGENT_NAMES))

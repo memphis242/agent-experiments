@@ -7,17 +7,16 @@ Stdlib-only Python (3.12+). Run everything from the repository root.
     python harness/arms.py                        # writes /workspace/agent-experiments-arms/A1..A9
     python harness/arms.py --arms-dir DIR --arm A4
 
-Each root holds `settings.json`, `CLAUDE.md`, and `agents/` (absent for A1).
+Each root holds exactly `settings.json`, `CLAUDE.md`, and `agents/` (absent for A1); a run refuses to start if the root holds anything else. Every arm denies a fixed set of tools (`arms.DENIED_TOOLS`); A2-A9 also set `CLAUDE_CODE_SUBAGENT_MODEL` (with `_FORCE=1`) in `settings.json` `env`, so built-in agent types run on the arm's subagent model. Regenerate the roots after pulling harness changes: matrix and aggregate compare hashes.
 Review the sources under `harness/arms/templates/`. Re-running overwrites those
-files and leaves `projects/` (transcripts) alone.
+files.
 
 ## 2. Authenticate
 
     claude setup-token
     export CLAUDE_CODE_OAUTH_TOKEN=<token>
 
-`run.py` refuses to start without it. The token is passed through the
-environment only.
+`run.py` refuses to start without it (except `--dry-run`). The child environment is built from an allowlist (PATH, HOME, USER, LOGNAME, LANG, LC_ALL, LC_CTYPE, TERM, SHELL, the token, and CLAUDE_CONFIG_DIR, plus a fixed `DISABLE_AUTOUPDATER=1`); `ANTHROPIC_API_KEY` and everything else is not inherited. Acceptance packs get the same environment without the token.
 
 ## 3. Build the mission template and the pause samples
 
@@ -35,31 +34,31 @@ human pauses at resume rounds for the 5m and 1h cost scenarios. Without it,
 
 Options: `--autocompact N` (at least 100000), `--template`, `--runs-dir`
 (default `/workspace/agent-experiments-runs`), `--max-rounds 5` (agent invocations in total: the initial one plus up to 4 repair resumes). There is no dollar cap: runs are never stopped on cost, and cost is only recorded.
-`--acceptance-timeout`, `--cli-timeout`, `--seed`.
+`--acceptance-timeout` (default 2400 s), `--cli-timeout` (default 6 hours), `--seed`.
 
-`--task` takes `task1`..`task4` or the full directory name (`task1-utlog-translator`, `task2-sample-app-status`, `task3-hk-staleness`, `task4-stor-app`); run IDs and `run.json` use the short form.
+`--task` takes `task1`..`task4` or the full directory name (`task1-utlog-translator`, `task2-sample-app-status`, `task3-hk-staleness`, `task4-stor-app`); `run.json` uses the short form.
 
 Expected layout: `tasks/<task-dir>/{spec.md,prompt.md,acceptance/run.sh}`; the
 acceptance contract is in `harness/ACCEPTANCE_CONTRACT.md`.
 
 Each run gets a private copy of the arm root at `<run-dir>/config/`, used as `CLAUDE_CONFIG_DIR` for every round, so transcripts live in the run directory. `run.json` records `config_sha256` (over `settings.json`, `CLAUDE.md`, `agents/`) so later edits of an arm root are detectable. After cloning, the run executes `ctf/setup_ctf.sh` from the template if present, before invoking claude; a non-zero exit ends the run as `infra_error`.
 
-The run directory `<runs-dir>/<arm>-<task>-r<rep>-<UTC timestamp>/` holds
-`repo/`, `run.json` (rewritten after every round), raw `cli-roundN.*` output,
-`acceptance/` and `acceptance-*-roundN.*`, and a copy of the session transcripts
-under `transcripts/`. `status` in `run.json` is `completed` (acceptance passed
-or the round cap was hit), `infra_error` (acceptance pack fault), `cli_error`
-(claude failed, for example rate limiting; rerun), or `error`.
-The process exits 0 only for `completed`.
+The run ID is an opaque 8-hex nonce (it is the directory name and the `Run ID:` in the system prompt, so it does not reveal the arm). `run.json` holds the arm, task, and repetition, and `<runs-dir>/runs.tsv` indexes them (`nonce, arm, task, rep, start|end, time, status`; the last line per nonce wins).
+
+The run directory `<runs-dir>/<nonce>/` holds `repo/`, `config/`, `run.json` (rewritten after every round), raw `cli-roundN.*` output, `results/` (acceptance result JSON and logs), and a copy of the session transcripts under `transcripts/`. The pack copy is deleted after each acceptance run and its `selftest/` directory is never copied.
+
+`status` in `run.json`: `completed` (acceptance passed, or the round cap was hit), `usage_limit` (subscription limit; exit code 3), `infra_error` (acceptance pack exit 2 or contract violation, or the CTF setup failed), `cli_error` (claude failed or timed out), `error`. Only `completed` exits 0. An acceptance timeout is a failed round (spend kept, generic feedback, the run continues). `run.json` also records `provenance` (claude version, harness git SHA and dirty flag, spec and pack hashes, template HEAD), `validation` (model, effort, and forbidden-tool violations per transcript; report only), `leak_check` (transcript lines mentioning `acceptance/`, `selftest`, `reference/`, or `agent-experiments-runs`; report only), and `cost`.
+
+Cost: `cost.scenarios.billed` prices every token as recorded and is the primary figure (`totals.billed_usd`). `none`, `5m`, and `1h` reprice the main agent only; subagent requests keep recorded pricing. `uniform_1h` reprices subagent writes at the 1h price. `cost.reconciliation` compares billed cost per round with the CLI's `total_cost_usd` (report only; the CLI figure is kept as `totals.cli_reported_per_round_usd`).
 
 ## Run isolation
 
 cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234) and, with CTF, shares
 `/dev/shm` (OSAL's RAM disk at `/dev/shm/osal:RAM`, which CTF deletes between
-runs). Every claude invocation and every acceptance `run.sh` therefore runs in
+runs), and CTF finds and kills cFS by command line across the host. Every claude invocation and every acceptance `run.sh` therefore runs in
 its own namespaces:
 
-    pasta --config-net --quiet -t none -u none -T none -U none -- sh -c 'unshare -m -i sh -c "mount -t tmpfs tmpfs /dev/shm && unshare -U --map-user=<uid> --map-group=<gid> sh -c <command>"'
+    pasta --config-net --quiet -t none -u none -T none -U none -- sh -c 'unshare -m -i -p -f --mount-proc --kill-child sh -c "mount -t tmpfs tmpfs /dev/shm && <hiding steps> && unshare -U --map-user=<uid> --map-group=<gid> sh -c <command>"'
 
 pasta and unshare must be installed; outbound HTTPS still works. In order:
 
@@ -67,38 +66,45 @@ pasta and unshare must be installed; outbound HTTPS still works. In order:
    fixed UDP ports do not collide. The four `none` port options disable pasta's
    default loopback port forwarding, which otherwise diverted the namespace's
    UDP traffic to host ports and reached other sessions' cFS instances.
-2. **Mount + IPC namespaces (`unshare -m -i`).** A private tmpfs on `/dev/shm`
-   keeps OSAL's RAM disk and shared memory per run. The mount happens here
-   because only this layer still has root capabilities.
+2. **Mount, IPC, and PID namespaces (`unshare -m -i -p -f --mount-proc --kill-child`).** A private tmpfs on `/dev/shm`
+   keeps OSAL's RAM disk and shared memory per run; the PID namespace makes
+   CTF's `pgrep`/`pkill` see only this run and kills everything left inside when
+   the namespace ends. The mounts happen here because only this layer still has
+   root capabilities. For claude invocations (not acceptance runs) this layer
+   also hides the answer key: this run's `repo/` and `config/` are bind-mounted
+   to a staging directory, an empty tmpfs is mounted over each path in
+   `run.HIDDEN_PATHS` (`/workspace`, `~/.claude`, `~/projects/agent-experiments`,
+   `/tmp`), and the staged directories are bound back at their original paths.
+   Nothing else under those paths is visible, and the command starts in `repo/`.
+   `claude` itself must live outside the hidden paths.
 3. **Nested user namespace (`unshare -U --map-user --map-group`).** Maps the
    harness uid/gid back. As fake root, OSAL skips its unprivileged
    message-queue depth adaptation and cFS fails to boot with `OS_QueueCreate`
    EINVAL. Because the uid is not 0, `IS_SANDBOX` is not needed.
 
-`run.py` self-checks the full wrapper at startup (uid equals the harness uid
-and `/dev/shm` is empty) and fails clearly otherwise. `--no-netns` disables the
+Every wrapped command runs in its own session; on timeout the whole process group is killed.
+
+`run.py` self-checks the full wrapper at startup (harness uid, empty `/dev/shm`, own PID namespace, only this run's `repo/` and `config/` visible, `claude` reachable) and fails clearly otherwise. `--no-netns` disables the
 wrapper for debugging; do not run concurrent cFS runs with it.
-`ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are removed from the child
-environment so runs bill to the subscription token only. After each claude
+After each claude
 call and each acceptance run, leftover `core-cpu1` processes whose cwd is under
 the run directory are killed (found by scanning `/proc`).
 
 ## 5. A matrix
 
     python harness/matrix.py --reps 3 --parallel 3          # all arms x task1..task4
-    python harness/matrix.py --tasks task1 task2 --reps 3 --parallel 3      # 3 is the default; needs pasta (see Network isolation)
+    python harness/matrix.py --tasks task1 task2 --reps 3 --parallel 3      # 3 is the default; needs pasta (see Run isolation)
     python harness/matrix.py --arms A4 A5 --tasks task3 --reps 3 --runs-dir /workspace/agent-experiments-runs-b -- --autocompact 200000
 
-Cells whose run ID prefix already has a `run.json` with status `completed` are
-skipped. Use a separate `--runs-dir` for each compaction window so run IDs do
-not collide. `--dry-run` lists the commands.
+A cell is skipped only if a `completed` run exists for it whose `config_sha256` equals the current arm root's and whose harness SHA equals the current one. Cells that ended in `usage_limit`, `cli_error`, or any other status rerun from scratch (their spend stays recorded in their run directories). Once any run reports a usage limit, no new cell is launched; wait for the limit to reset and rerun the same command. Use a separate `--runs-dir` for each compaction window.
+
+**Use a fresh runs directory for the real matrix**, for example `--runs-dir /workspace/agent-experiments-runs-main`. The default directory may hold smoke runs made with older settings or harness code. `--dry-run` lists the commands.
 
 ## 6. Aggregate
 
-    python harness/aggregate.py [--runs-dir DIR] [--scenario none|5m|1h]
+    python harness/aggregate.py [--runs-dir DIR] [--scenario billed|none|5m|1h|uniform_1h]
 
-Prints a Markdown table per arm and task: runs, passed, median (range) cost
-over passed runs, rounds, subagent spawns, compaction events.
+Per arm and task: attempts, passes, attrition by status, total spend over all attempts, USD per pass (spend divided by passes; the primary metric), the conditional median and range over passing attempts, and median (range) of rounds, subagent spawns, and compaction events. Warnings list runs with an analysis error and runs whose config or harness hash differs from the majority.
 
 ## Offline cost
 

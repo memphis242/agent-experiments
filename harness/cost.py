@@ -2,12 +2,16 @@
 """Offline cost computation from session transcripts under three cache scenarios.
 
 Scenarios (see docs/experiment-design.md):
+  billed: every token at the price it was recorded under (the primary figure).
+  The remaining scenarios reprice the MAIN agent only; subagent requests stay
+  as recorded.
   none: cache read and cache creation tokens are billed at the input price.
   5m:   cache creation is billed at the 5m write price; at each simulated
         pause longer than 300 s the request following the pause has its cache
         read tokens rebilled as 5m writes.
   1h:   cache creation is billed at the 1h write price; the same rebilling
         applies only to pauses longer than 3600 s.
+  uniform_1h: subagent cache writes repriced at the 1h write price.
 
 Pauses are positioned by main-transcript request index (the position of a
 deduplicated request in the main transcript, starting at 0). Subagent
@@ -26,7 +30,12 @@ from typing import Mapping, Sequence
 
 from transcript import TranscriptError, iter_entries, parse_timestamp, subagent_files
 
-SCENARIOS: tuple[str, ...] = ("none", "5m", "1h")
+# "billed" prices every token as it was recorded and is the primary figure.
+# "none", "5m", and "1h" are counterfactuals for the MAIN agent only; subagent
+# requests keep their recorded pricing there. "uniform_1h" reprices subagent
+# writes at the 1h write price and leaves the main agent as recorded.
+SCENARIOS: tuple[str, ...] = ("billed", "none", "5m", "1h", "uniform_1h")
+PRIMARY_SCENARIO = "billed"
 PAUSE_THRESHOLD_S: Mapping[str, float] = MappingProxyType({"5m": 300.0, "1h": 3600.0})
 SOURCES: tuple[str, ...] = ("main", "subagent")
 _PER_MILLION = 1_000_000.0
@@ -170,12 +179,27 @@ def main_request_count(main_paths: Path | Sequence[Path]) -> int:
     return sum(1 for r in load_requests(main_paths) if r.source == "main")
 
 
+def _recorded_cost(req: Request) -> float:
+    p = price_for(req.model)
+    return (req.input_tokens * p.input + req.output_tokens * p.output + req.cache_read_tokens * p.cache_read
+            + req.cache_write_5m_tokens * p.write_5m + req.cache_write_1h_tokens * p.write_1h) / _PER_MILLION
+
+
 def request_cost(req: Request, scenario: str, pause_s: float = 0.0) -> float:
     """USD for one request under a scenario; pause_s is the pause just before it."""
     assert scenario in SCENARIOS and pause_s >= 0.0
     p = price_for(req.model)
     writes = req.cache_write_5m_tokens + req.cache_write_1h_tokens
     read = req.cache_read_tokens
+    if scenario == "billed":
+        return _recorded_cost(req)
+    if scenario == "uniform_1h":
+        if req.source == "main":
+            return _recorded_cost(req)
+        return (req.input_tokens * p.input + req.output_tokens * p.output + read * p.cache_read
+                + writes * p.write_1h) / _PER_MILLION
+    if req.source != "main":
+        return _recorded_cost(req)
     usd = req.output_tokens * p.output
     if scenario == "none":
         usd += (req.input_tokens + writes + read) * p.input
@@ -187,6 +211,19 @@ def request_cost(req: Request, scenario: str, pause_s: float = 0.0) -> float:
         else:
             usd += read * p.cache_read
     return usd / _PER_MILLION
+
+
+def billed_by_round(requests: Sequence[Request], round_starts: Sequence[float]) -> tuple[float, ...]:
+    """Billed USD per round; a request belongs to the last round that started at or before it."""
+    assert round_starts, "at least one round start is required"
+    totals = [0.0] * len(round_starts)
+    for req in requests:
+        index = 0
+        for i, start in enumerate(round_starts):
+            if req.timestamp + 1.0 >= start:
+                index = i
+        totals[index] += _recorded_cost(req)
+    return tuple(totals)
 
 
 @dataclass(frozen=True)

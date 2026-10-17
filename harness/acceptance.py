@@ -13,6 +13,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
+from proc import run_group
+
 EXIT_PASS, EXIT_FAIL, EXIT_INFRA = 0, 1, 2
 CHECK_ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # Feedback must be in spec language: no pack paths and no test file names.
@@ -95,34 +97,51 @@ def compose_feedback(failures: Sequence[Check]) -> str:
     return FEEDBACK_PREAMBLE + "\n\n" + "\n".join(items) + "\n"
 
 
+class AcceptanceTimeout(Exception):
+    """The pack exceeded its time limit. The agent's code was being exercised, so
+    this is recorded as a failed round, not as an infrastructure error."""
+
+
+GENERIC_TIMEOUT_FEEDBACK = ("The acceptance run did not complete; verify the build, tests and runtime "
+                            "behavior end to end.")
+
+
 def run_pack(pack_src: Path, run_dir: Path, repo: Path, round_no: int, timeout_s: float,
              wrap: Callable[[list[str]], list[str]] | None = None,
              env: dict[str, str] | None = None) -> AcceptanceResult:
-    """Copy the pack outside the repo, execute it, and validate its result file."""
+    """Copy the pack (without selftest/) next to the repo, run it, validate its
+    result file, and delete the copy. Results and logs go under <run_dir>/results/,
+    which the agent cannot see."""
     pack = run_dir / "acceptance"
+    results = run_dir / "results"
+    results.mkdir(exist_ok=True)
     if pack.exists():
         shutil.rmtree(pack)
     try:
-        shutil.copytree(pack_src, pack)
-    except OSError as exc:
-        raise AcceptanceInfraError(f"cannot copy acceptance pack {pack_src}: {exc}") from exc
-    script = pack / "run.sh"
-    if not script.is_file():
-        raise AcceptanceInfraError(f"acceptance pack {pack_src} has no run.sh")
-    out_json = run_dir / f"acceptance-result-round{round_no}.json"
-    out_json.unlink(missing_ok=True)
-    try:
+        try:
+            shutil.copytree(pack_src, pack, ignore=shutil.ignore_patterns("selftest"))
+        except OSError as exc:
+            raise AcceptanceInfraError(f"cannot copy acceptance pack {pack_src}: {exc}") from exc
+        script = pack / "run.sh"
+        if not script.is_file():
+            raise AcceptanceInfraError(f"acceptance pack {pack_src} has no run.sh")
+        out_json = results / f"acceptance-result-round{round_no}.json"
+        out_json.unlink(missing_ok=True)
         cmd = ["bash", str(script), str(repo), str(out_json)]
-        proc = subprocess.run(wrap(cmd) if wrap else cmd, cwd=pack, env={**(os.environ if env is None else env), "ACCEPT_NO_NAMESPACE": "1"},
-                              capture_output=True, text=True, timeout=timeout_s, check=False)
-    except subprocess.TimeoutExpired:
-        raise AcceptanceInfraError(f"acceptance run.sh exceeded {timeout_s:.0f} s") from None
-    (run_dir / f"acceptance-log-round{round_no}.txt").write_text(
-        f"exit {proc.returncode}\n--- stdout\n{proc.stdout}\n--- stderr\n{proc.stderr}", encoding="utf-8")
-    if proc.returncode == EXIT_INFRA:
-        raise AcceptanceInfraError("acceptance run.sh reported an infrastructure error (exit 2); see its log")
-    try:
-        data = json.loads(out_json.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ContractError(f"acceptance run.sh (exit {proc.returncode}) wrote no valid result JSON: {exc}") from exc
-    return parse_result(data, proc.returncode)
+        try:
+            proc = run_group(wrap(cmd) if wrap else cmd, cwd=pack,
+                             env={**(os.environ if env is None else env), "ACCEPT_NO_NAMESPACE": "1"},
+                             timeout=timeout_s)
+        except subprocess.TimeoutExpired:
+            raise AcceptanceTimeout(f"acceptance run.sh exceeded {timeout_s:.0f} s") from None
+        (results / f"acceptance-log-round{round_no}.txt").write_text(
+            f"exit {proc.returncode}\n--- stdout\n{proc.stdout}\n--- stderr\n{proc.stderr}", encoding="utf-8")
+        if proc.returncode == EXIT_INFRA:
+            raise AcceptanceInfraError("acceptance run.sh reported an infrastructure error (exit 2); see its log")
+        try:
+            data = json.loads(out_json.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ContractError(f"acceptance run.sh (exit {proc.returncode}) wrote no valid result JSON: {exc}") from exc
+        return parse_result(data, proc.returncode)
+    finally:
+        shutil.rmtree(pack, ignore_errors=True)

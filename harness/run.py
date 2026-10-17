@@ -13,12 +13,15 @@ import hashlib
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import signal
 import subprocess
 import sys
+import tempfile
 import time
+import functools
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -27,6 +30,7 @@ from typing import Any, Sequence
 import acceptance
 import arms
 import cost
+import proc
 import transcript
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -35,17 +39,38 @@ DEFAULT_RUNS_DIR = Path("/workspace/agent-experiments-runs")
 DEFAULT_TASKS_DIR = REPO_ROOT / "tasks"
 DEFAULT_GAPS = Path(__file__).resolve().parent / "gaps.json"
 TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
-SCRUBBED_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+# The child environment is built only from these variables (when set), plus
+# the token, the config dir, and fixed values below. Nothing else is inherited,
+# so launching-session variables cannot override an arm's settings.
+ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SHELL")
+ENV_FIXED = {"DISABLE_AUTOUPDATER": "1"}
 # Loopback port forwarding is disabled in all four directions so that the
 # namespace's traffic can never reach another session's cFS on the host.
 PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "-t", "none", "-u", "none", "-T", "none", "-U", "none", "--")
 STRAY_PROCESS_NAMES = frozenset({"core-cpu1"})
-SCHEMA_VERSION = 1
-STATUSES = ("running", "completed", "infra_error", "cli_error", "error")
+
+# Paths covered by an empty tmpfs while claude runs (not during acceptance runs).
+# "~" is the harness user's home. Only this run's repo/ and config/ are bound
+# back afterwards, so nothing else under these paths is visible to the agent.
+HIDDEN_PATHS: tuple[tuple[str, str], ...] = (
+    ("/workspace", "the runs dir holds other runs' solved repos; agent-experiments-scout holds reference "
+                   "solutions; the worktree holds the acceptance packs; the arms dir holds every arm's config"),
+    ("~/.claude", "the user's own Claude Code transcripts and settings"),
+    ("~/projects/agent-experiments", "the primary checkout holds the acceptance packs"),
+    ("/tmp", "scratch space of other sessions, which may hold packs or solutions"),
+)
+EXIT_USAGE_LIMIT = 3
+USAGE_LIMIT_RE = re.compile(r"usage limit|rate limit|exceeded|\b429\b", re.IGNORECASE)
+SCHEMA_VERSION = 2
+STATUSES = ("running", "completed", "usage_limit", "infra_error", "cli_error", "error")
 
 
 class RunError(Exception):
     """A fatal, user-actionable problem with the run setup or the claude invocation."""
+
+
+class UsageLimit(RunError):
+    """The subscription usage or rate limit was hit; the attempt is recorded with its spend."""
 
 
 class InfraError(RunError):
@@ -66,6 +91,9 @@ def resolve_task(tasks_dir: Path, name: str) -> tuple[str, str]:
     return (found.group(0) if found else directory), directory
 
 
+ARM_ROOT_ENTRIES = ("settings.json", "CLAUDE.md", "agents")
+
+
 def hash_config_root(root: Path) -> str:
     """SHA-256 over the relative paths and bytes of settings.json, CLAUDE.md, and agents/."""
     digest = hashlib.sha256()
@@ -74,6 +102,65 @@ def hash_config_root(root: Path) -> str:
         if path.is_file():
             digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
     return digest.hexdigest()
+
+
+def hash_tree(root: Path) -> str:
+    """SHA-256 over every file's relative path and bytes under root."""
+    digest = hashlib.sha256()
+    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+        digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
+def copy_arm_root(source: Path, dest: Path) -> None:
+    """Copy exactly settings.json, CLAUDE.md, and agents/; refuse any other content."""
+    extras = sorted(p.name for p in source.iterdir() if p.name not in ARM_ROOT_ENTRIES)
+    if extras:
+        raise RunError(f"arm root {source} holds unexpected entries {extras}; remove them or regenerate the arm")
+    for name in ("settings.json", "CLAUDE.md"):
+        if not (source / name).is_file():
+            raise RunError(f"arm root {source} lacks {name}; run harness/arms.py")
+    dest.mkdir(parents=True)
+    shutil.copyfile(source / "settings.json", dest / "settings.json")
+    shutil.copyfile(source / "CLAUDE.md", dest / "CLAUDE.md")
+    if (source / "agents").exists():
+        shutil.copytree(source / "agents", dest / "agents")
+
+
+def _capture(cmd: Sequence[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> str:
+    try:
+        done = subprocess.run(list(cmd), cwd=cwd, env=env, capture_output=True, text=True, check=False, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        return f"unavailable: {exc}"
+    if done.returncode != 0:
+        return f"unavailable: exit {done.returncode}: {done.stderr.strip()[:200]}"
+    return done.stdout.strip()
+
+
+@functools.cache
+def harness_git() -> tuple[str, bool]:
+    """(HEAD sha, dirty) of the worktree for files under harness/."""
+    sha = _capture(["git", "-C", str(REPO_ROOT), "rev-parse", "HEAD"])
+    status = _capture(["git", "-C", str(REPO_ROOT), "status", "--porcelain", "--", "harness"])
+    return sha, status.startswith("unavailable") or bool(status)
+
+
+def new_run_id(runs_dir: Path) -> str:
+    """Opaque 8-hex nonce; the arm/task/rep mapping lives in run.json and runs.tsv."""
+    while True:
+        nonce = secrets.token_hex(4)
+        if not (runs_dir / nonce).exists():
+            return nonce
+
+
+def append_index(runs_dir: Path, fields: Sequence[object]) -> None:
+    """Append one tab-separated line to runs.tsv (a single O_APPEND write)."""
+    line = "\t".join(str(f) for f in fields) + "\n"
+    fd = os.open(runs_dir / "runs.tsv", os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o644)
+    try:
+        os.write(fd, line.encode())
+    finally:
+        os.close(fd)
 
 
 @dataclass(frozen=True)
@@ -100,40 +187,86 @@ class RunConfig:
         arms.get_arm(self.arm)
 
 
-def wrap_netns(cmd: Sequence[str]) -> list[str]:
-    """Run cmd isolated in network, mount, IPC, and user namespaces.
+def hiding_steps(run_dir: Path) -> list[str]:
+    """Shell steps (run as root in the mount namespace) that hide HIDDEN_PATHS and
+    bind this run's repo/ and config/ back at their original paths."""
+    run = run_dir.resolve()
+    stage = "/dev/shm/.stage"
+    steps = [f"mkdir -p {stage}/repo {stage}/config",
+             f"mount --bind {shlex.quote(str(run / 'repo'))} {stage}/repo",
+             f"mount --bind {shlex.quote(str(run / 'config'))} {stage}/config"]
+    for template, _reason in HIDDEN_PATHS:
+        path = shlex.quote(os.path.expanduser(template))
+        steps.append(f"{{ [ ! -d {path} ] || mount -t tmpfs tmpfs {path}; }}")
+    steps += [f"mkdir -p {shlex.quote(str(run / 'repo'))} {shlex.quote(str(run / 'config'))}",
+              f"mount --bind {stage}/repo {shlex.quote(str(run / 'repo'))}",
+              f"mount --bind {stage}/config {shlex.quote(str(run / 'config'))}",
+              f"umount {stage}/repo {stage}/config",
+              f"rmdir {stage}/repo {stage}/config {stage}"]
+    return steps
 
-    Layers, outermost first: pasta (user + network namespace, root inside),
-    `unshare -m -i` (mount + IPC namespaces, with a private tmpfs on /dev/shm,
-    which must be mounted while still root), then `unshare -U` mapping the
-    harness uid/gid back so the command is not fake root (OSAL skips its
-    message-queue depth adaptation for uid 0 and cFS then fails to boot).
-    pasta cannot exec the program directly, hence `sh -c` at each layer.
+
+def wrap_netns(cmd: Sequence[str], hide_run_dir: Path | None = None) -> list[str]:
+    """Run cmd isolated in network, mount, IPC, PID, and user namespaces.
+
+    Layers, outermost first: pasta (user + network namespace, root inside);
+    `unshare -m -i -p -f --mount-proc --kill-child` (mount, IPC, and PID
+    namespaces, so CTF's pgrep/pkill see only this run and everything dies with
+    the namespace), whose script mounts a private tmpfs on /dev/shm and, when
+    hide_run_dir is given, hides HIDDEN_PATHS while still root; then
+    `unshare -U` mapping the harness uid/gid back so the command is not fake
+    root (OSAL skips its message-queue depth adaptation for uid 0 and cFS then
+    fails to boot). pasta cannot exec the program directly, hence `sh -c` at
+    each layer. With hide_run_dir the command starts in <hide_run_dir>/repo.
     """
-    inner = shlex.join(cmd)
     mapped = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
-              f"sh -c {shlex.quote(inner)}")
-    namespaced = f"unshare -m -i sh -c {shlex.quote('mount -t tmpfs tmpfs /dev/shm && ' + mapped)}"
+              f"sh -c {shlex.quote(shlex.join(cmd))}")
+    steps = ["mount -t tmpfs tmpfs /dev/shm"]
+    if hide_run_dir is not None:
+        steps += hiding_steps(hide_run_dir)
+        steps.append(f"cd {shlex.quote(str(hide_run_dir.resolve() / 'repo'))}")
+    steps.append(mapped)
+    namespaced = ("unshare -m -i -p -f --mount-proc --kill-child sh -c "
+                  + shlex.quote(" && ".join(steps)))
     return [*PASTA_PREFIX, "sh", "-c", namespaced]
 
 
-def check_netns() -> None:
-    """Fail clearly unless the wrapper runs as the harness uid with an empty private /dev/shm."""
-    script = f'test "$(id -u)" = {os.getuid()} && test -z "$(ls -A /dev/shm)"'
-    probe = wrap_netns(["sh", "-c", script])
+def check_netns(runs_dir: Path, claude_bin: str = "claude") -> None:
+    """Fail clearly unless the full wrapper (with hiding) isolates as intended: harness uid,
+    empty private /dev/shm, own PID namespace, only this run's repo/config visible,
+    and the claude binary still reachable."""
+    runs_dir.mkdir(parents=True, exist_ok=True)
+    probe_dir = Path(tempfile.mkdtemp(prefix=".selfcheck-", dir=runs_dir))
     try:
-        proc = subprocess.run(probe, capture_output=True, text=True, check=False, timeout=60)
-    except (OSError, subprocess.TimeoutExpired) as exc:
-        raise RunError(f"run isolation self-check failed ({shlex.join(probe)}): {exc}; "
-                       "install pasta and unshare or pass --no-netns") from exc
-    if proc.returncode != 0:
-        raise RunError(f"run isolation self-check failed ({shlex.join(probe)} exited "
-                       f"{proc.returncode}): {proc.stderr.strip()}; fix pasta or pass --no-netns")
+        (probe_dir / "repo").mkdir()
+        (probe_dir / "config").mkdir()
+        (probe_dir / "repo" / "marker").write_text("x")
+        (probe_dir / "hidden-sibling").write_text("x")
+        run = shlex.quote(str(probe_dir.resolve()))
+        script = (f'test "$(id -u)" = {os.getuid()} && test -z "$(ls -A /dev/shm)" '
+                  f'&& case "$(cat /proc/1/comm)" in sh|bash|dash) ;; *) exit 1;; esac '
+                  f'&& test -f {run}/repo/marker && test -w {run}/repo && test -w {run}/config '
+                  f'&& test ! -e {run}/hidden-sibling && command -v {shlex.quote(claude_bin)} >/dev/null')
+        cmd = wrap_netns(["sh", "-c", script], hide_run_dir=probe_dir)
+        try:
+            done = proc.run_group(cmd, cwd=None, env=None, timeout=60)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            raise RunError(f"run isolation self-check failed ({shlex.join(cmd)}): {exc}; "
+                           "install pasta and unshare or pass --no-netns") from exc
+        if done.returncode != 0:
+            raise RunError(f"run isolation self-check failed ({shlex.join(cmd)} exited "
+                           f"{done.returncode}): {done.stderr.strip()}; fix pasta or pass --no-netns")
+    finally:
+        shutil.rmtree(probe_dir, ignore_errors=True)
 
 
-def child_env(config_dir: Path, base: dict[str, str] | None = None) -> dict[str, str]:
-    """Environment for claude and the acceptance pack: subscription auth only."""
-    env = {k: v for k, v in (os.environ if base is None else base).items() if k not in SCRUBBED_ENV}
+def child_env(config_dir: Path, base: dict[str, str] | None = None, include_token: bool = True) -> dict[str, str]:
+    """Allowlisted environment for claude (token included) and acceptance packs (token excluded)."""
+    source = os.environ if base is None else base
+    env = {k: source[k] for k in ENV_ALLOWLIST if k in source}
+    if include_token and TOKEN_ENV in source:
+        env[TOKEN_ENV] = source[TOKEN_ENV]
+    env.update(ENV_FIXED)
     env["CLAUDE_CONFIG_DIR"] = str(config_dir)
     return env
 
@@ -156,10 +289,6 @@ def kill_stray_processes(run_dir: Path, names: frozenset[str] = STRAY_PROCESS_NA
         except OSError:
             continue  # exited meanwhile or not ours
     return killed
-
-
-def make_run_id(arm: str, task: str, rep: int, now: datetime) -> str:
-    return f"{arm}-{task}-r{rep}-{now.astimezone(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
 
 
 def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: str | None) -> list[str]:
@@ -238,6 +367,18 @@ def prepare_repo(cfg: RunConfig, run_dir: Path) -> Path:
     return repo
 
 
+def provenance(cfg: RunConfig, spec: Path, pack: Path) -> dict[str, object]:
+    sha, dirty = harness_git()
+    version_env = {k: v for k, v in os.environ.items() if k in ENV_ALLOWLIST}
+    return {
+        "claude_version": _capture([cfg.claude_bin, "--version"], env=version_env),
+        "harness_sha": sha, "harness_dirty": dirty,
+        "spec_sha256": hashlib.sha256(spec.read_bytes()).hexdigest(),
+        "pack_sha256": hash_tree(pack),
+        "template_head": _capture(["git", "-C", str(cfg.template), "rev-parse", "HEAD"]),
+    }
+
+
 class Runner:
     def __init__(self, cfg: RunConfig, run_id: str, run_dir: Path) -> None:
         self.cfg, self.run_id, self.run_dir = cfg, run_id, run_dir
@@ -246,6 +387,8 @@ class Runner:
         self.repo = run_dir / "repo"
         self.session_ids: list[str] = []
         self.resume_indices: list[int] = []
+        self.leak_hits: list[dict[str, object]] = []
+        self.leak_offsets: dict[str, int] = {}
         self.record: dict[str, Any] = {}
 
     def init_record(self, started: datetime) -> None:
@@ -257,22 +400,26 @@ class Runner:
             raise RunError(f"arm root not generated or unreadable ({settings_path}): {exc}; run harness/arms.py") from exc
         config_hash = hash_config_root(self.source_root)
         try:
-            shutil.copytree(self.source_root, self.arm_root, ignore=shutil.ignore_patterns("projects"))
+            copy_arm_root(self.source_root, self.arm_root)
         except OSError as exc:
             raise RunError(f"cannot copy arm root {self.source_root} to {self.arm_root}: {exc}") from exc
         assert hash_config_root(self.arm_root) == config_hash
+        task_root = self.cfg.tasks_dir / self.cfg.task_dir
         self.record = {
             "schema_version": SCHEMA_VERSION,
-            "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir, "rep": self.cfg.rep,
+            "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir,
+            "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
             "models": {"main": arms.MAIN_MODEL, "subagent": arm.subagent_model},
             "delegation": arm.delegation,
             "settings": settings, "config_sha256": config_hash,
+            "provenance": provenance(self.cfg, task_root / "spec.md", task_root / "acceptance"),
             "autocompact": self.cfg.autocompact,
             "max_rounds": self.cfg.max_rounds,
             "session_ids": [], "resume_request_indices": [],
             "rounds": [], "passed": False, "rounds_used": 0, "cap_hit": False,
             "error": None, "cost": None, "behavior": None, "totals": None,
+            "validation": None, "leak_check": [],
             "layer2": {"rounds": None, "tokens": None, "cost_usd": None, "rating": None},
         }
         self.save()
@@ -287,20 +434,27 @@ class Runner:
         cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
         env = child_env(self.arm_root)
         if self.cfg.netns:
-            cmd = wrap_netns(cmd)
+            cmd = wrap_netns(cmd, hide_run_dir=self.run_dir)
         try:
-            proc = subprocess.run(cmd, cwd=self.repo, env=env, capture_output=True, text=True,
-                                  timeout=self.cfg.cli_timeout_s, check=False)
+            done = proc.run_group(cmd, cwd=self.repo, env=env, timeout=self.cfg.cli_timeout_s)
         except subprocess.TimeoutExpired:
             raise RunError(f"claude exceeded --cli-timeout of {self.cfg.cli_timeout_s} s in round {round_no}") from None
         except OSError as exc:
             raise RunError(f"cannot execute {self.cfg.claude_bin!r}: {exc}") from exc
         finally:
             kill_stray_processes(self.run_dir)
-        (self.run_dir / f"cli-round{round_no}.stdout.json").write_text(proc.stdout, encoding="utf-8")
-        (self.run_dir / f"cli-round{round_no}.stderr.txt").write_text(proc.stderr, encoding="utf-8")
-        result = parse_cli_result(proc.stdout)
-        result["_exit_code"] = proc.returncode
+        (self.run_dir / f"cli-round{round_no}.stdout.json").write_text(done.stdout, encoding="utf-8")
+        (self.run_dir / f"cli-round{round_no}.stderr.txt").write_text(done.stderr, encoding="utf-8")
+        try:
+            result = parse_cli_result(done.stdout)
+        except RunError as exc:
+            if USAGE_LIMIT_RE.search(done.stdout + "\n" + done.stderr):
+                raise UsageLimit(f"usage limit suspected in round {round_no}: {exc}") from exc
+            raise
+        result["_exit_code"] = done.returncode
+        failed = bool(result.get("is_error")) or done.returncode != 0
+        if failed and USAGE_LIMIT_RE.search(str(result.get("result") or "") + "\n" + done.stderr):
+            result["_usage_limit"] = True
         return result
 
     # -- analysis ----------------------------------------------------------
@@ -319,11 +473,36 @@ class Runner:
             if sub.is_dir():
                 shutil.copytree(sub, dest / main.stem / "subagents", dirs_exist_ok=True)
 
-    def analyze(self) -> None:
-        """Refresh cost, behavior, and totals; failures are recorded, not fatal."""
+    def scan_leaks(self, mains: list[Path], sub_dirs: list[Path], round_no: int) -> None:
+        """Report-only: strings that point at the answer key in transcript entries new this round."""
+        files = list(mains) + [p for d in sub_dirs for p in transcript.subagent_files(d)]
+        for path in files:
+            hits, total = transcript.scan_new_lines(path, self.leak_offsets.get(str(path), 0))
+            self.leak_offsets[str(path)] = total
+            self.leak_hits.extend({**h, "round": round_no} for h in hits)
+        self.record["leak_check"] = list(self.leak_hits)
+
+    def reconcile(self, requests: Sequence[cost.Request]) -> dict[str, Any]:
+        """Billed cost per round against the CLI-reported figure (report only)."""
+        rounds = [r for r in self.record["rounds"] if r.get("started_epoch") is not None]
+        if not rounds:
+            return {}
+        billed = cost.billed_by_round(requests, [r["started_epoch"] for r in rounds])
+        rows = []
+        for r, usd in zip(rounds, billed):
+            cli = (r.get("cli") or {}).get("total_cost_usd")
+            diff = None if cli is None else usd - cli
+            rows.append({"round": r["round"], "billed_usd": round(usd, 6), "cli_usd": cli,
+                         "diff_usd": None if diff is None else round(diff, 6),
+                         "rel_diff": None if not cli else round(diff / cli, 6)})
+        return {"rounds": rows, "total_billed_usd": round(sum(billed), 6)}
+
+    def analyze(self, round_no: int) -> None:
+        """Refresh cost, behavior, validation, and totals; failures are recorded, not fatal."""
         try:
             mains, sub_dirs = self.transcripts()
             self.archive_transcripts(mains)
+            self.scan_leaks(mains, sub_dirs, round_no)
             gaps: tuple[float, ...] | None = None
             warnings: list[str] = []
             if self.resume_indices:
@@ -331,20 +510,32 @@ class Runner:
                     gaps = cost.load_gaps(self.cfg.gaps_path)
                 else:
                     warnings.append(f"pause samples {self.cfg.gaps_path} missing; scenarios computed without pauses")
-            report = cost.cost_for_transcripts(mains, sub_dirs, self.resume_indices, gaps, self.cfg.seed)
-            self.record["cost"] = {**report.to_dict(), "seed": self.cfg.seed, "warnings": warnings}
+            requests = cost.load_requests(mains, sub_dirs)
+            pauses = cost.sample_pauses(self.resume_indices, gaps, self.cfg.seed) if self.resume_indices and gaps else {}
+            report = cost.compute_cost(requests, pauses)
+            self.record["cost"] = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO,
+                                   "seed": self.cfg.seed, "warnings": warnings,
+                                   "reconciliation": self.reconcile(requests)}
             behavior = transcript.summarize_behavior(mains, sub_dirs)
             behavior["agent_definition_models"] = arms.agent_models(self.arm_root)
             self.record["behavior"] = behavior
+            arm = arms.get_arm(self.cfg.arm)
+            forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
+            violations = transcript.validate_models(mains, sub_dirs, arms.MAIN_MODEL, arm.subagent_model,
+                                                    arms.EFFORT_BY_MODEL, forbidden)
+            inventory = [{k: v for k, v in i.items() if k != "path"} for i in transcript.subagent_inventory(sub_dirs)]
+            self.record["validation"] = {"ok": not violations, "violations": violations, "subagents": inventory}
             self.record["analysis_error"] = None
         except (cost.CostError, transcript.TranscriptError, OSError) as exc:
             self.record["analysis_error"] = str(exc)
         rounds = self.record["rounds"]
+        billed = ((self.record.get("cost") or {}).get("scenarios", {}).get(cost.PRIMARY_SCENARIO, {}).get("total_usd"))
         self.record["totals"] = {
-            "cli_cost_usd": round(sum(r["cli"].get("total_cost_usd") or 0.0 for r in rounds), 6),
-            "turns": sum(r["cli"].get("num_turns") or 0 for r in rounds),
-            "api_time_ms": sum(r["cli"].get("duration_api_ms") or 0 for r in rounds),
-            "cli_duration_ms": sum(r["cli"].get("duration_ms") or 0 for r in rounds),
+            "billed_usd": billed,
+            "cli_reported_per_round_usd": round(sum((r.get("cli") or {}).get("total_cost_usd") or 0.0 for r in rounds), 6),
+            "turns": sum((r.get("cli") or {}).get("num_turns") or 0 for r in rounds),
+            "api_time_ms": sum((r.get("cli") or {}).get("duration_api_ms") or 0 for r in rounds),
+            "cli_duration_ms": sum((r.get("cli") or {}).get("duration_ms") or 0 for r in rounds),
             "wall_time_s": round(sum(r["wall_time_s"] for r in rounds), 3),
         }
 
@@ -356,17 +547,20 @@ class Runner:
             raise RunError(f"acceptance pack not found: {pack_src}")
         for round_no in range(1, self.cfg.max_rounds + 1):
             entry: dict[str, Any] = {"round": round_no, "kind": "initial" if session_id is None else "resume",
-                                     "started_at": _iso(_utc_now()), "message": message}
+                                     "started_at": _iso(_utc_now()), "started_epoch": time.time(),
+                                     "message": message}
             t0 = time.monotonic()
             try:
                 result = self.invoke(message, session_id, round_no)
             except RunError as exc:
+                status = "usage_limit" if isinstance(exc, UsageLimit) else "cli_error"
                 entry.update(wall_time_s=round(time.monotonic() - t0, 3), cli={}, acceptance=None, error=str(exc))
                 self.record["rounds"].append(entry)
-                self.record.update(status="cli_error", error=str(exc))
-                self.analyze_if_possible()
+                self.record.update(status=status, error=str(exc))
+                self.analyze_if_possible(round_no)
                 return
             entry["wall_time_s"] = round(time.monotonic() - t0, 3)
+            entry["ended_epoch"] = time.time()
             entry["cli"] = {k: result.get(k) for k in (
                 "session_id", "total_cost_usd", "num_turns", "duration_ms", "duration_api_ms",
                 "usage", "modelUsage", "is_error", "result", "subtype", "_exit_code")}
@@ -375,42 +569,50 @@ class Runner:
                 self.session_ids.append(session_id)
             self.record["rounds"].append(entry)
             self.record["rounds_used"] = round_no
-            self.analyze()
+            self.analyze(round_no)
             self.save()
             if result.get("is_error") or result["_exit_code"] != 0:
-                message_text = f"claude reported an error in round {round_no} (exit {result['_exit_code']}): {result.get('result')}"
-                self.record.update(status="cli_error", error=message_text)
+                text = f"claude reported an error in round {round_no} (exit {result['_exit_code']}): {result.get('result')}"
+                self.record.update(status="usage_limit" if result.get("_usage_limit") else "cli_error", error=text)
                 return
             # The next resume's first request is the one after those seen so far.
             mains, _ = self.transcripts()
             next_index = cost.main_request_count(mains)
+            feedback: str | None = None
             try:
                 try:
                     outcome = acceptance.run_pack(
                         pack_src, self.run_dir, self.repo, round_no, self.cfg.acceptance_timeout_s,
-                        wrap=wrap_netns if self.cfg.netns else None, env=child_env(self.arm_root))
+                        wrap=wrap_netns if self.cfg.netns else None,
+                        env=child_env(self.arm_root, include_token=False))
                 finally:
                     kill_stray_processes(self.run_dir)
+            except acceptance.AcceptanceTimeout as exc:
+                # The agent's code was being exercised: a failed round, not an infrastructure error.
+                entry["acceptance"] = {"passed": False, "timed_out": True, "error": str(exc), "checks": []}
+                feedback = acceptance.GENERIC_TIMEOUT_FEEDBACK
             except acceptance.ContractError as exc:
                 entry["acceptance"] = None
                 entry["acceptance_error"] = str(exc)
                 self.record.update(status="infra_error", error=str(exc))
                 return
-            entry["acceptance"] = outcome.to_dict()
-            if outcome.passed:
-                self.record.update(status="completed", passed=True)
-                return
+            else:
+                entry["acceptance"] = outcome.to_dict()
+                if outcome.passed:
+                    self.record.update(status="completed", passed=True)
+                    return
+                feedback = acceptance.compose_feedback(outcome.failures())
             if round_no == self.cfg.max_rounds:
                 self.record.update(status="completed", cap_hit=True)
                 return
-            message = acceptance.compose_feedback(outcome.failures())
+            message = feedback
             self.resume_indices.append(next_index)
             self.save()
         raise AssertionError("loop exits through a return")
 
-    def analyze_if_possible(self) -> None:
+    def analyze_if_possible(self, round_no: int) -> None:
         if self.session_ids:
-            self.analyze()
+            self.analyze(round_no)
 
 
 def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
@@ -422,21 +624,28 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
         ["git", "-C", str(repo), "add", "TASK.md"],
         ["git", "-C", str(repo), "commit", "-m", "Add TASK.md"],
         ["bash", str(repo / "ctf" / "setup_ctf.sh")],
-        ["cp", "-r", str(arms.arm_root(cfg.arm, cfg.arms_dir)), str(run_dir / "config")],
+        ["cp", "settings.json, CLAUDE.md, agents/ from", str(arms.arm_root(cfg.arm, cfg.arms_dir)),
+         "to", str(run_dir / "config")],
     ]
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
-    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>"
-    wrap = wrap_netns if cfg.netns else list
-    print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
-        wrap(build_claude_command(cfg, run_id, prompt, None))))
-    print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails:")
-    print(shlex.join(wrap(
-        ["bash", f"{run_dir}/acceptance/run.sh", str(repo), f"{run_dir}/acceptance-result-roundN.json"])))
-    print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
-        wrap(
-            build_claude_command(cfg, run_id, sample_feedback, "<session_id>"))))
+    env = (f"env -i {' '.join(f'{k}=<{k}>' for k in ENV_ALLOWLIST)} "
+           + " ".join(f"{k}={v}" for k, v in ENV_FIXED.items())
+           + f" CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>")
+
+    def claude_line(message: str, session: str | None) -> str:
+        cmd = build_claude_command(cfg, run_id, message, session)
+        if cfg.netns:
+            cmd = wrap_netns(cmd, hide_run_dir=run_dir)
+        return f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(cmd)
+
+    print(claude_line(prompt, None))
+    print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails (pack copied to {run_dir}/acceptance "
+          f"without selftest/, results under {run_dir}/results/, copy removed afterwards):")
+    pack_cmd = ["bash", f"{run_dir}/acceptance/run.sh", str(repo), f"{run_dir}/results/acceptance-result-roundN.json"]
+    print(shlex.join(wrap_netns(pack_cmd) if cfg.netns else pack_cmd))
+    print(claude_line(sample_feedback, "<session_id>"))
 
 
 def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfig]:
@@ -452,12 +661,12 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--gaps", type=Path, default=DEFAULT_GAPS, help="gaps.json from gaps.py")
     p.add_argument("--max-rounds", type=int, default=5,
                    help="agent invocations in total: the initial one plus up to N-1 repair resumes (default 5)")
-    p.add_argument("--acceptance-timeout", type=float, default=1800.0)
-    p.add_argument("--cli-timeout", type=float, default=None, help="seconds per claude invocation (default: none)")
+    p.add_argument("--acceptance-timeout", type=float, default=2400.0, help="seconds per acceptance run (default 2400)")
+    p.add_argument("--cli-timeout", type=float, default=21600.0, help="seconds per claude invocation (default 6 hours)")
     p.add_argument("--seed", type=int, default=0, help="seed for simulated pause sampling")
     p.add_argument("--claude-bin", default="claude")
     p.add_argument("--no-netns", action="store_true",
-                   help="do not isolate claude and the acceptance pack in a pasta network namespace (debugging)")
+                   help="do not isolate claude and the acceptance pack in namespaces (debugging)")
     p.add_argument("--dry-run", action="store_true")
     a = p.parse_args(argv)
     if a.rep < 1 or a.max_rounds < 1:
@@ -477,40 +686,50 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
 def main(argv: Sequence[str] | None = None) -> int:
     args, cfg = parse_args(argv)
     now = _utc_now()
-    run_id = make_run_id(cfg.arm, cfg.task, cfg.rep, now)
-    run_dir = cfg.runs_dir / run_id
     prompt_path = cfg.tasks_dir / cfg.task_dir / "prompt.md"
+    runner: Runner | None = None
+    run_id = "<run-id>"
     try:
         if not prompt_path.is_file():
             raise RunError(f"task prompt not found: {prompt_path}")
         prompt = prompt_path.read_text(encoding="utf-8").strip()
         if args.dry_run:
-            dry_run(cfg, run_id, run_dir, prompt)
+            run_id = "<8-hex-nonce>"
+            dry_run(cfg, run_id, cfg.runs_dir / run_id, prompt)
             return 0
         if not os.environ.get(TOKEN_ENV):
             raise RunError(f"{TOKEN_ENV} is not set; create one with `claude setup-token`")
         if cfg.netns:
-            check_netns()
+            check_netns(cfg.runs_dir, cfg.claude_bin)
         if not cfg.template.is_dir():
             raise RunError(f"mission template not found: {cfg.template}; run fixture/build-template.sh")
-        run_dir.mkdir(parents=True)
+        cfg.runs_dir.mkdir(parents=True, exist_ok=True)
+        run_id = new_run_id(cfg.runs_dir)
+        run_dir = cfg.runs_dir / run_id
+        run_dir.mkdir()
+        append_index(cfg.runs_dir, [run_id, cfg.arm, cfg.task, cfg.rep, "start", _iso(now), "running"])
         runner = Runner(cfg, run_id, run_dir)
-        runner.init_record(now)
         try:
+            runner.init_record(now)
             prepare_repo(cfg, run_dir)
             runner.run(prompt)
         except RunError as exc:
             runner.record.update(status="infra_error" if isinstance(exc, InfraError) else "error", error=str(exc))
             raise
         finally:
-            runner.record["finished_at"] = _iso(_utc_now())
-            runner.save()
+            if runner.record:
+                runner.record["finished_at"] = _iso(_utc_now())
+                runner.save()
+            append_index(cfg.runs_dir, [run_id, cfg.arm, cfg.task, cfg.rep, "end", _iso(_utc_now()),
+                                        runner.record.get("status", "error")])
     except (RunError, arms.ArmError, OSError) as exc:
         print(f"run: error: {exc}", file=sys.stderr)
         return 1
     rec = runner.record
-    print(f"{run_id}: status={rec['status']} passed={rec['passed']} rounds={rec['rounds_used']} "
-          f"cap_hit={rec['cap_hit']}")
+    print(f"{run_id}: arm={cfg.arm} task={cfg.task} rep={cfg.rep} status={rec['status']} "
+          f"passed={rec['passed']} rounds={rec['rounds_used']} cap_hit={rec['cap_hit']}")
+    if rec["status"] == "usage_limit":
+        return EXIT_USAGE_LIMIT
     return 0 if rec["status"] == "completed" else 1
 
 

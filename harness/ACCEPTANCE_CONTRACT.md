@@ -11,7 +11,11 @@ an agent failure.
     bash <run-dir>/acceptance/run.sh <repo-path> <out.json>
 
 The working directory is the copied pack. The script must not modify the
-repository. It runs under a timeout (`--acceptance-timeout`, default 1800 s).
+repository. It runs under a timeout (`--acceptance-timeout`, default 2400 s). A timeout is recorded as a failed round (spend kept) and the run continues with the generic feedback "The acceptance run did not complete; verify the build, tests and runtime behavior end to end." Packs must catch exceptions per check and report them as failed checks; exit 2 is reserved for faults that precede any use of the agent's code.
+
+## Hidden answer key
+
+The harness copies the pack to `<run-dir>/acceptance/` for the duration of one run, without any `selftest/` directory, and deletes the copy afterwards. The pack's environment carries no `CLAUDE_CODE_OAUTH_TOKEN`.
 
 ## Environment
 
@@ -29,13 +33,13 @@ repository. It runs under a timeout (`--acceptance-timeout`, default 1800 s).
 |--------|---------|
 | 0 | Every check passed |
 | 1 | At least one check failed |
-| 2 | Infrastructure error (pack could not run); the run aborts as `infra_error` |
+| 2 | Infrastructure or integrity error found BEFORE the pack touched the agent's repository; the run aborts as `infra_error` |
 
 Any other status is a contract violation. Status must agree with `passed`.
 
 ## Result file
 
-`out.json` is written by the script on exit 0 and 1:
+`out.json` lives under `<run-dir>/results/` (outside the agent's view) and is written by the script on exit 0 and 1:
 
     {
       "passed": false,

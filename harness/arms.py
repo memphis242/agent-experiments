@@ -34,6 +34,15 @@ EFFORT_BY_MODEL: Mapping[str, str] = MappingProxyType({
 })
 
 SUBAGENT_NAMES: tuple[str, ...] = ("explorer", "implementer", "tester", "debugger", "reviewer")
+# Tools denied in every arm. Agent, Skill, WebSearch, and WebFetch stay available;
+# A1 additionally denies Agent. These either spawn or message other agents
+# outside the Agent tool, schedule work, or change the working tree location,
+# which would break the one-factor-per-arm design or the run's isolation.
+DENIED_TOOLS: tuple[str, ...] = (
+    "Workflow", "SendMessage", "ListAgents", "RemoteTrigger", "CronCreate", "CronDelete",
+    "CronList", "ScheduleWakeup", "EnterWorktree", "ExitWorktree", "PushNotification",
+    "EndConversation",
+)
 PROMPT_CACHE_TTL = "1h"
 SUBAGENT_PROMPT_CACHE_TTL = "5m"
 
@@ -98,7 +107,15 @@ def build_settings(arm: ArmSpec) -> dict[str, object]:
         "autoMemoryEnabled": False,
     }
     if arm.subagent_model is None:
-        settings["permissions"] = {"deny": ["Agent"]}
+        settings["permissions"] = {"deny": ["Agent", *DENIED_TOOLS]}
+    else:
+        settings["permissions"] = {"deny": list(DENIED_TOOLS)}
+        # Built-in agent types (Explore, Plan, general-purpose) would otherwise
+        # inherit the main model; FORCE makes this model win over per-call overrides.
+        settings["env"] = {
+            "CLAUDE_CODE_SUBAGENT_MODEL": arm.subagent_model,
+            "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1",
+        }
     return settings
 
 

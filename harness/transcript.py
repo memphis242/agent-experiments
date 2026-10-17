@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Sequence
+from typing import Iterator, Mapping, Sequence
 
 SPAWN_TOOL_NAMES: frozenset[str] = frozenset({"Agent", "Task"})
 
@@ -76,18 +76,122 @@ def _tool_uses(entry: dict) -> Iterator[dict]:
                 yield block
 
 
+def _assistant_messages(path: Path) -> Iterator[tuple[dict, dict]]:
+    """(entry, message) for assistant entries, one per message id."""
+    seen: set[str] = set()
+    for entry in iter_entries(path):
+        message = entry.get("message")
+        if entry.get("type") != "assistant" or not isinstance(message, dict):
+            continue
+        if message.get("model") == "<synthetic>":
+            continue
+        key = str(message.get("id") or entry.get("uuid") or "")
+        if key in seen:
+            continue
+        seen.add(key)
+        yield entry, message
+
+
+def subagent_inventory(subagent_dirs: Sequence[Path]) -> list[dict[str, object]]:
+    """One record per subagent transcript: type and tool_use id from its .meta.json,
+    and the models and efforts actually observed in the transcript."""
+    inventory: list[dict[str, object]] = []
+    for directory in subagent_dirs:
+        for path in subagent_files(directory):
+            meta: dict = {}
+            meta_path = path.with_suffix(".meta.json")
+            if meta_path.is_file():
+                try:
+                    loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+                    meta = loaded if isinstance(loaded, dict) else {}
+                except (OSError, json.JSONDecodeError):
+                    meta = {}
+            models: Counter[str] = Counter()
+            efforts: Counter[str] = Counter()
+            for entry, message in _assistant_messages(path):
+                models[str(message.get("model"))] += 1
+                if isinstance(entry.get("effort"), str):
+                    efforts[entry["effort"]] += 1
+            inventory.append({
+                "path": path, "agent_id": path.stem.removeprefix("agent-"),
+                "tool_use_id": meta.get("toolUseId"), "agent_type": meta.get("agentType"),
+                "models": dict(models), "efforts": dict(efforts)})
+    return inventory
+
+
+def validate_models(main_paths: Sequence[Path], subagent_dirs: Sequence[Path], main_model: str,
+                    subagent_model: str | None, expected_effort: Mapping[str, str],
+                    forbidden_tools: Sequence[str]) -> list[dict[str, object]]:
+    """Violations of the arm's model, effort, and tool policy (reported, never acted on)."""
+    found: Counter[tuple[str, str, str, str, str]] = Counter()
+
+    def check(path: Path, source: str, expected_model: str | None) -> None:
+        for entry, message in _assistant_messages(path):
+            model = str(message.get("model"))
+            if expected_model is None:
+                found[("unexpected_subagent", source, path.name, "none", model)] += 1
+                continue
+            if model != expected_model:
+                found[("model", source, path.name, expected_model, model)] += 1
+            effort = entry.get("effort")
+            wanted = expected_effort.get(expected_model)
+            if isinstance(effort, str) and wanted and effort != wanted:
+                found[("effort", source, path.name, wanted, effort)] += 1
+            content = message.get("content")
+            for block in content if isinstance(content, list) else []:
+                if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in forbidden_tools:
+                    found[("forbidden_tool", source, path.name, "not used", str(block.get("name")))] += 1
+
+    for path in main_paths:
+        check(path, "main", main_model)
+    for directory in subagent_dirs:
+        for path in subagent_files(directory):
+            check(path, "subagent", subagent_model)
+    return [{"kind": k[0], "source": k[1], "file": k[2], "expected": k[3], "observed": k[4], "count": n}
+            for k, n in sorted(found.items())]
+
+
+LEAK_PATTERNS: tuple[str, ...] = ("acceptance/", "selftest", "reference/", "agent-experiments-runs")
+
+
+def scan_new_lines(path: Path, start_line: int, patterns: Sequence[str] = LEAK_PATTERNS
+                   ) -> tuple[list[dict[str, object]], int]:
+    """Hits for patterns in lines after start_line; returns (hits, total line count)."""
+    hits: list[dict[str, object]] = []
+    total = 0
+    try:
+        handle = path.open(encoding="utf-8", errors="replace")
+    except OSError as exc:
+        raise TranscriptError(f"cannot open transcript {path}: {exc}") from exc
+    with handle:
+        for number, line in enumerate(handle, 1):
+            total = number
+            if number <= start_line:
+                continue
+            for pattern in patterns:
+                position = line.find(pattern)
+                if position >= 0:
+                    hits.append({"file": path.name, "line": number, "pattern": pattern,
+                                 "excerpt": line[max(0, position - 60):position + 80].strip()})
+    return hits, total
+
+
 def summarize_behavior(main_paths: Sequence[Path], subagent_dirs: Sequence[Path]) -> dict[str, object]:
     """Counts of tool calls, subagent spawns, and compaction events.
 
     Tool-use blocks are deduplicated by block id because parallel tool calls
-    can repeat the same message across several transcript entries.
+    can repeat the same message across several transcript entries. Each spawn
+    records the subagent type and the models observed in the matching
+    subagent transcript (joined by tool_use id).
     """
     tool_calls: dict[str, Counter[str]] = {"main": Counter(), "subagent": Counter()}
     spawns_by_type: Counter[str] = Counter()
     spawns_by_model: Counter[str] = Counter()
-    spawn_inputs: list[dict[str, object]] = []
+    spawn_calls: list[dict[str, object]] = []
     seen_blocks: set[str] = set()
     compactions = 0
+    inventory = subagent_inventory(subagent_dirs)
+    by_tool_use = {str(i["tool_use_id"]): i for i in inventory if i["tool_use_id"]}
 
     sources = [("main", p) for p in main_paths]
     sources += [("subagent", p) for d in subagent_dirs for p in subagent_files(d)]
@@ -110,18 +214,21 @@ def summarize_behavior(main_paths: Sequence[Path], subagent_dirs: Sequence[Path]
                 if name in SPAWN_TOOL_NAMES:
                     tool_input = block.get("input") if isinstance(block.get("input"), dict) else {}
                     subagent_type = str(tool_input.get("subagent_type") or "general-purpose")
-                    model = tool_input.get("model")
+                    match = by_tool_use.get(str(block_id))
+                    observed = sorted(match["models"]) if match else []
                     spawns_by_type[subagent_type] += 1
-                    spawns_by_model[str(model) if model else "(from agent definition)"] += 1
-                    spawn_inputs.append({"source": source, "subagent_type": subagent_type, "model": model})
+                    for model in observed or ["(no transcript)"]:
+                        spawns_by_model[model] += 1
+                    spawn_calls.append({"source": source, "subagent_type": subagent_type,
+                                        "model_arg": tool_input.get("model"), "observed_models": observed})
     return {
         "tool_calls_main": dict(sorted(tool_calls["main"].items())),
         "tool_calls_subagent": dict(sorted(tool_calls["subagent"].items())),
         "tool_calls_total": sum(tool_calls["main"].values()) + sum(tool_calls["subagent"].values()),
         "subagent_spawns": sum(spawns_by_type.values()),
         "subagent_spawns_by_type": dict(sorted(spawns_by_type.items())),
-        "subagent_spawns_by_model_arg": dict(sorted(spawns_by_model.items())),
-        "subagent_spawn_calls": spawn_inputs,
+        "subagent_spawns_by_observed_model": dict(sorted(spawns_by_model.items())),
+        "subagent_spawn_calls": spawn_calls,
         "compaction_events": compactions,
-        "subagent_transcripts": sum(1 for src, _ in sources if src == "subagent"),
+        "subagent_transcripts": len(inventory),
     }

@@ -59,14 +59,16 @@ class CostTest(unittest.TestCase):
         report = cost.compute_cost(cost.load_requests(self.main, self.sub_dir))
         # Opus main: input 150, output 1500, read 30000, writes 2000 (1h).
         # Sonnet 4.6 sub: input 1000, output 2000, read 30000, writes 4000 (5m recorded).
-        none = (150 + 30_000 + 2000) * 4.0 + 1500 * 20.0 + (1000 + 30_000 + 4000) * 3.0 + 2000 * 15.0
-        m5 = 150 * 4.0 + 30_000 * 0.2 + 2000 * 5.0 + 1500 * 20.0 \
-            + 1000 * 3.0 + 30_000 * 0.3 + 4000 * 3.75 + 2000 * 15.0
-        h1 = 150 * 4.0 + 30_000 * 0.2 + 2000 * 8.0 + 1500 * 20.0 \
-            + 1000 * 3.0 + 30_000 * 0.3 + 4000 * 6.0 + 2000 * 15.0
-        self.assertAlmostEqual(report.scenarios["none"].total_usd, none / 1e6, places=9)
-        self.assertAlmostEqual(report.scenarios["5m"].total_usd, m5 / 1e6, places=9)
-        self.assertAlmostEqual(report.scenarios["1h"].total_usd, h1 / 1e6, places=9)
+        sub_billed = 1000 * 3.0 + 30_000 * 0.3 + 4000 * 3.75 + 2000 * 15.0
+        sub_1h = 1000 * 3.0 + 30_000 * 0.3 + 4000 * 6.0 + 2000 * 15.0
+        main_none = (150 + 30_000 + 2000) * 4.0 + 1500 * 20.0
+        main_5m = 150 * 4.0 + 30_000 * 0.2 + 2000 * 5.0 + 1500 * 20.0
+        main_1h = 150 * 4.0 + 30_000 * 0.2 + 2000 * 8.0 + 1500 * 20.0
+        expect = {"billed": main_1h + sub_billed, "none": main_none + sub_billed, "5m": main_5m + sub_billed,
+                  "1h": main_1h + sub_billed, "uniform_1h": main_1h + sub_1h}
+        for name, value in expect.items():
+            self.assertAlmostEqual(report.scenarios[name].total_usd, value / 1e6, places=9, msg=name)
+        self.assertEqual(cost.PRIMARY_SCENARIO, "billed")
         self.assertAlmostEqual(report.scenarios["1h"].by_source["subagent"] + report.scenarios["1h"].by_source["main"],
                                report.scenarios["1h"].total_usd, places=12)
 
@@ -86,6 +88,14 @@ class CostTest(unittest.TestCase):
         # Exactly at the threshold does not rebill.
         edge = cost.compute_cost(reqs, {1: 300.0})
         self.assertAlmostEqual(edge.scenarios["5m"].total_usd, base.scenarios["5m"].total_usd, places=12)
+
+    def test_billed_by_round(self):
+        reqs = cost.load_requests(self.main, self.sub_dir)
+        t0 = reqs[0].timestamp
+        per_round = cost.billed_by_round(reqs, [t0, t0 + 45])
+        report = cost.compute_cost(reqs)
+        self.assertAlmostEqual(sum(per_round), report.scenarios["billed"].total_usd, places=12)
+        self.assertGreater(per_round[1], 0.0)  # m2 at +60 s lands in round 2
 
     def test_errors(self):
         reqs = cost.load_requests(self.main, self.sub_dir)
