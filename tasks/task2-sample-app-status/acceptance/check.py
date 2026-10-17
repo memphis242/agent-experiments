@@ -24,6 +24,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import traceback
 import threading
 import time
 from collections.abc import Callable
@@ -182,9 +183,17 @@ def run_cmd(args: list[str], cwd: Path, timeout: float, env: dict[str, str] | No
 
 
 def scratch_root() -> Path:
-    for cand in (os.environ.get("ACCEPT_SCRATCH"), "/workspace/tmp", tempfile.gettempdir()):
-        if cand and Path(cand).is_dir() and os.access(cand, os.W_OK):
+    for cand in (os.environ.get("ACCEPT_SCRATCH"), "/workspace/tmp-acceptance"):
+        if not cand:
+            continue
+        try:
+            Path(cand).mkdir(parents=True, exist_ok=True)
+        except OSError:
+            continue
+        if os.access(cand, os.W_OK):
             return Path(cand)
+    if os.environ.get("ACCEPT_ALLOW_SYSTEM_TMP") == "1" and os.access(tempfile.gettempdir(), os.W_OK):
+        return Path(tempfile.gettempdir())
     raise InfraError("no writable scratch directory")
 
 
@@ -933,7 +942,7 @@ def run_ctf(ws: Workspace, work: Path, budget: Budget) -> str:
     if not ((root / "ctf" / "venv" / "bin" / "python").exists() and (root / "ctf" / "CTF" / "ctf").exists()):
         # The harness runs ctf/setup_ctf.sh before the agent starts; a repository without it
         # is a fault of the run environment, not of the agent.
-        raise InfraError("ctf/CTF and ctf/venv are missing; ctf/setup_ctf.sh must run before the checks")
+        raise Fail("ctf/CTF or ctf/venv missing in the repository copy (the CTF environment is set up before the agent starts)")
     env = {"CFS_ROOT": str(root), "CTF_RESULTS_DIR": str(work / "ctf-results")}
     rc, out, timed_out = run_cmd(["bash", str(script), "ctf/tests/sample_app_status_rate.json"], root,
                                  budget.cap(240), env=env)
@@ -986,6 +995,8 @@ def guarded(cid: str, fn: Callable[[], str | None], results: dict[str, Result], 
         results[cid] = Result(cid, True, "", detail or "")
     except Fail as exc:
         results[cid] = Result(cid, False, FB[cid] + needs, str(exc))
+    except Exception as exc:  # noqa: BLE001
+        results[cid] = Result(cid, False, FB[cid] + needs, "unexpected error while checking:\n" + "".join(traceback.format_exception(exc)))
 
 
 def measure_baseline(repo: Path, out_path: Path) -> int:
@@ -1027,53 +1038,99 @@ def main(argv: list[str]) -> int:
             print(f"pack file {needed.name} missing", file=sys.stderr)
             return 2
 
+    # Pre-flight: everything that can be judged before the agent's code is touched.
+    if shutil.which("gcov") is None:
+        print("infrastructure error: gcov is not installed", file=sys.stderr)
+        return 2
     budget = Budget()
     results: dict[str, Result] = {}
-    work = Path(tempfile.mkdtemp(prefix="task2-accept-", dir=scratch_root()))
-    notes = ""
     try:
-        notes = isolation_note()
+        work = Path(tempfile.mkdtemp(prefix="task2-accept-", dir=scratch_root()))
+    except (InfraError, OSError) as exc:
+        print(f"infrastructure error: {exc}", file=sys.stderr)
+        return 2
+    notes = isolation_note()
+    state: dict[str, Workspace] = {}
+
+    def failing(ids: list[str], exc: BaseException, feedback_suffix: str = "") -> None:
+        trace = "".join(traceback.format_exception(exc))
+        for cid in ids:
+            if cid not in results:
+                results[cid] = Result(cid, False, FB[cid] + feedback_suffix, "unexpected error while checking:\n" + trace)
+
+    def step(ids: list[str], fn: Callable[[], None]) -> None:
+        """Run a step; an unexpected exception fails the checks it was to produce."""
+        try:
+            fn()
+        except Fail as exc:
+            for cid in ids:
+                if cid not in results:
+                    results[cid] = Result(cid, False, FB[cid], str(exc))
+        except Exception as exc:  # noqa: BLE001 - every error after pre-flight is a check failure
+            failing(ids, exc)
+
+    def do_static() -> None:
         guarded("to-lab-subscription", lambda: check_to_lab(repo), results)
         guarded("ccdd-definitions", lambda: check_ccdd(repo), results)
         guarded("report-present", lambda: check_report(repo), results)
 
+    def do_build() -> None:
         tree = work / "tree"
         copy_tree(repo, tree, with_ctf_env=True)
         ws = Workspace(tree)
+        state["ws"] = ws
         build(ws, budget)
         results["build-no-warnings"] = Result("build-no-warnings", ws.build_ok, "" if ws.build_ok else FB["build-no-warnings"],
                                               ws.build_detail + f"\n[{notes}]")
 
+    def do_tests() -> None:
+        ws = state["ws"]
         if ws.install_dir is None:
             for cid in ("unit-tests-pass", "coverage-not-below-baseline"):
                 results[cid] = Result(cid, False, FB[cid] + NEEDS_BUILD, ws.build_detail)
-        else:
-            ok, detail = run_unit_tests(ws, budget)
-            results["unit-tests-pass"] = Result("unit-tests-pass", ok, "" if ok else FB["unit-tests-pass"], detail)
-            if ok:
-                cov_ok, cov_detail = check_coverage(ws)
-                results["coverage-not-below-baseline"] = Result(
-                    "coverage-not-below-baseline", cov_ok, "" if cov_ok else FB["coverage-not-below-baseline"], cov_detail)
-            else:
-                results["coverage-not-below-baseline"] = Result(
-                    "coverage-not-below-baseline", False,
-                    FB["coverage-not-below-baseline"] + " The unit tests did not all pass, so coverage was not measured.",
-                    detail)
+            return
+        ok, detail = run_unit_tests(ws, budget)
+        results["unit-tests-pass"] = Result("unit-tests-pass", ok, "" if ok else FB["unit-tests-pass"], detail)
+        if not ok:
+            results["coverage-not-below-baseline"] = Result(
+                "coverage-not-below-baseline", False,
+                FB["coverage-not-below-baseline"] + " The unit tests did not all pass, so coverage was not measured.", detail)
+            return
+        step(["coverage-not-below-baseline"], do_coverage)
 
+    def do_coverage() -> None:
+        cov_ok, cov_detail = check_coverage(state["ws"])
+        results["coverage-not-below-baseline"] = Result(
+            "coverage-not-below-baseline", cov_ok, "" if cov_ok else FB["coverage-not-below-baseline"], cov_detail)
+
+    def do_hidden() -> None:
         hidden_ok, hidden_detail = run_hidden_coverage(repo, work, budget)
         results["hidden-coverage-test"] = Result("hidden-coverage-test", hidden_ok,
                                                  "" if hidden_ok else FB["hidden-coverage-test"], hidden_detail)
 
-        run_network_checks(ws, work, budget, results)
+    def do_network() -> None:
+        run_network_checks(state["ws"], work, budget, results)
 
-        def ctf_body() -> str:
-            return run_ctf(ws, work, budget)
-        guarded("ctf-test-passes", ctf_body, results,
+    def do_ctf() -> None:
+        ws = state["ws"]
+        guarded("ctf-test-passes", lambda: run_ctf(ws, work, budget), results,
                 needs=NEEDS_BUILD if ws.install_dir is None else "")
+
+    try:
+        step(["to-lab-subscription", "ccdd-definitions", "report-present"], do_static)
+        step(["build-no-warnings"], do_build)
+        if "ws" not in state:
+            for cid in ("unit-tests-pass", "coverage-not-below-baseline", "ctf-test-passes", *[c for c, _ in SCENARIOS]):
+                results.setdefault(cid, Result(cid, False, FB[cid] + NEEDS_BUILD, results["build-no-warnings"].detail))
+        else:
+            step(["unit-tests-pass", "coverage-not-below-baseline"], do_tests)
+            step(["status-packet-default-divisor", "set-rate-valid", "set-rate-invalid", "process-count", "reset-counters"],
+                 do_network)
+            step(["ctf-test-passes"], do_ctf)
+        step(["hidden-coverage-test"], do_hidden)
+        for cid in CHECK_ORDER:  # a step that died without reporting its checks
+            results.setdefault(cid, Result(cid, False, FB[cid], "no result was produced"))
         return write_results(out_path, results)
-    except InfraError as exc:
-        print(f"infrastructure error: {exc}", file=sys.stderr)
-        return 2
     finally:
         stop_stray_cfs(work)
         shutil.rmtree(work, ignore_errors=True)

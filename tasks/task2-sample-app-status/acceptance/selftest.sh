@@ -17,9 +17,9 @@ set -euo pipefail
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 template="${TEMPLATE:-/workspace/agent-experiments-fixture/mission-template}"
 fixture="${FIXTURE:-$here/../../../fixture/mission}"
-scratch_base="${SELFTEST_TMP:-/workspace/tmp}"
-ctf_cache="${SELFTEST_CTF_CACHE:-/workspace/tmp/task2-selftest-ctf}"
-[ -d "$scratch_base" ] || scratch_base="${TMPDIR:-/tmp}"
+scratch_base="${SELFTEST_TMP:-/workspace/tmp-acceptance}"
+ctf_cache="${SELFTEST_CTF_CACHE:-/workspace/tmp-acceptance/task2-selftest-ctf}"
+mkdir -p "$scratch_base"
 modes=("$@")
 [ "${#modes[@]}" -gt 0 ] || modes=(template reference)
 

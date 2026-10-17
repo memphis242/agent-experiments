@@ -169,6 +169,15 @@ static void Handler_GetInfo(void *UserObj, UT_EntryKey_t FuncKey, const UT_StubC
     Info->Crc = (Status >= 0) ? TABLE_CRC : 0xBADBAD01u;
 }
 
+static SAMPLE_APP_ExampleTable_t Example_Table;
+
+static void Handler_GetAddress(void *UserObj, UT_EntryKey_t FuncKey, const UT_StubContext_t *Context)
+{
+    void **Out = UT_Hook_GetArgValueByName(Context, "TblPtr", void **);
+
+    *Out = &Example_Table;
+}
+
 /* ---- helpers ------------------------------------------------------------ */
 
 typedef union
@@ -182,28 +191,53 @@ typedef union
     SAMPLE_APP_SendHkCmd_t        SendHk;
 } Cmd_Buf_t;
 
-/* Every buffer queued here must be consumed by the unit under test, or it would
- * be handed to a later command; housekeeping requests read the message ID only. */
-static void Pipe_Deliver_Hk(Cmd_Buf_t *Buf)
+/* The message being delivered; the message-service stubs answer from it by pointer,
+ * so the number of times the unit under test queries a message does not matter. */
+static struct
 {
-    CFE_SB_MsgId_t MsgId = CFE_SB_ValueToMsgId(SAMPLE_APP_SEND_HK_MID);
+    const void       *Ptr;
+    CFE_SB_MsgId_t    MsgId;
+    CFE_MSG_FcnCode_t Fc;
+    size_t            Size;
+} Cur;
 
-    UT_SetDataBuffer(UT_KEY(CFE_MSG_GetMsgId), &MsgId, sizeof(MsgId), false);
-    SAMPLE_APP_TaskPipe(&Buf->SBBuf);
+static void Handler_GetMsgId(void *UserObj, UT_EntryKey_t FuncKey, const UT_StubContext_t *Context)
+{
+    const void     *Msg = UT_Hook_GetArgValueByName(Context, "MsgPtr", const CFE_MSG_Message_t *);
+    CFE_SB_MsgId_t *Out = UT_Hook_GetArgValueByName(Context, "MsgId", CFE_SB_MsgId_t *);
+
+    *Out = (Msg == Cur.Ptr) ? Cur.MsgId : CFE_SB_INVALID_MSG_ID;
+}
+
+static void Handler_GetFcnCode(void *UserObj, UT_EntryKey_t FuncKey, const UT_StubContext_t *Context)
+{
+    const void        *Msg = UT_Hook_GetArgValueByName(Context, "MsgPtr", const CFE_MSG_Message_t *);
+    CFE_MSG_FcnCode_t *Out = UT_Hook_GetArgValueByName(Context, "FcnCode", CFE_MSG_FcnCode_t *);
+
+    *Out = (Msg == Cur.Ptr) ? Cur.Fc : 0;
+}
+
+static void Handler_GetSize(void *UserObj, UT_EntryKey_t FuncKey, const UT_StubContext_t *Context)
+{
+    const void *Msg = UT_Hook_GetArgValueByName(Context, "MsgPtr", const CFE_MSG_Message_t *);
+    CFE_MSG_Size_t *Out = UT_Hook_GetArgValueByName(Context, "Size", CFE_MSG_Size_t *);
+
+    *Out = (Msg == Cur.Ptr) ? Cur.Size : 0;
 }
 
 static void Pipe_Deliver(CFE_SB_MsgId_t MsgId, CFE_MSG_FcnCode_t Fc, size_t Size, Cmd_Buf_t *Buf, bool LengthIsWrong)
 {
-    UT_SetDataBuffer(UT_KEY(CFE_MSG_GetMsgId), &MsgId, sizeof(MsgId), false);
-    UT_SetDataBuffer(UT_KEY(CFE_MSG_GetFcnCode), &Fc, sizeof(Fc), false);
-    UT_SetDataBuffer(UT_KEY(CFE_MSG_GetSize), &Size, sizeof(Size), false);
-    if (LengthIsWrong)
-    {
-        /* The length check reads the message ID and function code again to report the error. */
-        UT_SetDataBuffer(UT_KEY(CFE_MSG_GetMsgId), &MsgId, sizeof(MsgId), false);
-        UT_SetDataBuffer(UT_KEY(CFE_MSG_GetFcnCode), &Fc, sizeof(Fc), false);
-    }
+    (void)LengthIsWrong;
+    Cur.Ptr   = &Buf->SBBuf;
+    Cur.MsgId = MsgId;
+    Cur.Fc    = Fc;
+    Cur.Size  = Size;
     SAMPLE_APP_TaskPipe(&Buf->SBBuf);
+}
+
+static void Pipe_Deliver_Hk(Cmd_Buf_t *Buf)
+{
+    Pipe_Deliver(CFE_SB_ValueToMsgId(SAMPLE_APP_SEND_HK_MID), 0, sizeof(Buf->SendHk), Buf, false);
 }
 
 static void Send_Hk(uint32 Count)
@@ -256,12 +290,8 @@ static void Send_Noop(void)
 /* PROCESS whose table access succeeds. */
 static void Send_Process_Ok(void)
 {
-    static SAMPLE_APP_ExampleTable_t Tbl;
-    void                            *TblPtr = &Tbl;
-
     UT_SetDefaultReturnValue(UT_KEY(CFE_TBL_GetAddress), CFE_SUCCESS);
     UT_SetDefaultReturnValue(UT_KEY(CFE_TBL_ReleaseAddress), CFE_SUCCESS);
-    UT_SetDataBuffer(UT_KEY(CFE_TBL_GetAddress), &TblPtr, sizeof(TblPtr), false);
     Send_Simple(SAMPLE_APP_PROCESS_CC, sizeof(SAMPLE_APP_ProcessCmd_t));
 }
 
@@ -274,12 +304,8 @@ static void Send_Process_GetAddressFails(void)
 
 static void Send_Process_ReleaseFails(void)
 {
-    static SAMPLE_APP_ExampleTable_t Tbl;
-    void                            *TblPtr = &Tbl;
-
     UT_SetDefaultReturnValue(UT_KEY(CFE_TBL_GetAddress), CFE_SUCCESS);
     UT_SetDefaultReturnValue(UT_KEY(CFE_TBL_ReleaseAddress), CFE_TBL_ERR_NO_ACCESS);
-    UT_SetDataBuffer(UT_KEY(CFE_TBL_GetAddress), &TblPtr, sizeof(TblPtr), false);
     Send_Simple(SAMPLE_APP_PROCESS_CC, sizeof(SAMPLE_APP_ProcessCmd_t));
     UT_ClearDefaultReturnValue(UT_KEY(CFE_TBL_ReleaseAddress));
 }
@@ -293,6 +319,11 @@ static void Start_App_With_TableStatus(int32 TableInfoStatus)
     UT_SetHookFunction(UT_KEY(CFE_SB_TransmitMsg), Hook_Transmit, NULL);
     UT_SetVaHookFunction(UT_KEY(CFE_EVS_SendEvent), Hook_Event, NULL);
     UT_SetHandlerFunction(UT_KEY(CFE_TBL_GetInfo), Handler_GetInfo, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TBL_GetAddress), Handler_GetAddress, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_MSG_GetMsgId), Handler_GetMsgId, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_MSG_GetFcnCode), Handler_GetFcnCode, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_MSG_GetSize), Handler_GetSize, NULL);
+    memset(&Cur, 0, sizeof(Cur));
     UtAssert_INT32_EQ(SAMPLE_APP_Init(), CFE_SUCCESS);
     Rec_Reset();
 }
