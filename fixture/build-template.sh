@@ -68,7 +68,7 @@ git -C "${STAGE}" add -f -A
 #    honored when staging it.
 # Overlay the mission files, excluding per-checkout artifacts that are
 # recreated by ctf/setup_ctf.sh in every run.
-rsync -a --exclude=/ctf/CTF --exclude=/ctf/venv --exclude=/ctf/results "${HERE}/mission/" "${STAGE}/"
+rsync -a --exclude=/ctf/CTF --exclude=/ctf/venv --exclude=/ctf/results --exclude=__pycache__ "${HERE}/mission/" "${STAGE}/"
 find "${STAGE}" -name .git -not -path "${STAGE}/.git" -prune -exec rm -rf {} +
 git -C "${STAGE}" add -A
 git -C "${STAGE}" \

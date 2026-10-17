@@ -1,3 +1,4 @@
 CTF/
 venv/
 results/
+__pycache__/
