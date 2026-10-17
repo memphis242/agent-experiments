@@ -9,8 +9,10 @@ run.json is rewritten atomically after every step so a crash leaves a record.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -40,6 +42,34 @@ class RunError(Exception):
     """A fatal, user-actionable problem with the run setup or the claude invocation."""
 
 
+class InfraError(RunError):
+    """A fault in the run environment (for example the CTF setup script), not in the agent."""
+
+
+def resolve_task(tasks_dir: Path, name: str) -> tuple[str, str]:
+    """Map a full task directory name or its short form (task1) to (short, directory name)."""
+    if (tasks_dir / name).is_dir():
+        directory = name
+    else:
+        matches = sorted(p.name for p in tasks_dir.glob(f"{name}-*") if p.is_dir())
+        if len(matches) != 1:
+            raise RunError(f"task {name!r} does not match exactly one directory in {tasks_dir} "
+                           f"({len(matches)} matches)")
+        directory = matches[0]
+    found = re.match(r"task\d+", directory)
+    return (found.group(0) if found else directory), directory
+
+
+def hash_config_root(root: Path) -> str:
+    """SHA-256 over the relative paths and bytes of settings.json, CLAUDE.md, and agents/."""
+    digest = hashlib.sha256()
+    paths = [root / "settings.json", root / "CLAUDE.md", *sorted((root / "agents").glob("*"))]
+    for path in paths:
+        if path.is_file():
+            digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
+    return digest.hexdigest()
+
+
 @dataclass(frozen=True)
 class RunConfig:
     arm: str
@@ -57,6 +87,7 @@ class RunConfig:
     cli_timeout_s: float | None
     seed: int
     claude_bin: str
+    task_dir: str = ""
 
     def __post_init__(self) -> None:
         assert self.rep >= 1 and self.max_rounds >= 1 and self.max_budget_usd > 0
@@ -127,7 +158,7 @@ def _git(args: Sequence[str], cwd: Path | None = None) -> None:
 
 
 def prepare_repo(cfg: RunConfig, run_dir: Path) -> Path:
-    spec = cfg.tasks_dir / cfg.task / "spec.md"
+    spec = cfg.tasks_dir / cfg.task_dir / "spec.md"
     if not spec.is_file():
         raise RunError(f"task spec not found: {spec}")
     repo = run_dir / "repo"
@@ -135,13 +166,21 @@ def prepare_repo(cfg: RunConfig, run_dir: Path) -> Path:
     shutil.copyfile(spec, repo / "TASK.md")
     _git(["add", "TASK.md"], cwd=repo)
     _git(["commit", "--quiet", "-m", "Add TASK.md"], cwd=repo)
+    setup = repo / "ctf" / "setup_ctf.sh"
+    if setup.is_file():
+        proc = subprocess.run(["bash", str(setup)], cwd=repo, capture_output=True, text=True, check=False)
+        (run_dir / "setup_ctf.log").write_text(
+            f"exit {proc.returncode}\n--- stdout\n{proc.stdout}\n--- stderr\n{proc.stderr}", encoding="utf-8")
+        if proc.returncode != 0:
+            raise InfraError(f"ctf/setup_ctf.sh exited {proc.returncode}; see {run_dir / 'setup_ctf.log'}")
     return repo
 
 
 class Runner:
     def __init__(self, cfg: RunConfig, run_id: str, run_dir: Path) -> None:
         self.cfg, self.run_id, self.run_dir = cfg, run_id, run_dir
-        self.arm_root = arms.arm_root(cfg.arm, cfg.arms_dir)
+        self.source_root = arms.arm_root(cfg.arm, cfg.arms_dir)
+        self.arm_root = run_dir / "config"  # this run's private CLAUDE_CONFIG_DIR
         self.repo = run_dir / "repo"
         self.session_ids: list[str] = []
         self.resume_indices: list[int] = []
@@ -150,18 +189,24 @@ class Runner:
 
     def init_record(self, started: datetime) -> None:
         arm = arms.get_arm(self.cfg.arm)
-        settings_path = self.arm_root / "settings.json"
+        settings_path = self.source_root / "settings.json"
         try:
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise RunError(f"arm root not generated or unreadable ({settings_path}): {exc}; run harness/arms.py") from exc
+        config_hash = hash_config_root(self.source_root)
+        try:
+            shutil.copytree(self.source_root, self.arm_root, ignore=shutil.ignore_patterns("projects"))
+        except OSError as exc:
+            raise RunError(f"cannot copy arm root {self.source_root} to {self.arm_root}: {exc}") from exc
+        assert hash_config_root(self.arm_root) == config_hash
         self.record = {
             "schema_version": SCHEMA_VERSION,
-            "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "rep": self.cfg.rep,
+            "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir, "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
             "models": {"main": arms.MAIN_MODEL, "subagent": arm.subagent_model},
             "delegation": arm.delegation,
-            "settings": settings,
+            "settings": settings, "config_sha256": config_hash,
             "autocompact": self.cfg.autocompact,
             "max_rounds": self.cfg.max_rounds, "max_budget_usd": self.cfg.max_budget_usd,
             "session_ids": [], "resume_request_indices": [],
@@ -242,7 +287,7 @@ class Runner:
     # -- main loop ---------------------------------------------------------
     def run(self, prompt: str) -> None:
         message, session_id = prompt, None
-        pack_src = self.cfg.tasks_dir / self.cfg.task / "acceptance"
+        pack_src = self.cfg.tasks_dir / self.cfg.task_dir / "acceptance"
         if not pack_src.is_dir():
             raise RunError(f"acceptance pack not found: {pack_src}")
         for round_no in range(1, self.cfg.max_rounds + 1):
@@ -308,14 +353,16 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     sample_feedback = "<deterministic feedback composed from failing checks>"
     steps = [
         ["git", "clone", "--quiet", str(cfg.template), str(repo)],
-        ["cp", str(cfg.tasks_dir / cfg.task / "spec.md"), str(repo / "TASK.md")],
+        ["cp", str(cfg.tasks_dir / cfg.task_dir / "spec.md"), str(repo / "TASK.md")],
         ["git", "-C", str(repo), "add", "TASK.md"],
         ["git", "-C", str(repo), "commit", "-m", "Add TASK.md"],
+        ["bash", str(repo / "ctf" / "setup_ctf.sh")],
+        ["cp", "-r", str(arms.arm_root(cfg.arm, cfg.arms_dir)), str(run_dir / "config")],
     ]
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
-    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(arms.arm_root(cfg.arm, cfg.arms_dir)))} {TOKEN_ENV}=<token>"
+    env = f"CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>"
     print(f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(
         build_claude_command(cfg, run_id, prompt, None, cfg.max_budget_usd)))
     print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails:")
@@ -327,7 +374,7 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
 def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfig]:
     p = argparse.ArgumentParser(description="Run one arm x task x repetition.")
     p.add_argument("--arm", required=True, choices=list(arms.ARMS))
-    p.add_argument("--task", required=True)
+    p.add_argument("--task", required=True, help="task1..task4 or the full directory name under tasks/")
     p.add_argument("--rep", required=True, type=int)
     p.add_argument("--autocompact", type=int, default=None, help="auto-compaction window in tokens (min 100000)")
     p.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
@@ -335,7 +382,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--arms-dir", type=Path, default=arms.DEFAULT_ARMS_DIR)
     p.add_argument("--tasks-dir", type=Path, default=DEFAULT_TASKS_DIR)
     p.add_argument("--gaps", type=Path, default=DEFAULT_GAPS, help="gaps.json from gaps.py")
-    p.add_argument("--max-rounds", type=int, default=5)
+    p.add_argument("--max-rounds", type=int, default=5,
+                   help="agent invocations in total: the initial one plus up to N-1 repair resumes (default 5)")
     p.add_argument("--max-budget-usd", type=float, default=150.0)
     p.add_argument("--acceptance-timeout", type=float, default=1800.0)
     p.add_argument("--cli-timeout", type=float, default=None, help="seconds per claude invocation (default: none)")
@@ -347,9 +395,13 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
         p.error("--rep and --max-rounds must be >= 1 and --max-budget-usd > 0")
     if a.autocompact is not None and a.autocompact < 100_000:
         p.error("--autocompact must be at least 100000")
-    cfg = RunConfig(a.arm, a.task, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
+    try:
+        short, directory = resolve_task(a.tasks_dir, a.task)
+    except RunError as exc:
+        p.error(str(exc))
+    cfg = RunConfig(a.arm, short, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
                     a.gaps, a.max_rounds, a.max_budget_usd, a.acceptance_timeout, a.cli_timeout, a.seed,
-                    a.claude_bin)
+                    a.claude_bin, directory)
     return a, cfg
 
 
@@ -358,7 +410,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     now = _utc_now()
     run_id = make_run_id(cfg.arm, cfg.task, cfg.rep, now)
     run_dir = cfg.runs_dir / run_id
-    prompt_path = cfg.tasks_dir / cfg.task / "prompt.md"
+    prompt_path = cfg.tasks_dir / cfg.task_dir / "prompt.md"
     try:
         if not prompt_path.is_file():
             raise RunError(f"task prompt not found: {prompt_path}")
@@ -377,7 +429,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             prepare_repo(cfg, run_dir)
             runner.run(prompt)
         except RunError as exc:
-            runner.record.update(status="error", error=str(exc))
+            runner.record.update(status="infra_error" if isinstance(exc, InfraError) else "error", error=str(exc))
             raise
         finally:
             runner.record["finished_at"] = _iso(_utc_now())

@@ -121,11 +121,41 @@ class EndToEndTest(unittest.TestCase):
             self.assertTrue(rec["cost"]["warnings"])
             self.assertTrue((run_dir / "repo" / "TASK.md").is_file())
             self.assertFalse((run_dir / "repo" / "acceptance").exists())
+            self.assertEqual(len(rec["config_sha256"]), 64)
+            self.assertEqual(rec["config_sha256"], run.hash_config_root(root / "arms" / "A4"))
+            self.assertTrue((run_dir / "config" / "projects").is_dir())  # transcripts land in the run dir
+            self.assertFalse((root / "arms" / "A4" / "projects").exists())
+
+    def test_ctf_setup_failure_is_infra_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            template = root / "template"
+            (template / "ctf").mkdir(parents=True)
+            (template / "ctf" / "setup_ctf.sh").write_text("exit 3\n")
+            subprocess.run(["git", "init", "-q", str(template)], check=True)
+            subprocess.run(["git", "-C", str(template), "add", "."], check=True)
+            subprocess.run(["git", "-C", str(template), "-c", "user.name=t", "-c", "user.email=t@t",
+                            "commit", "-qm", "init"], check=True)
+            task = root / "tasks" / "task9-demo"
+            (task / "acceptance").mkdir(parents=True)
+            (task / "spec.md").write_text("s")
+            (task / "prompt.md").write_text("p")
+            arms.generate_arm("A1", root / "arms")
+            os.environ["CLAUDE_CODE_OAUTH_TOKEN"] = "x"
+            rc = run.main(["--arm", "A1", "--task", "task9", "--rep", "1", "--template", str(template),
+                           "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
+                           "--tasks-dir", str(root / "tasks"), "--claude-bin", "/nonexistent"])
+            self.assertEqual(rc, 1)
+            (run_dir,) = (root / "runs").iterdir()
+            rec = json.loads((run_dir / "run.json").read_text())
+            self.assertEqual(rec["status"], "infra_error")
+            self.assertEqual((rec["task"], rec["task_dir"]), ("task9", "task9-demo"))
 
 
 class CommandTest(unittest.TestCase):
     def test_flags(self):
-        _, cfg = run.parse_args(["--arm", "A1", "--task", "t", "--rep", "1", "--autocompact", "100000"])
+        _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--autocompact", "100000"])
+        self.assertEqual((cfg.task, cfg.task_dir), ("task1", "task1-utlog-translator"))
         cmd = run.build_claude_command(cfg, "RID", "hi", "sess", 10.0)
         self.assertEqual(cmd[:5], ["claude", "-p", "--resume", "sess", "hi"])
         self.assertIn("Run ID: RID", cmd)

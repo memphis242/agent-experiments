@@ -13,6 +13,10 @@ an agent failure.
 The working directory is the copied pack. The script must not modify the
 repository. It runs under a timeout (`--acceptance-timeout`, default 1800 s).
 
+## Rounds
+
+`--max-rounds` (default 5) counts agent invocations: the initial session plus up to 4 repair resumes. The pack runs after every invocation; a failure after the last one is recorded as a cap hit.
+
 ## Exit status
 
 | Status | Meaning |

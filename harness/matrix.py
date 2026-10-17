@@ -18,6 +18,7 @@ from typing import Sequence
 import arms
 import run
 
+TASKS = ("task1", "task2", "task3", "task4")
 RUN_PY = Path(__file__).resolve().parent / "run.py"
 
 
@@ -38,7 +39,7 @@ def build_cells(arm_ids: Sequence[str], tasks: Sequence[str], reps: Sequence[int
 def main(argv: Sequence[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--arms", nargs="+", default=list(arms.ARMS), choices=list(arms.ARMS))
-    p.add_argument("--tasks", nargs="+", required=True)
+    p.add_argument("--tasks", nargs="+", default=list(TASKS), help="short task names (default: task1..task4)")
     p.add_argument("--reps", type=int, default=3, help="repetitions 1..N")
     p.add_argument("--runs-dir", type=Path, default=run.DEFAULT_RUNS_DIR)
     p.add_argument("--parallel", type=int, default=3)

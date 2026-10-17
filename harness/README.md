@@ -34,12 +34,16 @@ human pauses at resume rounds for the 5m and 1h cost scenarios. Without it,
     python harness/run.py --arm A4 --task task2 --rep 1 --dry-run   # print commands only
 
 Options: `--autocompact N` (at least 100000), `--template`, `--runs-dir`
-(default `/workspace/agent-experiments-runs`), `--max-rounds 5`,
+(default `/workspace/agent-experiments-runs`), `--max-rounds 5` (agent invocations in total: the initial one plus up to 4 repair resumes),
 `--max-budget-usd 150` (a total across rounds; each call gets the remainder),
 `--acceptance-timeout`, `--cli-timeout`, `--seed`.
 
-Expected layout: `tasks/<task>/{spec.md,prompt.md,acceptance/run.sh}`; the
+`--task` takes `task1`..`task4` or the full directory name (`task1-utlog-translator`, `task2-sample-app-status`, `task3-hk-staleness`, `task4-stor-app`); run IDs and `run.json` use the short form.
+
+Expected layout: `tasks/<task-dir>/{spec.md,prompt.md,acceptance/run.sh}`; the
 acceptance contract is in `harness/ACCEPTANCE_CONTRACT.md`.
+
+Each run gets a private copy of the arm root at `<run-dir>/config/`, used as `CLAUDE_CONFIG_DIR` for every round, so transcripts live in the run directory. `run.json` records `config_sha256` (over `settings.json`, `CLAUDE.md`, `agents/`) so later edits of an arm root are detectable. After cloning, the run executes `ctf/setup_ctf.sh` from the template if present, before invoking claude; a non-zero exit ends the run as `infra_error`.
 
 The run directory `<runs-dir>/<arm>-<task>-r<rep>-<UTC timestamp>/` holds
 `repo/`, `run.json` (rewritten after every round), raw `cli-roundN.*` output,
@@ -51,6 +55,7 @@ The process exits 0 only for `completed`.
 
 ## 5. A matrix
 
+    python harness/matrix.py --reps 3 --parallel 3          # all arms x task1..task4
     python harness/matrix.py --tasks task1 task2 --reps 3 --parallel 3
     python harness/matrix.py --arms A4 A5 --tasks task3 --reps 3 --runs-dir /workspace/agent-experiments-runs-b -- --autocompact 200000
 
