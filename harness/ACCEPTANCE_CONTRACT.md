@@ -13,6 +13,12 @@ an agent failure.
 The working directory is the copied pack. The script must not modify the
 repository. It runs under a timeout (`--acceptance-timeout`, default 1800 s).
 
+## Environment
+
+| Variable | Meaning |
+|----------|---------|
+| `ACCEPT_NO_NAMESPACE` | Set to `1` by the harness; packs must skip any namespace or isolation setup of their own when it is present. The harness already runs the pack inside its isolation wrapper, whose uid-mapped inner namespace has no capabilities. |
+
 ## Rounds
 
 `--max-rounds` (default 5) counts agent invocations: the initial session plus up to 4 repair resumes. The pack runs after every invocation; a failure after the last one is recorded as a cap hit.

@@ -113,7 +113,7 @@ def run_pack(pack_src: Path, run_dir: Path, repo: Path, round_no: int, timeout_s
     out_json.unlink(missing_ok=True)
     try:
         cmd = ["bash", str(script), str(repo), str(out_json)]
-        proc = subprocess.run(wrap(cmd) if wrap else cmd, cwd=pack, env=env if env is not None else os.environ.copy(),
+        proc = subprocess.run(wrap(cmd) if wrap else cmd, cwd=pack, env={**(os.environ if env is None else env), "ACCEPT_NO_NAMESPACE": "1"},
                               capture_output=True, text=True, timeout=timeout_s, check=False)
     except subprocess.TimeoutExpired:
         raise AcceptanceInfraError(f"acceptance run.sh exceeded {timeout_s:.0f} s") from None

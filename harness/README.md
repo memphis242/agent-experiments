@@ -53,27 +53,32 @@ or the round cap was hit), `infra_error` (acceptance pack fault), `cli_error`
 (claude failed, for example rate limiting; rerun), or `error`.
 The process exits 0 only for `completed`.
 
-## Network isolation
+## Run isolation
 
-cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234), so every claude
-invocation and every acceptance `run.sh` runs inside its own network namespace:
+cFS binds fixed UDP ports (CI_LAB 1234, TO_LAB 2234) and, with CTF, shares
+`/dev/shm` (OSAL's RAM disk at `/dev/shm/osal:RAM`, which CTF deletes between
+runs). Every claude invocation and every acceptance `run.sh` therefore runs in
+its own namespaces:
 
-    pasta --config-net --quiet -t none -u none -T none -U none -- sh -c 'unshare -U --map-user=<uid> --map-group=<gid> sh -c "<command>"'
+    pasta --config-net --quiet -t none -u none -T none -U none -- sh -c 'unshare -m -i sh -c "mount -t tmpfs tmpfs /dev/shm && unshare -U --map-user=<uid> --map-group=<gid> sh -c <command>"'
 
-pasta and unshare must be installed; outbound HTTPS still works. Two details
-matter, each learned from a failure:
+pasta and unshare must be installed; outbound HTTPS still works. In order:
 
-- The inner `unshare -U --map-user/--map-group` maps the harness uid/gid back.
-  Without it the process is fake root in the user namespace, OSAL skips its
-  unprivileged message-queue depth adaptation, and cFS fails to boot with
-  `OS_QueueCreate` EINVAL. Because the uid is not 0, `IS_SANDBOX` is not needed.
-- The four `none` port options disable pasta's default loopback port
-  forwarding. With forwarding on, the namespace's UDP traffic was diverted to
-  host ports and reached other sessions' cFS instances.
+1. **User + network namespace (pasta).** Gives each run its own loopback, so
+   fixed UDP ports do not collide. The four `none` port options disable pasta's
+   default loopback port forwarding, which otherwise diverted the namespace's
+   UDP traffic to host ports and reached other sessions' cFS instances.
+2. **Mount + IPC namespaces (`unshare -m -i`).** A private tmpfs on `/dev/shm`
+   keeps OSAL's RAM disk and shared memory per run. The mount happens here
+   because only this layer still has root capabilities.
+3. **Nested user namespace (`unshare -U --map-user --map-group`).** Maps the
+   harness uid/gid back. As fake root, OSAL skips its unprivileged
+   message-queue depth adaptation and cFS fails to boot with `OS_QueueCreate`
+   EINVAL. Because the uid is not 0, `IS_SANDBOX` is not needed.
 
-`run.py` self-checks the full wrapper at startup (it must run
-`test "$(id -u)" = <uid>`) and fails clearly otherwise. `--no-netns` disables
-the wrapper for debugging; do not run concurrent cFS runs with it.
+`run.py` self-checks the full wrapper at startup (uid equals the harness uid
+and `/dev/shm` is empty) and fails clearly otherwise. `--no-netns` disables the
+wrapper for debugging; do not run concurrent cFS runs with it.
 `ANTHROPIC_API_KEY` and `ANTHROPIC_AUTH_TOKEN` are removed from the child
 environment so runs bill to the subscription token only. After each claude
 call and each acceptance run, leftover `core-cpu1` processes whose cwd is under

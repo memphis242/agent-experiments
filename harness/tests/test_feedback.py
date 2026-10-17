@@ -75,6 +75,7 @@ FAKE_CLAUDE = textwrap.dedent('''\
 
 PACK = textwrap.dedent('''\
     #!/usr/bin/env bash
+    [ "$ACCEPT_NO_NAMESPACE" = 1 ] || { echo "ACCEPT_NO_NAMESPACE missing" >&2; exit 2; }
     if [ -f "$1/done" ]; then
       echo '{"passed": true, "checks": [{"id": "done-file", "passed": true, "feedback": "", "detail": ""}]}' > "$2"; exit 0
     fi
@@ -161,11 +162,17 @@ class NetnsTest(unittest.TestCase):
                                         "-T", "none", "-U", "none", "--"])
         self.assertEqual(wrapped[12:14], ["sh", "-c"])
         self.assertEqual(len(wrapped), 15)
-        middle = shlex.split(wrapped[14])  # layer 1: what the outer sh runs
+        ns = shlex.split(wrapped[14])  # layer 1: mount + IPC namespaces
+        self.assertEqual(ns[:4], ["unshare", "-m", "-i", "sh"])
+        self.assertEqual(ns[4], "-c")
+        script = ns[5]
+        prefix = "mount -t tmpfs tmpfs /dev/shm && "
+        self.assertTrue(script.startswith(prefix))
+        middle = shlex.split(script[len(prefix):])  # layer 2: uid mapping
         self.assertEqual(middle[:2], ["unshare", "-U"])
         self.assertEqual(middle[2:4], [f"--map-user={os.getuid()}", f"--map-group={os.getgid()}"])
         self.assertEqual(middle[4:6], ["sh", "-c"])
-        self.assertEqual(shlex.split(middle[6]), cmd)  # layer 2: the original argv
+        self.assertEqual(shlex.split(middle[6]), cmd)  # layer 3: the original argv
 
     def test_child_env_scrubs_and_sets(self):
         base = {"ANTHROPIC_API_KEY": "k", "ANTHROPIC_AUTH_TOKEN": "t", "CLAUDE_CODE_OAUTH_TOKEN": "o", "PATH": "/bin"}

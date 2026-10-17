@@ -102,29 +102,33 @@ class RunConfig:
 
 
 def wrap_netns(cmd: Sequence[str]) -> list[str]:
-    """Run cmd in a private network namespace as the harness user.
+    """Run cmd isolated in network, mount, IPC, and user namespaces.
 
-    pasta cannot exec the program directly, so the command goes through
-    `sh -c`. The inner `unshare -U` maps the harness uid/gid back, so the
-    command is not fake root (OSAL skips its message-queue depth adaptation
-    for uid 0 and cFS then fails to boot). Two quoting layers are applied.
+    Layers, outermost first: pasta (user + network namespace, root inside),
+    `unshare -m -i` (mount + IPC namespaces, with a private tmpfs on /dev/shm,
+    which must be mounted while still root), then `unshare -U` mapping the
+    harness uid/gid back so the command is not fake root (OSAL skips its
+    message-queue depth adaptation for uid 0 and cFS then fails to boot).
+    pasta cannot exec the program directly, hence `sh -c` at each layer.
     """
     inner = shlex.join(cmd)
-    middle = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
+    mapped = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
               f"sh -c {shlex.quote(inner)}")
-    return [*PASTA_PREFIX, "sh", "-c", middle]
+    namespaced = f"unshare -m -i sh -c {shlex.quote('mount -t tmpfs tmpfs /dev/shm && ' + mapped)}"
+    return [*PASTA_PREFIX, "sh", "-c", namespaced]
 
 
 def check_netns() -> None:
-    """Fail clearly unless the full wrapper can run a command as the harness uid."""
-    probe = wrap_netns(["sh", "-c", f'test "$(id -u)" = {os.getuid()}'])
+    """Fail clearly unless the wrapper runs as the harness uid with an empty private /dev/shm."""
+    script = f'test "$(id -u)" = {os.getuid()} && test -z "$(ls -A /dev/shm)"'
+    probe = wrap_netns(["sh", "-c", script])
     try:
         proc = subprocess.run(probe, capture_output=True, text=True, check=False, timeout=60)
     except (OSError, subprocess.TimeoutExpired) as exc:
-        raise RunError(f"network namespace self-check failed ({shlex.join(probe)}): {exc}; "
+        raise RunError(f"run isolation self-check failed ({shlex.join(probe)}): {exc}; "
                        "install pasta and unshare or pass --no-netns") from exc
     if proc.returncode != 0:
-        raise RunError(f"network namespace self-check failed ({shlex.join(probe)} exited "
+        raise RunError(f"run isolation self-check failed ({shlex.join(probe)} exited "
                        f"{proc.returncode}): {proc.stderr.strip()}; fix pasta or pass --no-netns")
 
 
