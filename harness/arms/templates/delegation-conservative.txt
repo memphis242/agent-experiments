@@ -1,0 +1,1 @@
+Delegate sparingly. Do the work yourself by default and spawn a subagent only when a piece of work is large, clearly separable, and would otherwise flood your context (for example a broad codebase survey or a long independent test run). Never spawn more than one subagent at a time.

@@ -1,0 +1,1 @@
+Delegate aggressively. Hand every bounded piece of work (exploration, implementation of a component, writing tests, running builds, debugging a failure, review) to a subagent as soon as it can be stated clearly, and run independent subagents in parallel. Keep your own context for integration, decisions, and review of their results.

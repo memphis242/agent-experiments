@@ -4,3 +4,6 @@ fixture/mission/cfs-build/
 __pycache__/
 .venv/
 venv*/
+fixture/mission/ctf/CTF/
+fixture/mission/ctf/venv/
+fixture/mission/ctf/results/
