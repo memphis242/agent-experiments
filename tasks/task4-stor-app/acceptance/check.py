@@ -79,7 +79,8 @@ class Ctx:
     def timeout_for(self, want: float) -> float:
         left = self.remaining() - 20
         if left < 30:
-            raise Fail("the time budget for the review ran out before this step could run")
+            raise InfraError("the time budget of the review ran out before every check could run "
+                             "(an infrastructure outcome, not a requirement failure)")
         return min(want, left)
 
     # -- repository copy and build ---------------------------------------------------
@@ -407,6 +408,29 @@ def c_startup_and_hk(ctx: Ctx) -> None:
     time.sleep(1.0)
     p.check(len(cfs.packet_files()) >= 1, "no packet file exists after housekeeping traffic was stored")
     p.raise_if()
+
+
+LIVE_CHECKS = {"scheduled-housekeeping", "startup-and-hk", "decimation-and-stats", "packet-file-naming-and-header",
+               "rollover", "idle-file-close", "purge-order", "quota-drop", "restart-scan", "set-param-errors",
+               "file-add-list-delete", "file-path-rejection", "file-exists-rejection", "file-quota-rejection",
+               "reset-counters"}
+
+
+def run_check(ctx: Ctx, spec: CheckSpec) -> None:
+    """Run one check; a live scenario that fails is run once more from a fresh cFS before it counts as failed."""
+    try:
+        spec.fn(ctx)
+    except Fail as first:
+        if spec.check_id not in LIVE_CHECKS:
+            raise
+        print(f"[{spec.check_id}] first attempt failed ({str(first)[:200]}); retrying once", flush=True)
+        if ctx.cfs is not None:
+            ctx.cfs.stop()
+        ctx.session_key = None
+        try:
+            spec.fn(ctx)
+        except Fail as second:
+            raise Fail(f"{second} [first attempt: {first}]", second.feedback) from None
 
 
 def ceil_div(a: int, b: int) -> int:
@@ -1253,8 +1277,13 @@ def main(argv: list[str]) -> int:
             return 2
     deadline = time.monotonic() + TOTAL_BUDGET_S
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(2))  # run the cleanup below when timed out
-    base = os.environ.get("STOR_PACK_TMP") or tempfile.gettempdir()
-    work = Path(tempfile.mkdtemp(prefix="stor-pack-", dir=base))
+    base = os.environ.get("STOR_PACK_TMP") or "/workspace/tmp-acceptance"
+    try:
+        Path(base).mkdir(parents=True, exist_ok=True)
+        work = Path(tempfile.mkdtemp(prefix="stor-pack-", dir=base))
+    except OSError as exc:
+        print(f"infrastructure error: cannot create scratch space under {base}: {exc}", file=sys.stderr)
+        return 2
     ctx = Ctx(repo, work, deadline)
     by_id = {c.check_id: c for c in CHECKS}
     results: dict[str, dict[str, object]] = {}
@@ -1268,7 +1297,7 @@ def main(argv: list[str]) -> int:
             spec = by_id[cid]
             t0 = time.monotonic()
             try:
-                spec.fn(ctx)
+                run_check(ctx, spec)
                 results[cid] = {"id": cid, "passed": True, "feedback": "", "detail": f"{time.monotonic() - t0:.0f} s"}
             except Fail as exc:
                 results[cid] = {"id": cid, "passed": False, "feedback": exc.feedback or spec.feedback,

@@ -14,7 +14,9 @@ here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 template="${TEMPLATE:-/workspace/agent-experiments-fixture/mission-template}"
 with_ref=0
 [ "${1:-}" = "--with-reference" ] && with_ref=1
-work="$(mktemp -d "${TMPDIR:-/tmp}/stor-selftest-XXXXXX")"
+scratch_root="${ACCEPT_SCRATCH_ROOT:-/workspace/tmp-acceptance}"
+mkdir -p "$scratch_root" || exit 2
+work="$(mktemp -d "$scratch_root/stor-selftest-XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 status=0
 fail() { echo "SELFTEST FAIL: $*"; status=1; }
@@ -113,7 +115,15 @@ for n, v in [("STOR_PATH_LEN", "64"), ("STOR_MAX_ENTRIES", "32"), ("STOR_LIST_EN
 json.dump(const, open(f"{d}/mission_constants.json", "w"), indent=2)
 PY
     if [ -f "$work/ref/ctf/setup_ctf.sh" ]; then
-        bash "$work/ref/ctf/setup_ctf.sh" > "$work/ctf-setup.log" 2>&1 || { fail "ctf/setup_ctf.sh failed"; tail -n 5 "$work/ctf-setup.log"; }
+        if ! bash "$work/ref/ctf/setup_ctf.sh" > "$work/ctf-setup.log" 2>&1; then
+            # no network (for example inside a private namespace): reuse an existing set-up CTF checkout if given
+            if [ -n "${CTF_CACHE:-}" ] && [ -d "$CTF_CACHE/CTF" ] && [ -d "$CTF_CACHE/venv" ]; then
+                rm -rf "$work/ref/ctf/CTF" "$work/ref/ctf/venv"
+                cp -a "$CTF_CACHE/CTF" "$CTF_CACHE/venv" "$work/ref/ctf/"
+            else
+                fail "ctf/setup_ctf.sh failed"; tail -n 5 "$work/ctf-setup.log"
+            fi
+        fi
     fi
     start=$SECONDS
     bash "$here/run.sh" "$work/ref" "$work/ref.json" > "$work/ref.log" 2>&1

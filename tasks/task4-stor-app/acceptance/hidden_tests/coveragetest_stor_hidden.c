@@ -1242,8 +1242,178 @@ static int get_list(int first_tx, lpkt_t *out, int max)
 
 /* --------------------------------------------------------------- test fixture */
 
+/* ---------------------------------------------------------- wider API coverage */
+
+static void H_OS_FileSysStatVolume(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    OS_statvfs_t *st = UT_Hook_GetArgValueByName(c, "statbuf", OS_statvfs_t *);
+    (void)ud;
+    memset(st, 0, sizeof(*st));
+    st->block_size = 512;
+    st->total_blocks = 1u << 20;
+    st->blocks_free = 1u << 20;
+    ret_i32(key, OS_SUCCESS);
+}
+
+static void H_OS_CloseFileByName(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    const char *path = UT_Hook_GetArgValueByName(c, "Filename", const char *);
+    int i = mf_find(path), k;
+    (void)ud;
+    if (i < 0) { ret_i32(key, OS_FS_ERR_PATH_INVALID); return; }
+    for (k = 0; k < MFD_MAX; k++)
+        if (mfd[k].used && mfd[k].file == i) { mfd[k].used = false; n_close++; }
+    ret_i32(key, OS_SUCCESS);
+}
+
+static void H_OS_CloseAllFiles(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    int k;
+    (void)ud; (void)c;
+    for (k = 0; k < MFD_MAX; k++)
+        if (mfd[k].used) { mfd[k].used = false; n_close++; }
+    ret_i32(key, OS_SUCCESS);
+}
+
+static void H_OS_TranslatePath(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    const char *v = UT_Hook_GetArgValueByName(c, "VirtualPath", const char *);
+    char *l = UT_Hook_GetArgValueByName(c, "LocalPath", char *);
+    (void)ud;
+    snprintf(l, OS_MAX_LOCAL_PATH_LEN, "%s", v);
+    ret_i32(key, name_check(v));
+}
+
+static void H_OS_chmod(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    (void)ud;
+    ret_i32(key, mf_find(UT_Hook_GetArgValueByName(c, "path", const char *)) >= 0 ? OS_SUCCESS : OS_ERROR);
+}
+
+static void H_FS_ReadHeader(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    CFE_FS_Header_t *h = UT_Hook_GetArgValueByName(c, "Hdr", CFE_FS_Header_t *);
+    int32 n = do_read(UT_Hook_GetArgValueByName(c, "FileDes", osal_id_t), h, sizeof(*h));
+    (void)ud;
+    ret_i32(key, n == (int32)sizeof(*h) ? n : CFE_FS_BAD_ARGUMENT);
+}
+
+static uint8 sb_pool[8][MSG_MAX_BYTES] __attribute__((aligned(16)));
+static int   sb_pool_next;
+
+static void H_SB_Alloc(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    size_t n = UT_Hook_GetArgValueByName(c, "MsgSize", size_t);
+    CFE_SB_Buffer_t *b = NULL;
+    (void)ud;
+    if (n <= MSG_MAX_BYTES)
+    {
+        b = (CFE_SB_Buffer_t *)sb_pool[sb_pool_next++ % 8];
+        memset(b, 0, n);
+    }
+    UT_Stub_SetReturnValue(key, b);
+}
+
+static void H_SB_TransmitBuffer(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    const CFE_MSG_Message_t *m = (const CFE_MSG_Message_t *)UT_Hook_GetArgValueByName(c, "BufPtr", CFE_SB_Buffer_t *);
+    msgreg_t *r = reg_find(m);
+    (void)ud;
+    if (r == NULL)
+        UtAssert_Failed("a buffer was transmitted that was never initialized with CFE_MSG_Init");
+    else if (ntx < TX_MAX && r->size <= MSG_MAX_BYTES)
+    {
+        tx[ntx].mid = r->mid;
+        tx[ntx].size = r->size;
+        memcpy(tx[ntx].bytes, m, r->size);
+        ntx++;
+    }
+    ret_i32(key, CFE_SUCCESS);
+}
+
+static void H_TIME_Add(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    CFE_TIME_SysTime_t a = UT_Hook_GetArgValueByName(c, "Time1", CFE_TIME_SysTime_t);
+    CFE_TIME_SysTime_t b = UT_Hook_GetArgValueByName(c, "Time2", CFE_TIME_SysTime_t);
+    (void)ud;
+    a.Seconds += b.Seconds;
+    a.Subseconds += b.Subseconds;
+    UT_Stub_SetReturnValue(key, a);
+}
+
+static void H_TIME_Subtract(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    CFE_TIME_SysTime_t a = UT_Hook_GetArgValueByName(c, "Time1", CFE_TIME_SysTime_t);
+    CFE_TIME_SysTime_t b = UT_Hook_GetArgValueByName(c, "Time2", CFE_TIME_SysTime_t);
+    (void)ud;
+    a.Seconds -= b.Seconds;
+    a.Subseconds -= b.Subseconds;
+    UT_Stub_SetReturnValue(key, a);
+}
+
+static void H_TIME_Compare(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    CFE_TIME_SysTime_t a = UT_Hook_GetArgValueByName(c, "TimeA", CFE_TIME_SysTime_t);
+    CFE_TIME_SysTime_t b = UT_Hook_GetArgValueByName(c, "TimeB", CFE_TIME_SysTime_t);
+    CFE_TIME_Compare_t r = CFE_TIME_EQUAL;
+    (void)ud;
+    if (a.Seconds < b.Seconds || (a.Seconds == b.Seconds && a.Subseconds < b.Subseconds)) r = CFE_TIME_A_LT_B;
+    else if (a.Seconds > b.Seconds || a.Subseconds > b.Subseconds) r = CFE_TIME_A_GT_B;
+    UT_Stub_SetReturnValue(key, r);
+}
+
+/* Calls this test cannot answer faithfully: report them by name instead of returning a silent default. */
+static char unmodelled_seen[16][48];
+static int  n_unmodelled;
+
+static void H_Unmodelled(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    const char *name = ud;
+    int i;
+    (void)c;
+    for (i = 0; i < n_unmodelled; i++)
+        if (strcmp(unmodelled_seen[i], name) == 0) break;
+    if (i == n_unmodelled && n_unmodelled < 16) snprintf(unmodelled_seen[n_unmodelled++], 48, "%s", name);
+    UtAssert_Failed("unmodelled call: %s (outside the OSAL/cFE calls this review environment can answer)", name);
+    ret_i32(key, -1);
+}
+
+#define UNMODELLED(fn) UT_SetHandlerFunction(UT_KEY(fn), H_Unmodelled, (void *)#fn)
+
+static void register_wide_hooks(void)
+{
+    UT_SetHandlerFunction(UT_KEY(OS_FileSysStatVolume), H_OS_FileSysStatVolume, NULL);
+    UT_SetHandlerFunction(UT_KEY(OS_CloseFileByName), H_OS_CloseFileByName, NULL);
+    UT_SetHandlerFunction(UT_KEY(OS_CloseAllFiles), H_OS_CloseAllFiles, NULL);
+    UT_SetHandlerFunction(UT_KEY(OS_TranslatePath), H_OS_TranslatePath, NULL);
+    UT_SetHandlerFunction(UT_KEY(OS_chmod), H_OS_chmod, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_FS_ReadHeader), H_FS_ReadHeader, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_SB_AllocateMessageBuffer), H_SB_Alloc, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_SB_ReleaseMessageBuffer), H_TBL_Ok, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_SB_TransmitBuffer), H_SB_TransmitBuffer, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TBL_Validate), H_TBL_Ok, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TBL_Modified), H_TBL_Ok, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TIME_Add), H_TIME_Add, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TIME_Subtract), H_TIME_Subtract, NULL);
+    UT_SetHandlerFunction(UT_KEY(CFE_TIME_Compare), H_TIME_Compare, NULL);
+    UT_SetVaHookFunction(UT_KEY(CFE_EVS_SendEventWithAppID), ev_hook, NULL);
+    UT_SetVaHookFunction(UT_KEY(CFE_EVS_SendTimedEvent), ev_hook, NULL);
+    UNMODELLED(OS_ShellOutputToFile);
+    UNMODELLED(OS_GetFsInfo);
+    UNMODELLED(OS_FS_GetPhysDriveName);
+    UNMODELLED(OS_FileSysAddFixedMap);
+    UNMODELLED(OS_TaskCreate);
+    UNMODELLED(CFE_FS_ParseInputFileName);
+    UNMODELLED(CFE_FS_ParseInputFileNameEx);
+    UNMODELLED(CFE_FS_BackgroundFileDumpRequest);
+    UNMODELLED(CFE_ES_CreateChildTask);
+    UNMODELLED(CFE_ES_GetPoolBuf);
+    UNMODELLED(CFE_ES_PoolCreate);
+}
+
 static void register_hooks(void)
 {
+    register_wide_hooks();
     UT_SetHandlerFunction(UT_KEY(OS_OpenCreate), H_OS_OpenCreate, NULL);
     UT_SetHandlerFunction(UT_KEY(OS_write), H_OS_write, NULL);
     UT_SetHandlerFunction(UT_KEY(OS_TimedWrite), H_OS_write, NULL);
@@ -1304,6 +1474,7 @@ static void Setup(void)
     UT_ResetState(0);
     mf_reset();
     nreg = ntx = nev = nsubs = nunsubs = 0;
+    sb_pool_next = 0;
     msg_pool_next = 0;
     sub_rc = unsub_rc = CFE_SUCCESS;
     tbl_reg_rc = tbl_load_rc = CFE_SUCCESS;

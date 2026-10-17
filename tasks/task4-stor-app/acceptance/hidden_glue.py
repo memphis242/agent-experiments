@@ -134,5 +134,14 @@ def run_hidden(ctx, pack: Path) -> None:  # noqa: ANN001 - ctx is check.Ctx (imp
         raise Fail(f"the behaviour test crashed (exit {proc.returncode}); tail: {out[-800:]}",
                    BASE + " STOR must not crash (or abort an assertion) when given the specified commands, packets, "
                    "tables and file operations.")
+    unmodelled = sorted({m.group(1) for f in fails for m in re.finditer(r"unmodelled call: (\w+)", f)})
     if fails or proc.returncode != 0:
-        raise Fail(f"{len(fails)} failed assertions; first: " + " | ".join(fails[:8]), feedback_for(failed_cases))
+        extra = ""
+        if unmodelled:
+            extra = (" STOR called " + ", ".join(unmodelled) + ", which is outside the OSAL and cFE calls the review "
+                     "environment can answer; use the standard OSAL file and directory calls and the cFE message, table, "
+                     "event and time calls instead.")
+        detail = f"{len(fails)} failed assertions; first: " + " | ".join(fails[:8])
+        if unmodelled:
+            detail = "UNMODELLED CALLS: " + ", ".join(unmodelled) + "; " + detail
+        raise Fail(detail, feedback_for(failed_cases) + extra)

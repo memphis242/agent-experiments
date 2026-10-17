@@ -16,7 +16,9 @@ command -v timeout >/dev/null || { echo "timeout not found" >&2; exit 2; }
 rm -f "$out"
 
 # All scratch space of this invocation lives under one directory, so cleanup never touches another run.
-scratch="$(mktemp -d "${TMPDIR:-/tmp}/stor-run-XXXXXX")" || { echo "cannot create scratch directory" >&2; exit 2; }
+scratch_root="${ACCEPT_SCRATCH_ROOT:-/workspace/tmp-acceptance}"
+mkdir -p "$scratch_root" || { echo "cannot create $scratch_root" >&2; exit 2; }
+scratch="$(mktemp -d "$scratch_root/stor-run-XXXXXX")" || { echo "cannot create scratch directory" >&2; exit 2; }
 cleanup() {
     # Never leave a cFS running, whatever happened: stop those whose working directory is under our scratch.
     for pid in $(pgrep -x core-cpu1 2>/dev/null || true); do
@@ -25,6 +27,8 @@ cleanup() {
     done
     rm -rf "$scratch"
 }
+# The agent's code (build, cFS, test framework) runs under this script: hand it no credentials.
+unset CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
 trap cleanup EXIT
 trap 'exit 2' TERM INT
 
