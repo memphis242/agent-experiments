@@ -37,11 +37,19 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
 - Payload `HK_SetStaleCycles_Payload_t { uint8 StaleCycles; uint8 Spare[3]; }`
   and command `HK_SetStaleCyclesCmd_t` in the config message headers.
 - Valid 1 to 255: set the value, `CommandCounter`++, event
-  `HK_STALE_CYCLES_INF_EID` (38, INFORMATION) containing the new value.
+  `HK_STALE_CYCLES_INF_EID` (38, INFORMATION) containing the new value in
+  decimal. A command of the wrong length is handled by HK's existing length
+  check.
   Value 0: unchanged, `CommandErrorCounter`++, event
   `HK_STALE_CYCLES_ERR_EID` (39, ERROR).
 - Changing the threshold re-evaluates staleness at the next combined send,
-  not immediately.
+  not immediately. Staleness is recomputed at every combined send from the
+  entry's missed cycles and the current threshold, so raising the threshold
+  can make an entry fresh again at the next send (with the fresh event), and
+  lowering it can make an entry stale (with the stale event).
+- "Present" follows HK's existing data-present flag: a combined send counts
+  an entry as present when its input arrived since the previous send, and
+  the send consumes the flag.
 
 ### New command: REPORT_STALE
 
@@ -61,8 +69,11 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
   } HK_StaleReport_Payload_t;
   ```
 
-  with telemetry header, listed in copy-table order, unused slots set to
-  `CFE_SB_INVALID_MSG_ID`. Topic `CFE_MISSION_HK_STALE_RPT_TLM_TOPICID`
+  as `HK_StaleReportTlm_t { CFE_MSG_TelemetryHeader_t TelemetryHeader;
+  HK_StaleReport_Payload_t Payload; }`, entries listed in copy-table order,
+  unused slots set to `CFE_SB_INVALID_MSG_ID`. The command type is
+  `HK_SetStaleCyclesCmd_t { CFE_MSG_CommandHeader_t CommandHeader;
+  HK_SetStaleCycles_Payload_t Payload; }`. Topic `CFE_MISSION_HK_STALE_RPT_TLM_TOPICID`
   default 0xA2 in `fsw/inc/hk_topicids.h`; `HK_STALE_RPT_TLM_MID` via
   `CFE_PLATFORM_HK_TLM_MIDVAL` in `config/default_hk_msgids.h`. Add it to
   `sample_defs/tables/to_lab_sub.c`.
@@ -71,8 +82,8 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
 
 - When an entry becomes stale (missed cycles reaches `StaleCycles` during a
   combined send): `StaleTransitionCtr`++ and one event `HK_INPUT_STALE_EID`
-  (40, INFORMATION) naming the input and output MIDs in hex. No repeat while
-  it stays stale.
+  (40, INFORMATION) naming the input and output MIDs as `0x` followed by
+  hex digits. No repeat while it stays stale.
 - When a stale entry's input arrives: one event `HK_INPUT_FRESH_EID`
   (41, INFORMATION) naming both MIDs.
 - Loading a new copy table resets all missed-cycle counts and stale states
@@ -105,8 +116,10 @@ as payload); nothing schedules it automatically.
 - `make native_std.prep && make -j native_std.install` with no warnings
   (`-Werror`), `make -j native_std.runtest` passing.
 - Unit tests in HK's existing style for every new or changed path; line
-  coverage of each HK source file per `make native_std.lcov` must not fall
-  below its current value.
+  coverage of each HK source file must not fall below its current value
+  (100 percent today). Measure it from the gcov data the unit-test build
+  produces, for example `gcov --json-format` on the coverage objects under
+  `build-native_std`; lcov is not installed.
 - CTF definitions for the new command, the report packet and the extended
   housekeeping payload under `ctf/ccdd/json/`; a CTF test
   `ctf/tests/hk_staleness.json` that sets `StaleCycles` to 2, requests

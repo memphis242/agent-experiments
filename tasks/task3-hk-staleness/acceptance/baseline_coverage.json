@@ -1,0 +1,21 @@
+{
+  "method": "gcov --json-format line coverage of apps/hk/fsw/src/*.c after native_std.runtest",
+  "files": {
+    "hk_app.c": {
+      "covered": 99,
+      "lines": 99
+    },
+    "hk_cmds.c": {
+      "covered": 24,
+      "lines": 24
+    },
+    "hk_dispatch.c": {
+      "covered": 77,
+      "lines": 77
+    },
+    "hk_utils.c": {
+      "covered": 260,
+      "lines": 260
+    }
+  }
+}

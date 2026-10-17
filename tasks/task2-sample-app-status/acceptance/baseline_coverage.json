@@ -1,0 +1,21 @@
+{
+  "method": "gcov --json-format over the sample_app coverage test objects; a line is covered when any test executed it",
+  "files": {
+    "sample_app.c": {
+      "lines": 42,
+      "hit": 42
+    },
+    "sample_app_cmds.c": {
+      "lines": 38,
+      "hit": 38
+    },
+    "sample_app_dispatch.c": {
+      "lines": 51,
+      "hit": 51
+    },
+    "sample_app_utils.c": {
+      "lines": 13,
+      "hit": 13
+    }
+  }
+}

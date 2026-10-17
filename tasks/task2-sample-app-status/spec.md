@@ -83,8 +83,10 @@ be downlinked through TO_LAB, be exercised by a CTF test, and be reported.
   succeed with no warnings (the mission compiles with `-Werror`).
 - `make -j native_std.runtest` passes. Every new or changed code path has a
   coverage test in `apps/sample_app/unit-test/coveragetest/`, following the
-  existing style; line coverage of each sample_app source file, as reported
-  by `make native_std.lcov`, must not fall below its current value.
+  existing style; line coverage of each sample_app source file must not
+  fall below its current value (100 percent today). Measure it from the
+  gcov data the unit-test build produces, for example `gcov --json-format`
+  on the coverage objects under `build-native_std`; lcov is not installed.
 - CTF: add command and telemetry definitions for SET_STATUS_RATE and the
   status packet under `ctf/ccdd/json/` following `ctf/ccdd/README.md`, and
   a test `ctf/tests/sample_app_status_rate.json` that sets divisor 1,
@@ -94,6 +96,7 @@ be downlinked through TO_LAB, be exercised by a CTF test, and be reported.
 - Report: `docs/reports/sample_app_status_rate.md` stating what changed
   (files and interfaces), unit test results (segment and assertion counts),
   coverage figures for sample_app, CTF results, and any open issues.
+- Event texts that report a value print it in decimal.
 - Commit the work.
 
 ## Acceptance

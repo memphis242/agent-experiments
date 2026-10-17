@@ -1,0 +1,48 @@
+{
+  "tlm_mid_name": "SAMPLE_APP_STATUS_TLM_MID",
+  "tlm_description": "status",
+  "tlm_data_type": "SAMPLE_APP_StatusTlm_t",
+  "tlm_parameters": [
+    {
+      "name": "Payload",
+      "description": "",
+      "data_type": "SAMPLE_APP_StatusTlm_Payload_t",
+      "array_size": "0",
+      "bit_length": "0",
+      "parameters": [
+        {
+          "name": "TableCrc",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "ProcessCmdCount",
+          "description": "",
+          "data_type": "uint32",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "StatusDivisor",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        },
+        {
+          "name": "HkCycleCount",
+          "description": "",
+          "data_type": "uint16",
+          "array_size": "0",
+          "bit_length": "0",
+          "parameters": []
+        }
+      ]
+    }
+  ]
+}

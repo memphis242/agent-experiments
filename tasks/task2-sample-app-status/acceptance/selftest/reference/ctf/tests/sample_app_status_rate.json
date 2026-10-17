@@ -1,0 +1,194 @@
+{
+  "test_script_number": "STATUS-RATE",
+  "test_script_name": "sample_app_status_rate.json",
+  "owner": "mission",
+  "description": "status rate",
+  "requirements": {},
+  "ctf_options": {
+    "verify_timeout": 10
+  },
+  "test_setup": "",
+  "environment": {},
+  "functions": {},
+  "tests": [
+    {
+      "test_number": "SR-1",
+      "description": "boot",
+      "instructions": [
+        {
+          "instruction": "RegisterCfs",
+          "data": {
+            "target": [
+              "mission"
+            ]
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "StartCfs",
+          "data": {
+            "target": [
+              "mission"
+            ]
+          },
+          "wait": 10
+        },
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "TO_LAB_CMD_MID",
+            "cc": "TO_LAB_OUTPUT_ENABLE_CC",
+            "args": {
+              "Payload": {
+                "dest_IP": "127.0.0.1"
+              }
+            }
+          },
+          "wait": 2
+        }
+      ]
+    },
+    {
+      "test_number": "SR-2",
+      "description": "divisor 1",
+      "instructions": [
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_CMD_MID",
+            "cc": "SAMPLE_APP_RESET_COUNTERS_CC",
+            "args": {}
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_CMD_MID",
+            "cc": "SAMPLE_APP_SET_STATUS_RATE_CC",
+            "args": {
+              "Payload": {
+                "Divisor": 1,
+                "Spare": 0
+              }
+            }
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "ClearTlmPacket",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_STATUS_TLM_MID"
+          },
+          "wait": 0
+        },
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_SEND_HK_MID",
+            "cc": "SAMPLE_APP_SEND_HK_CC",
+            "args": {}
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "CheckTlmValue",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_STATUS_TLM_MID",
+            "args": [
+              {
+                "compare": "==",
+                "variable": "Payload.StatusDivisor",
+                "value": 1
+              }
+            ]
+          },
+          "wait": 1
+        }
+      ]
+    },
+    {
+      "test_number": "SR-3",
+      "description": "divisor 0 rejected",
+      "instructions": [
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_CMD_MID",
+            "cc": "SAMPLE_APP_RESET_COUNTERS_CC",
+            "args": {}
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_CMD_MID",
+            "cc": "SAMPLE_APP_SET_STATUS_RATE_CC",
+            "args": {
+              "Payload": {
+                "Divisor": 0,
+                "Spare": 0
+              }
+            }
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "ClearTlmPacket",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_HK_TLM_MID"
+          },
+          "wait": 0
+        },
+        {
+          "instruction": "SendCfsCommand",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_SEND_HK_MID",
+            "cc": "SAMPLE_APP_SEND_HK_CC",
+            "args": {}
+          },
+          "wait": 1
+        },
+        {
+          "instruction": "CheckTlmValue",
+          "data": {
+            "target": "mission",
+            "mid": "SAMPLE_APP_HK_TLM_MID",
+            "args": [
+              {
+                "compare": "==",
+                "variable": "Payload.CommandErrorCounter",
+                "value": 1
+              }
+            ]
+          },
+          "wait": 1
+        }
+      ]
+    },
+    {
+      "test_number": "SR-4",
+      "description": "stop",
+      "instructions": [
+        {
+          "instruction": "ShutdownCfs",
+          "data": {
+            "target": "mission"
+          },
+          "wait": 1
+        }
+      ]
+    }
+  ]
+}

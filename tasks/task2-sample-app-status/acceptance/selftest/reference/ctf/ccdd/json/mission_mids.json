@@ -1,0 +1,95 @@
+[
+  {
+    "target": "set1",
+    "mids": [
+      {
+        "mid_name": "CFE_ES_CMD_MID",
+        "mid_value": "0x1806"
+      },
+      {
+        "mid_name": "CFE_ES_SEND_HK_MID",
+        "mid_value": "0x1808"
+      },
+      {
+        "mid_name": "CFE_ES_HK_TLM_MID",
+        "mid_value": "0x0800"
+      },
+      {
+        "mid_name": "CFE_EVS_CMD_MID",
+        "mid_value": "0x1801"
+      },
+      {
+        "mid_name": "CFE_EVS_SEND_HK_MID",
+        "mid_value": "0x1809"
+      },
+      {
+        "mid_name": "CFE_EVS_HK_TLM_MID",
+        "mid_value": "0x0801"
+      },
+      {
+        "mid_name": "CFE_EVS_LONG_EVENT_MSG_MID",
+        "mid_value": "0x0808"
+      },
+      {
+        "mid_name": "CFE_EVS_SHORT_EVENT_MSG_MID",
+        "mid_value": "0x0809"
+      },
+      {
+        "mid_name": "TO_LAB_CMD_MID",
+        "mid_value": "0x1880"
+      },
+      {
+        "mid_name": "TO_LAB_SEND_HK_MID",
+        "mid_value": "0x1881"
+      },
+      {
+        "mid_name": "TO_LAB_HK_TLM_MID",
+        "mid_value": "0x0880"
+      },
+      {
+        "mid_name": "SAMPLE_APP_CMD_MID",
+        "mid_value": "0x1882"
+      },
+      {
+        "mid_name": "SAMPLE_APP_SEND_HK_MID",
+        "mid_value": "0x1883"
+      },
+      {
+        "mid_name": "SAMPLE_APP_HK_TLM_MID",
+        "mid_value": "0x0883"
+      },
+      {
+        "mid_name": "SAMPLE_APP_STATUS_TLM_MID",
+        "mid_value": "0x088F"
+      },
+      {
+        "mid_name": "CI_LAB_CMD_MID",
+        "mid_value": "0x1884"
+      },
+      {
+        "mid_name": "CI_LAB_SEND_HK_MID",
+        "mid_value": "0x1885"
+      },
+      {
+        "mid_name": "CI_LAB_HK_TLM_MID",
+        "mid_value": "0x0884"
+      },
+      {
+        "mid_name": "HK_CMD_MID",
+        "mid_value": "0x189A"
+      },
+      {
+        "mid_name": "HK_SEND_HK_MID",
+        "mid_value": "0x189B"
+      },
+      {
+        "mid_name": "HK_HK_TLM_MID",
+        "mid_value": "0x089B"
+      },
+      {
+        "mid_name": "HK_SEND_COMBINED_PKT_MID",
+        "mid_value": "0x189C"
+      }
+    ]
+  }
+]

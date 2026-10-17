@@ -236,8 +236,10 @@ INFORMATION, except PURGE_INF which is DEBUG.
 - Build with no warnings (`-Werror`); `make -j native_std.runtest` passes.
 - One coverage test file per source module in
   `apps/stor/unit-test/coveragetest/` (the build requires it); line coverage
-  of every STOR source file per `make native_std.lcov` at least 95 percent
-  (the project convention is 100).
+  of every STOR source file at least 95 percent (the project convention is
+  100). Measure it from the gcov data the unit-test build produces, for
+  example `gcov --json-format` on the coverage objects under
+  `build-native_std`; lcov is not installed.
 - CTF definitions for all STOR commands and telemetry under `ctf/ccdd/json/`
   and a test `ctf/tests/stor_basic.json` covering: NOOP, a SET_PRIORITY
   error on an unknown MID, ADD_FILE of `/cf/stor_tbl.tbl` as `t/copy.tbl`
