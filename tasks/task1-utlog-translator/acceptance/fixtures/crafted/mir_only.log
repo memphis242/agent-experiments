@@ -1,0 +1,16 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 PANEL_Display
+[ PASS] 01.001 panel_test.c:12 - Panel_Show() (0) == 0 (0)
+[  MIR] 01.002 panel_test.c:13 - Verify the panel shows the banner
+[  MIR] 01.003 Verify the panel colors by eye
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 PANEL_Display        TOTAL::3     PASS::1     FAIL::0     MIR::2     TSF::0     TTF::0   
+
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 SUMMARY              TOTAL::3     PASS::1     FAIL::0     MIR::2     TSF::0     TTF::0   
+COMPLETE: 1 tests Segment(s) executed

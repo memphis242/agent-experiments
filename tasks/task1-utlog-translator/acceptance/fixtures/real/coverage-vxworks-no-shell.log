@@ -1,0 +1,13 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 OS_ShellOutputToFile_Impl
+[ PASS] 01.001 coveragetest-no-shell.c:34 - OS_ShellOutputToFile_Impl(UT_INDEX_0, "ut") (-28) == OS_ERR_NOT_IMPLEMENTED (-28)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 OS_ShellOutputToFile_Impl TOTAL::1     PASS::1     FAIL::0     MIR::0     TSF::0     TTF::0   
+COMPLETE: 1 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

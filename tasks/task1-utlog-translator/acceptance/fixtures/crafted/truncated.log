@@ -1,0 +1,253 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 Test_CF_Chunk_CreateAddReset
+[ PASS] 01.001 cf_chunk_tests.c:114 - CF_ChunkListInit(&clist, sizeof(chunks) / sizeof(chunks[0]), chunks)
+[ PASS] 01.002 cf_chunk_tests.c:115 - clist.count (0) == 0 (0)
+[ PASS] 01.003 cf_chunk_tests.c:116 - clist.max_chunks (3) == sizeof(chunks) / sizeof(chunks[0]) (3)
+[ PASS] 01.004 cf_chunk_tests.c:118 - chunks[1].size (0) == 0 (0)
+[ PASS] 01.005 cf_chunk_tests.c:119 - chunks[1].offset (0) == 0 (0)
+[ PASS] 01.006 cf_chunk_tests.c:122 - CF_ChunkListAdd(&clist, 5, 1)
+[ PASS] 01.007 cf_chunk_tests.c:123 - clist.chunks[0].offset (5) == 5 (5)
+[ PASS] 01.008 cf_chunk_tests.c:124 - clist.chunks[0].size (1) == 1 (1)
+[ PASS] 01.009 cf_chunk_tests.c:125 - clist.count (1) == 1 (1)
+[ PASS] 01.010 cf_chunk_tests.c:128 - CF_ChunkListAdd(&clist, 10, 1)
+[ PASS] 01.011 cf_chunk_tests.c:129 - clist.chunks[0].offset (5) == 5 (5)
+[ PASS] 01.012 cf_chunk_tests.c:130 - clist.chunks[0].size (1) == 1 (1)
+[ PASS] 01.013 cf_chunk_tests.c:131 - clist.chunks[1].offset (10) == 10 (10)
+[ PASS] 01.014 cf_chunk_tests.c:132 - clist.chunks[1].size (1) == 1 (1)
+[ PASS] 01.015 cf_chunk_tests.c:133 - clist.count (2) == 2 (2)
+[ PASS] 01.016 cf_chunk_tests.c:136 - CF_ChunkListAdd(&clist, 0, 2)
+[ PASS] 01.017 cf_chunk_tests.c:137 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 01.018 cf_chunk_tests.c:138 - clist.chunks[0].size (2) == 2 (2)
+[ PASS] 01.019 cf_chunk_tests.c:139 - clist.chunks[1].offset (5) == 5 (5)
+[ PASS] 01.020 cf_chunk_tests.c:140 - clist.chunks[1].size (1) == 1 (1)
+[ PASS] 01.021 cf_chunk_tests.c:141 - clist.chunks[2].offset (10) == 10 (10)
+[ PASS] 01.022 cf_chunk_tests.c:142 - clist.chunks[2].size (1) == 1 (1)
+[ PASS] 01.023 cf_chunk_tests.c:143 - clist.count (3) == 3 (3)
+[ PASS] 01.024 cf_chunk_tests.c:146 - CF_ChunkListAdd(&clist, 20, 2)
+[ PASS] 01.025 cf_chunk_tests.c:147 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 01.026 cf_chunk_tests.c:148 - clist.chunks[0].size (2) == 2 (2)
+[ PASS] 01.027 cf_chunk_tests.c:149 - clist.chunks[1].offset (10) == 10 (10)
+[ PASS] 01.028 cf_chunk_tests.c:150 - clist.chunks[1].size (1) == 1 (1)
+[ PASS] 01.029 cf_chunk_tests.c:151 - clist.chunks[2].offset (20) == 20 (20)
+[ PASS] 01.030 cf_chunk_tests.c:152 - clist.chunks[2].size (2) == 2 (2)
+[ PASS] 01.031 cf_chunk_tests.c:153 - clist.count (3) == 3 (3)
+[ PASS] 01.032 cf_chunk_tests.c:156 - CF_ChunkListAdd(&clist, 22, 2)
+[ PASS] 01.033 cf_chunk_tests.c:157 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 01.034 cf_chunk_tests.c:158 - clist.chunks[0].size (2) == 2 (2)
+[ PASS] 01.035 cf_chunk_tests.c:159 - clist.chunks[1].offset (10) == 10 (10)
+[ PASS] 01.036 cf_chunk_tests.c:160 - clist.chunks[1].size (1) == 1 (1)
+[ PASS] 01.037 cf_chunk_tests.c:161 - clist.chunks[2].offset (20) == 20 (20)
+[ PASS] 01.038 cf_chunk_tests.c:162 - clist.chunks[2].size (4) == 4 (4)
+[ PASS] 01.039 cf_chunk_tests.c:163 - clist.count (3) == 3 (3)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 Test_CF_Chunk_CreateAddReset TOTAL::39    PASS::39    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 Test_CF_Chunk_AddEmpty
+[ PASS] 02.001 cf_chunk_tests.c:175 - CF_ChunkListAdd(&clist, 100, 0)
+[ PASS] 02.002 cf_chunk_tests.c:176 - clist.count (0) == 0 (0)
+[ PASS] 02.003 cf_chunk_tests.c:181 - CF_ChunkListAdd(&clist, 50, 0)
+[ PASS] 02.004 cf_chunk_tests.c:182 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 02.005 cf_chunk_tests.c:183 - clist.chunks[0].size (10) == 10 (10)
+[ PASS] 02.006 cf_chunk_tests.c:184 - clist.chunks[1].offset (100) == 100 (100)
+[ PASS] 02.007 cf_chunk_tests.c:185 - clist.chunks[1].size (10) == 10 (10)
+[ PASS] 02.008 cf_chunk_tests.c:186 - clist.count (2) == 2 (2)
+[ PASS] 02.009 cf_chunk_tests.c:187 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 200, 0, NULL, NULL) (2) == 2 (2)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 Test_CF_Chunk_AddEmpty TOTAL::9     PASS::9     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 Test_CF_Chunk_Combine
+[ INFO] cf_chunk_tests.c:199:Initial chunk list state for reference
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{11, 2}
+[ INFO] cf_chunk_tests.c:82:2{23, 3}
+[ INFO] cf_chunk_tests.c:82:3{36, 4}
+[ INFO] cf_chunk_tests.c:82:4{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{11-13}
+[ INFO] cf_chunk_tests.c:91:2{23-26}
+[ INFO] cf_chunk_tests.c:91:3{36-40}
+[ INFO] cf_chunk_tests.c:91:4{50-55}
+[ INFO] cf_chunk_tests.c:203:Add chunk that won't add since list full and new chunk is smallest
+[ PASS] 03.001 cf_chunk_tests.c:204 - CF_ChunkListAdd(&clist, 2, 1)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{11, 2}
+[ INFO] cf_chunk_tests.c:82:2{23, 3}
+[ INFO] cf_chunk_tests.c:82:3{36, 4}
+[ INFO] cf_chunk_tests.c:82:4{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{11-13}
+[ INFO] cf_chunk_tests.c:91:2{23-26}
+[ INFO] cf_chunk_tests.c:91:3{36-40}
+[ INFO] cf_chunk_tests.c:91:4{50-55}
+[ PASS] 03.002 cf_chunk_tests.c:207 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 03.003 cf_chunk_tests.c:208 - clist.chunks[0].size (1) == 1 (1)
+[ PASS] 03.004 cf_chunk_tests.c:209 - clist.chunks[1].offset (11) == 11 (11)
+[ PASS] 03.005 cf_chunk_tests.c:210 - clist.chunks[1].size (2) == 2 (2)
+[ PASS] 03.006 cf_chunk_tests.c:211 - clist.count (5) == 5 (5)
+[ INFO] cf_chunk_tests.c:214:Add chunk that replaces chunk 0 as the smallest chunk
+[ PASS] 03.007 cf_chunk_tests.c:215 - CF_ChunkListAdd(&clist, 2, 2)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{2, 2}
+[ INFO] cf_chunk_tests.c:82:1{11, 2}
+[ INFO] cf_chunk_tests.c:82:2{23, 3}
+[ INFO] cf_chunk_tests.c:82:3{36, 4}
+[ INFO] cf_chunk_tests.c:82:4{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{2-4}
+[ INFO] cf_chunk_tests.c:91:1{11-13}
+[ INFO] cf_chunk_tests.c:91:2{23-26}
+[ INFO] cf_chunk_tests.c:91:3{36-40}
+[ INFO] cf_chunk_tests.c:91:4{50-55}
+[ PASS] 03.008 cf_chunk_tests.c:218 - clist.chunks[0].offset (2) == 2 (2)
+[ PASS] 03.009 cf_chunk_tests.c:219 - clist.chunks[0].size (2) == 2 (2)
+[ PASS] 03.010 cf_chunk_tests.c:220 - clist.chunks[1].offset (11) == 11 (11)
+[ PASS] 03.011 cf_chunk_tests.c:221 - clist.chunks[1].size (2) == 2 (2)
+[ PASS] 03.012 cf_chunk_tests.c:222 - clist.count (5) == 5 (5)
+[ INFO] cf_chunk_tests.c:225:Add chunk that combines with chunk 1 w/ no overlap
+[ PASS] 03.013 cf_chunk_tests.c:226 - CF_ChunkListAdd(&clist, 10, 1)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{10, 3}
+[ INFO] cf_chunk_tests.c:82:2{23, 3}
+[ INFO] cf_chunk_tests.c:82:3{36, 4}
+[ INFO] cf_chunk_tests.c:82:4{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{10-13}
+[ INFO] cf_chunk_tests.c:91:2{23-26}
+[ INFO] cf_chunk_tests.c:91:3{36-40}
+[ INFO] cf_chunk_tests.c:91:4{50-55}
+[ PASS] 03.014 cf_chunk_tests.c:229 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 03.015 cf_chunk_tests.c:230 - clist.chunks[0].size (1) == 1 (1)
+[ PASS] 03.016 cf_chunk_tests.c:231 - clist.chunks[1].offset (10) == 10 (10)
+[ PASS] 03.017 cf_chunk_tests.c:232 - clist.chunks[1].size (3) == 3 (3)
+[ PASS] 03.018 cf_chunk_tests.c:233 - clist.chunks[2].offset (23) == 23 (23)
+[ PASS] 03.019 cf_chunk_tests.c:234 - clist.chunks[2].size (3) == 3 (3)
+[ PASS] 03.020 cf_chunk_tests.c:235 - clist.count (5) == 5 (5)
+[ INFO] cf_chunk_tests.c:238:Add chunk that should completely replace chunk 2 and 3, both as Next
+[ PASS] 03.021 cf_chunk_tests.c:239 - CF_ChunkListAdd(&clist, 20, 21)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{11, 2}
+[ INFO] cf_chunk_tests.c:82:2{20, 21}
+[ INFO] cf_chunk_tests.c:82:3{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{11-13}
+[ INFO] cf_chunk_tests.c:91:2{20-41}
+[ INFO] cf_chunk_tests.c:91:3{50-55}
+[ PASS] 03.022 cf_chunk_tests.c:242 - clist.chunks[1].offset (11) == 11 (11)
+[ PASS] 03.023 cf_chunk_tests.c:243 - clist.chunks[1].size (2) == 2 (2)
+[ PASS] 03.024 cf_chunk_tests.c:244 - clist.chunks[2].offset (20) == 20 (20)
+[ PASS] 03.025 cf_chunk_tests.c:245 - clist.chunks[2].size (21) == 21 (21)
+[ PASS] 03.026 cf_chunk_tests.c:246 - clist.chunks[3].offset (50) == 50 (50)
+[ PASS] 03.027 cf_chunk_tests.c:247 - clist.chunks[3].size (5) == 5 (5)
+[ PASS] 03.028 cf_chunk_tests.c:248 - clist.count (4) == 4 (4)
+[ INFO] cf_chunk_tests.c:251:Add chunk that combines with chunk 1, 2 and 3, (prev, next, next)
+[ PASS] 03.029 cf_chunk_tests.c:252 - CF_ChunkListAdd(&clist, 12, 25)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{11, 29}
+[ INFO] cf_chunk_tests.c:82:2{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{11-40}
+[ INFO] cf_chunk_tests.c:91:2{50-55}
+[ PASS] 03.030 cf_chunk_tests.c:255 - clist.chunks[0].offset (0) == 0 (0)
+[ PASS] 03.031 cf_chunk_tests.c:256 - clist.chunks[0].size (1) == 1 (1)
+[ PASS] 03.032 cf_chunk_tests.c:257 - clist.chunks[1].offset (11) == 11 (11)
+[ PASS] 03.033 cf_chunk_tests.c:258 - clist.chunks[1].size (29) == 29 (29)
+[ PASS] 03.034 cf_chunk_tests.c:259 - clist.chunks[2].offset (50) == 50 (50)
+[ PASS] 03.035 cf_chunk_tests.c:260 - clist.chunks[2].size (5) == 5 (5)
+[ PASS] 03.036 cf_chunk_tests.c:261 - clist.count (3) == 3 (3)
+[ INFO] cf_chunk_tests.c:264:Add chunk that is a subset of 3 (should just drop)
+[ PASS] 03.037 cf_chunk_tests.c:265 - CF_ChunkListAdd(&clist, 37, 2)
+[ INFO] cf_chunk_tests.c:79:Chunk list: index{offset, size}
+[ INFO] cf_chunk_tests.c:82:0{0, 1}
+[ INFO] cf_chunk_tests.c:82:1{11, 2}
+[ INFO] cf_chunk_tests.c:82:2{23, 3}
+[ INFO] cf_chunk_tests.c:82:3{36, 4}
+[ INFO] cf_chunk_tests.c:82:4{50, 5}
+[ INFO] cf_chunk_tests.c:88:Chunk list: index{start-end}
+[ INFO] cf_chunk_tests.c:91:0{0-1}
+[ INFO] cf_chunk_tests.c:91:1{11-13}
+[ INFO] cf_chunk_tests.c:91:2{23-26}
+[ INFO] cf_chunk_tests.c:91:3{36-40}
+[ INFO] cf_chunk_tests.c:91:4{50-55}
+[ PASS] 03.038 cf_chunk_tests.c:268 - clist.chunks[1].offset (11) == 11 (11)
+[ PASS] 03.039 cf_chunk_tests.c:269 - clist.chunks[1].size (2) == 2 (2)
+[ PASS] 03.040 cf_chunk_tests.c:270 - clist.chunks[2].offset (23) == 23 (23)
+[ PASS] 03.041 cf_chunk_tests.c:271 - clist.chunks[2].size (3) == 3 (3)
+[ PASS] 03.042 cf_chunk_tests.c:272 - clist.chunks[3].offset (36) == 36 (36)
+[ PASS] 03.043 cf_chunk_tests.c:273 - clist.chunks[3].size (4) == 4 (4)
+[ PASS] 03.044 cf_chunk_tests.c:274 - clist.count (5) == 5 (5)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 Test_CF_Chunk_Combine TOTAL::44    PASS::44    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 04 Test_CF_Chunk_GetRmFirst
+[ PASS] 04.001 cf_chunk_tests.c:286 - CF_ChunkList_GetFirstChunk(&clist) (0x0) == NULL (0x0)
+[ PASS] 04.002 cf_chunk_tests.c:295 - CF_ChunkList_GetFirstChunk(&clist) (0x7ffdd2bea730) == chunks (0x7ffdd2bea730)
+[ PASS] 04.003 cf_chunk_tests.c:298 - CF_ChunkList_RemoveFromFirst(&clist, 5)
+[ PASS] 04.004 cf_chunk_tests.c:299 - clist.chunks[0].offset (5) == 5 (5)
+[ PASS] 04.005 cf_chunk_tests.c:300 - clist.chunks[0].size (5) == 5 (5)
+[ PASS] 04.006 cf_chunk_tests.c:301 - clist.chunks[1].offset (20) == 20 (20)
+[ PASS] 04.007 cf_chunk_tests.c:302 - clist.chunks[1].size (10) == 10 (10)
+[ PASS] 04.008 cf_chunk_tests.c:303 - clist.count (2) == 2 (2)
+[ PASS] 04.009 cf_chunk_tests.c:306 - CF_ChunkList_RemoveFromFirst(&clist, 5)
+[ PASS] 04.010 cf_chunk_tests.c:307 - clist.chunks[0].offset (20) == 20 (20)
+[ PASS] 04.011 cf_chunk_tests.c:308 - clist.chunks[0].size (10) == 10 (10)
+[ PASS] 04.012 cf_chunk_tests.c:309 - clist.count (1) == 1 (1)
+[ PASS] 04.013 cf_chunk_tests.c:313 - CF_ChunkList_RemoveFromFirst(&clist, 50)
+[ PASS] 04.014 cf_chunk_tests.c:314 - clist.chunks[0].offset (20) == 20 (20)
+[ PASS] 04.015 cf_chunk_tests.c:315 - clist.chunks[0].size (10) == 10 (10)
+[ PASS] 04.016 cf_chunk_tests.c:316 - clist.count (1) == 1 (1)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 04 Test_CF_Chunk_GetRmFirst TOTAL::16    PASS::16    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 05 Test_CF_Chunk_ComputeGaps
+[ PASS] 05.001 cf_chunk_tests.c:329 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 0, 0, NULL, NULL) (0) == 0 (0)
+[ PASS] 05.002 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.003 cf_chunk_tests.c:334 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, total, 0, Test_CF_compute_gap_fn, &clist) (1) == 1 (1)
+[ PASS] 05.004 cf_chunk_tests.c:335 - Test_CF_compute_gap_context.chunks[0].size (10) == total (10)
+[ PASS] 05.005 cf_chunk_tests.c:336 - Test_CF_compute_gap_context.chunks[0].offset (0) == 0 (0)
+[ PASS] 05.006 cf_chunk_tests.c:337 - Test_CF_compute_gap_context.count (1) == 1 (1)
+[ PASS] 05.007 cf_chunk_tests.c:341 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, total, 0, NULL, NULL) (1) == 1 (1)
+[ PASS] 05.008 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.009 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.010 cf_chunk_tests.c:350 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 25, 0, Test_CF_compute_gap_fn, &clist) (2) == 2 (2)
+[ PASS] 05.011 cf_chunk_tests.c:351 - Test_CF_compute_gap_context.chunks[0].size (5) == 5 (5)
+[ PASS] 05.012 cf_chunk_tests.c:352 - Test_CF_compute_gap_context.chunks[0].offset (0) == 0 (0)
+[ PASS] 05.013 cf_chunk_tests.c:353 - Test_CF_compute_gap_context.chunks[1].size (10) == 10 (10)
+[ PASS] 05.014 cf_chunk_tests.c:354 - Test_CF_compute_gap_context.chunks[1].offset (10) == 10 (10)
+[ PASS] 05.015 cf_chunk_tests.c:355 - Test_CF_compute_gap_context.count (2) == 2 (2)
+[ PASS] 05.016 cf_chunk_tests.c:359 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 45, 0, NULL, NULL) (3) == 3 (3)
+[ PASS] 05.017 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.018 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.019 cf_chunk_tests.c:363 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 75, 25, Test_CF_compute_gap_fn, &clist) (2) == 2 (2)
+[ PASS] 05.020 cf_chunk_tests.c:364 - Test_CF_compute_gap_context.chunks[0].size (20) == 20 (20)
+[ PASS] 05.021 cf_chunk_tests.c:365 - Test_CF_compute_gap_context.chunks[0].offset (30) == 30 (30)
+[ PASS] 05.022 cf_chunk_tests.c:366 - Test_CF_compute_gap_context.chunks[1].size (15) == 15 (15)
+[ PASS] 05.023 cf_chunk_tests.c:367 - Test_CF_compute_gap_context.chunks[1].offset (60) == 60 (60)
+[ PASS] 05.024 cf_chunk_tests.c:368 - Test_CF_compute_gap_context.count (2) == 2 (2)
+[ PASS] 05.025 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.026 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.027 cf_chunk_tests.c:36 - CList (0x7ffdd2bea740) == Opaque (0x7ffdd2bea740)
+[ PASS] 05.028 cf_chunk_tests.c:372 - CF_ChunkList_ComputeGaps(&clist, TEST_CF_MAX_GAPS, 75, 0, Test_CF_compute_gap_fn, &clist) (3) == 3 (3)
+[ PASS] 05.029 cf_chunk_tests.c:373 - Test_CF_compute_gap_context.chunks[0].size (5) == 5 (5)
+[ PASS] 05.030 cf_chunk_tests.c:374 - Test_CF_compute_gap_context.chunks[0].offset (0) == 0 (0)
+[ PASS] 05.031 cf_chunk_tests.c:375 - Test_CF_compute_gap_context.chunks[1].size (10) == 10 (10)
+[ PASS] 05.032 cf_chunk_tests.c:376 - Test_CF_compute_gap_context.chunks[1].offset (10) == 10 (10)
+[ PASS] 05.033 cf_chunk_tests.c:377 - Test_CF_compute_gap_context.chunks[2].size (20) == 20 (20)
+[ PASS] 05.034 cf_chunk_tests.c:378 - Test_CF_compute_gap_context.chunks[2].offset (30) == 30 (30)
+[ PASS] 05.035 cf_chunk_tests.c:379 - Test_CF_compute_gap_context.count (3) == 3 (3)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 05 Test_CF_Chunk_ComputeGaps TOTAL::35    PASS::35    FAIL::0     MIR::0     TSF::0     TTF::0   

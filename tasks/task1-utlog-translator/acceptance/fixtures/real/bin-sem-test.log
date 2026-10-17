@@ -1,0 +1,112 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+OS_Posix_GetSchedulerParams():208:Policy 1: available, min-max: 1-99
+OS_Posix_GetSchedulerParams():208:Policy 2: available, min-max: 1-99
+OS_Posix_TaskAPI_Impl_Init():401:Selected policy 2 for RT tasks, root task = 99
+OS_Posix_TaskAPI_Impl_Init():419:Could not setschedparam in main thread: Operation not permitted (1)
+[  END] No test cases
+
+[BEGIN] 01 Test_BinSem
+[ PASS] 01.001 bin-sem-test.c:86 - OS_BinSemGetInfo(OS_OBJECT_ID_UNDEFINED, &sem_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.002 bin-sem-test.c:87 - OS_BinSemFlush(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.003 bin-sem-test.c:88 - OS_BinSemGive(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.004 bin-sem-test.c:89 - OS_BinSemTake(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.005 bin-sem-test.c:90 - OS_BinSemTimedWait(OS_OBJECT_ID_UNDEFINED, 0) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.006 bin-sem-test.c:91 - OS_BinSemDelete(OS_OBJECT_ID_UNDEFINED) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.007 bin-sem-test.c:94 - OS_BinSemCreate(NULL, "Test_Sem", 0, 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 01.008 bin-sem-test.c:95 - OS_BinSemCreate(&sem_id[0], NULL, 0, 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_BinSemCreate():98:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_BinSemCreate():99:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 01.009 bin-sem-test.c:96 - OS_BinSemGetInfo(sem_id[0], NULL) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_BinSemGetInfo():259:check '(bin_prop) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_BinSemGetIdByName():238:check '(sem_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 01.010 bin-sem-test.c:97 - OS_BinSemGetIdByName(NULL, "Test_Sem") (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 01.011 bin-sem-test.c:98 - OS_BinSemGetIdByName(&sem_id[0], NULL) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_BinSemGetIdByName():239:check '(sem_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 01.012 bin-sem-test.c:102 - OS_BinSemCreate(&sem_id[0], long_name, 0, 0) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 01.013 bin-sem-test.c:103 - OS_BinSemGetIdByName(&sem_id[0], long_name) (-13) == OS_ERR_NAME_TOO_LONG (-13)
+[ PASS] 01.014 bin-sem-test.c:106 - OS_BinSemCreate(&sem_id[0], "Test_Sem", 0, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.015 bin-sem-test.c:107 - OS_BinSemCreate(&sem_id[1], "Test_Sem", 0, 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 01.016 bin-sem-test.c:110 - OS_BinSemCreate(&sem_id[1], "Test_Sem_Nonzero", 1, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.017 bin-sem-test.c:118 - OS_BinSemGetInfo(sem_id[0], &sem_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.018 bin-sem-test.c:119 - sem_prop.value (0) == 0 (0)
+[ PASS] 01.019 bin-sem-test.c:120 - OS_BinSemGetInfo(sem_id[1], &sem_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.020 bin-sem-test.c:121 - sem_prop.value (1) == 1 (1)
+[ PASS] 01.021 bin-sem-test.c:125 - OS_BinSemTimedWait(sem_id[0], 0) (-7) == OS_SEM_TIMEOUT (-7)
+[ PASS] 01.022 bin-sem-test.c:126 - OS_BinSemTimedWait(sem_id[0], 1) (-7) == OS_SEM_TIMEOUT (-7)
+[ PASS] 01.023 bin-sem-test.c:129 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.024 bin-sem-test.c:131 - OS_BinSemTake(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.025 bin-sem-test.c:132 - OS_BinSemTimedWait(sem_id[0], 0) (-7) == OS_SEM_TIMEOUT (-7)
+[ PASS] 01.026 bin-sem-test.c:135 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.027 bin-sem-test.c:136 - OS_BinSemTimedWait(sem_id[0], 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.028 bin-sem-test.c:137 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.029 bin-sem-test.c:138 - OS_BinSemTimedWait(sem_id[0], 1) (0) == OS_SUCCESS (0)
+[ PASS] 01.030 bin-sem-test.c:141 - OS_BinSemTimedWait(sem_id[1], 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.031 bin-sem-test.c:146 - OS_BinSemGetInfo(sem_id[0], &sem_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.032 bin-sem-test.c:147 - sem_prop.value (0) == 0 (0)
+[ PASS] 01.033 bin-sem-test.c:148 - OS_BinSemGetInfo(sem_id[1], &sem_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.034 bin-sem-test.c:149 - sem_prop.value (0) == 0 (0)
+[ PASS] 01.035 bin-sem-test.c:158 - OS_TaskCreate(&task_id[0], "Task_0", Test_BinSem_Task0, NULL, TASK_STACK_SIZE, OSAL_PRIORITY_C(100), 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.036 bin-sem-test.c:35 - OS_BinSemGetIdByName(&sem_id, "Test_Sem") (0) == OS_SUCCESS (0)
+[ PASS] 01.037 bin-sem-test.c:162 - OS_TaskDelete(task_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.038 bin-sem-test.c:163 - task_counter[0] (0) == 0 (0)
+[ PASS] 01.039 bin-sem-test.c:167 - OS_BinSemGetInfo(sem_id[0], &sem_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.040 bin-sem-test.c:168 - sem_prop.value (0) == 0 (0)
+[ PASS] 01.041 bin-sem-test.c:176 - OS_TaskCreate(&task_id[0], "Task_0", Test_BinSem_Task0, NULL, TASK_STACK_SIZE, OSAL_PRIORITY_C(200), 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.042 bin-sem-test.c:35 - OS_BinSemGetIdByName(&sem_id, "Test_Sem") (0) == OS_SUCCESS (0)
+[ PASS] 01.043 bin-sem-test.c:180 - OS_TaskCreate(&task_id[1], "Task_1", Test_BinSem_Task1, NULL, TASK_STACK_SIZE, OSAL_PRIORITY_C(100), 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.044 bin-sem-test.c:183 - OS_TaskCreate(&task_id[2], "Task_2", Test_BinSem_Task2, NULL, TASK_STACK_SIZE, OSAL_PRIORITY_C(250), 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.045 bin-sem-test.c:49 - OS_BinSemGetIdByName(&sem_id, "Test_Sem") (0) == OS_SUCCESS (0)
+[ PASS] 01.046 bin-sem-test.c:63 - OS_BinSemGetIdByName(&sem_id, "Test_Sem") (0) == OS_SUCCESS (0)
+[ PASS] 01.047 bin-sem-test.c:187 - task_counter[0] + task_counter[1] + task_counter[2] (0) == 0 (0)
+[ PASS] 01.048 bin-sem-test.c:188 - OS_BinSemFlush(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.049 bin-sem-test.c:67 - OS_BinSemTimedWait(sem_id, 1000) (0) == OS_SUCCESS (0)
+[ PASS] 01.050 bin-sem-test.c:53 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.051 bin-sem-test.c:39 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.052 bin-sem-test.c:190 - task_counter[0] (1) == 1 (1)
+[ PASS] 01.053 bin-sem-test.c:191 - task_counter[1] (1) == 1 (1)
+[ PASS] 01.054 bin-sem-test.c:192 - task_counter[2] (1) == 1 (1)
+[ PASS] 01.055 bin-sem-test.c:200 - OS_TaskGetInfo(task_id[1], &task_prop) (0) == OS_SUCCESS (0)
+[ INFO] bin-sem-test.c:211:Task Priorities not in effect, skipping sem priority test
+[ PASS] 01.056 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.057 bin-sem-test.c:67 - OS_BinSemTimedWait(sem_id, 1000) (0) == OS_SUCCESS (0)
+[ PASS] 01.058 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (4) == test_val (4)
+[ PASS] 01.059 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.060 bin-sem-test.c:53 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.061 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (5) == test_val (5)
+[ PASS] 01.062 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.063 bin-sem-test.c:39 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.064 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (6) == test_val (6)
+[ PASS] 01.065 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.066 bin-sem-test.c:67 - OS_BinSemTimedWait(sem_id, 1000) (0) == OS_SUCCESS (0)
+[ PASS] 01.067 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (7) == test_val (7)
+[ PASS] 01.068 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.069 bin-sem-test.c:53 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.070 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (8) == test_val (8)
+[ PASS] 01.071 bin-sem-test.c:218 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.072 bin-sem-test.c:39 - OS_BinSemTake(sem_id) (0) == OS_SUCCESS (0)
+[ PASS] 01.073 bin-sem-test.c:220 - task_counter[0] + task_counter[1] + task_counter[2] (9) == test_val (9)
+[ PASS] 01.074 bin-sem-test.c:224 - OS_BinSemGive(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.075 bin-sem-test.c:226 - task_counter[0] + task_counter[1] + task_counter[2] (9) == test_val (9)
+[ PASS] 01.076 bin-sem-test.c:229 - OS_BinSemDelete(sem_id[0]) (0) == OS_SUCCESS (0)
+[ PASS] 01.077 bin-sem-test.c:230 - OS_BinSemDelete(sem_id[1]) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 Test_BinSem          TOTAL::77    PASS::77    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 Cleanup
+[  END] No test cases
+COMPLETE: 1 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

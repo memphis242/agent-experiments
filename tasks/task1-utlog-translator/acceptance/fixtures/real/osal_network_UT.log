@@ -1,0 +1,32 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+OS_Posix_GetSchedulerParams():208:Policy 1: available, min-max: 1-99
+OS_Posix_GetSchedulerParams():208:Policy 2: available, min-max: 1-99
+OS_Posix_TaskAPI_Impl_Init():401:Selected policy 2 for RT tasks, root task = 99
+OS_Posix_TaskAPI_Impl_Init():419:Could not setschedparam in main thread: Operation not permitted (1)
+[  END] No test cases
+
+[BEGIN] 01 OS_NetworkGetID
+[  MIR] 01.001 ut_os_support.h:89 - OS_NetworkGetID() value=694784
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 OS_NetworkGetID      TOTAL::1     PASS::0     FAIL::0     MIR::1     TSF::0     TTF::0   
+
+[BEGIN] 02 OS_NetworkGetHostName
+[ PASS] 02.001 ut_osnetwork_misc_test.c:151 - OS_NetworkGetHostName(NULL, sizeof(buffer)) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_NetworkGetHostName():65:check '(host_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 02.002 ut_osnetwork_misc_test.c:156 - OS_NetworkGetHostName(buffer, 0) (-40) == OS_ERR_INVALID_SIZE (-40)
+[ PASS] 02.003 ut_osnetwork_misc_test.c:164 - OS_NetworkGetHostName(buffer, sizeof(buffer)) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 OS_NetworkGetHostName TOTAL::3     PASS::3     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 Cleanup
+[  END] No test cases
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 SUMMARY              TOTAL::4     PASS::3     FAIL::0     MIR::1     TSF::0     TTF::0   
+COMPLETE: 2 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

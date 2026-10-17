@@ -1,0 +1,945 @@
+{
+ "real/bin-sem-test.log": {
+  "complete": true,
+  "tests": 2,
+  "failures": 0,
+  "skipped": 1,
+  "mir": 0,
+  "totals": {
+   "total": 77,
+   "pass": 77,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "Test_BinSem",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/condvar-test.log": {
+  "complete": true,
+  "tests": 4,
+  "failures": 0,
+  "skipped": 1,
+  "mir": 0,
+  "totals": {
+   "total": 108,
+   "pass": 108,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "CondVarOps",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "CondVarBasic",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "CondVarTimed",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/coverage-cf-cf_chunk.log": {
+  "complete": true,
+  "tests": 5,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 143,
+   "pass": 143,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "Test_CF_Chunk_CreateAddReset",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_AddEmpty",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_Combine",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_GetRmFirst",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_ComputeGaps",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/coverage-evs-ALL.log": {
+  "complete": true,
+  "tests": 16,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 1402,
+   "pass": 1400,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "Test_Init",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_IllegalAppID",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_UnregisteredApp",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_FilterRegistration",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_FilterReset",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Format",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Ports",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Logging",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_WriteApp",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_BadAppCmd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_EventCmd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_FilterCmd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_InvalidCmd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Squelching",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Misc",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_SetEvent",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/coverage-shared-heap.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 2,
+   "pass": 2,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "OS_HeapGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/coverage-time-ALL.log": {
+  "complete": true,
+  "tests": 17,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 481,
+   "pass": 464,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "Test_Main",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Init",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_GetTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_TimeOp",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_ConvertTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Print",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_RegisterSyncCallbackTrue",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_ExternalTone",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_External",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_PipeCmds",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_ResetArea",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_State",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_GetReference",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_Tone",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_1Hz",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_UnregisterSynchCallback",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CleanUpApp",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/coverage-vxworks-no-shell.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 1,
+   "pass": 1,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "OS_ShellOutputToFile_Impl",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/osal_core_UT.log": {
+  "complete": true,
+  "tests": 50,
+  "failures": 0,
+  "skipped": 2,
+  "mir": 6,
+  "totals": {
+   "total": 230,
+   "pass": 222,
+   "fail": 0,
+   "mir": 6,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "OS_API_Init",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_RegisterEventHandler",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf_enable",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_printf_disable",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemFlush",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemTimedWait",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_BinSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemTimedWait",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_CountSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGive",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemTake",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_MutSemGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueuePut",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGet",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_QueueGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectFd",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectSingle",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SelectMultiple",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "UT_os_init_task_misc",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskCreate",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskDelete",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskInstallDeleteHandler",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskExit",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskDelay",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskSetPriority",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetId",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetIdByName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_TaskFindIdBySystemData",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_GetErrorName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_StatusToString",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_GetLocalTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_SetLocalTime",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_HeapGetInfo",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
+ "real/osal_network_UT.log": {
+  "complete": true,
+  "tests": 3,
+  "failures": 0,
+  "skipped": 1,
+  "mir": 1,
+  "totals": {
+   "total": 4,
+   "pass": 3,
+   "fail": 0,
+   "mir": 1,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "OS_NetworkGetID",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "OS_NetworkGetHostName",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/clean.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 1,
+   "pass": 1,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "LAMP_Toggle",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/failing.log": {
+  "complete": true,
+  "tests": 2,
+  "failures": 1,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 5,
+   "pass": 3,
+   "fail": 2,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "WIDGET_Compute",
+    "failing": true,
+    "skipped": false,
+    "fail_lines": [
+     "[ FAIL] 01.002 widget_test.c:41 - Widget_Compute(3) (7) == 9 (9)",
+     "[ FAIL] 01.003 widget_test.c:42 - Widget_Compute(4) (8) == 16 (16)"
+    ]
+   },
+   {
+    "name": "WIDGET_Reset",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/mir_only.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 2,
+  "totals": {
+   "total": 3,
+   "pass": 1,
+   "fail": 0,
+   "mir": 2,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "PANEL_Display",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/no_cases.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 1,
+  "mir": 0,
+  "totals": {
+   "total": 0,
+   "pass": 0,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "VALVE_Cleanup",
+    "failing": false,
+    "skipped": true,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/truncated.log": {
+  "complete": false,
+  "tests": 5,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 143,
+   "pass": 143,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "Test_CF_Chunk_CreateAddReset",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_AddEmpty",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_Combine",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_GetRmFirst",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   },
+   {
+    "name": "Test_CF_Chunk_ComputeGaps",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ },
+ "crafted/tsf.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 1,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 2,
+   "pass": 1,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 1,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "GADGET_Startup",
+    "failing": true,
+    "skipped": false,
+    "fail_lines": [
+     "[  TSF] 01.001 gadget_test.c:22 - Gadget_Open() (-1) == 0 (0)"
+    ]
+   }
+  ]
+ },
+ "crafted/unknown_line.log": {
+  "complete": true,
+  "tests": 1,
+  "failures": 0,
+  "skipped": 0,
+  "mir": 0,
+  "totals": {
+   "total": 1,
+   "pass": 1,
+   "fail": 0,
+   "mir": 0,
+   "tsf": 0,
+   "ttf": 0
+  },
+  "cases": [
+   {
+    "name": "LAMP_Toggle",
+    "failing": false,
+    "skipped": false,
+    "fail_lines": []
+   }
+  ]
+ }
+}

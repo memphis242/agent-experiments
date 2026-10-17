@@ -1,0 +1,1495 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[ INFO] evs_UT.c:69:cFE EVS Unit Test Output File
+
+[  END] No test cases
+
+[BEGIN] 01 Test_Init
+[ INFO] evs_UT.c:105:Begin Test Init
+[ PASS] 01.001 evs_UT.c:120 - Syslog generated: '%s: Event Log cleared following power-on reset' (1) >  (0)
+[ PASS] 01.002 evs_UT.c:125 - CFE_EVS_TaskMain()
+[ INFO] evs_UT.c:130:CFE_EVS_TaskMain - Test error reading command pipe, unrecognized msgid
+[ PASS] 01.003 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 01.004 evs_UT.c:140 - Syslog generated: '%s: Error reading cmd pipe,RC=0x%08X' (1) >  (0)
+[ PASS] 01.005 evs_UT.c:141 - UT_EVS_EventBuf.EventID (5) == CFE_EVS_ERR_MSGID_EID (5)
+[ PASS] 01.006 evs_UT.c:148 - Syslog generated: '%s: Call to CFE_PSP_GetResetArea failed, RC=0x%08x' (1) >  (0)
+[ PASS] 01.007 evs_UT.c:154 - Syslog generated: '%s: Event Log restored, n=%d, c=%d, f=%d, m=%d, o=%d' (1) >  (0)
+[ PASS] 01.008 evs_UT.c:163 - Syslog generated: '%s: Event Log cleared, n=%d, c=%d, f=%d, m=%d, o=%d' (1) >  (0)
+[ PASS] 01.009 evs_UT.c:172 - Syslog generated: '%s: Event Log cleared, n=%d, c=%d, f=%d, m=%d, o=%d' (1) >  (0)
+[ PASS] 01.010 evs_UT.c:181 - Syslog generated: '%s: Event Log cleared, n=%d, c=%d, f=%d, m=%d, o=%d' (1) >  (0)
+[ PASS] 01.011 evs_UT.c:190 - Syslog generated: '%s: Event Log restored, n=%d, c=%d, f=%d, m=%d, o=%d' (1) >  (0)
+[ PASS] 01.012 evs_UT.c:196 - Syslog generated: '%s: OS_MutSemCreate failed, RC=%ld' (1) >  (0)
+[ PASS] 01.013 evs_UT.c:204 - Syslog generated: '%s: Unexpected size from CFE_PSP_GetResetArea: expected = 0x%08lX, actual = 0x%08lX' (1) >  (0)
+[ PASS] 01.014 evs_UT.c:212 - Syslog generated: '%s: Event Log cleared following power-on reset' (1) >  (0)
+[ PASS] 01.015 evs_UT.c:218 - Syslog generated: '%s: Call to CFE_EVS_Register Failed:RC=0x%08X' (1) >  (0)
+[ PASS] 01.016 evs_UT.c:224 - Syslog generated: '%s: Call to CFE_SB_CreatePipe Failed:RC=0x%08X' (1) >  (0)
+[ PASS] 01.017 evs_UT.c:230 - Syslog generated: '%s: Subscribing to Cmds Failed:RC=0x%08X' (1) >  (0)
+[ PASS] 01.018 evs_UT.c:236 - Syslog generated: '%s: Subscribing to HK Request Failed:RC=0x%08X' (1) >  (0)
+[ PASS] 01.019 evs_UT.c:242 - Syslog generated: '%s: Call to CFE_ES_GetAppID Failed:RC=0x%08X' (1) >  (0)
+[ PASS] 01.020 evs_UT.c:247 - CallCount: CFE_ES_WriteToSysLog() (0) == 0 (0)
+[ PASS] 01.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 01.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 01.023 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 01.024 evs_UT.c:256 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 01.025 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 01.026 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 01.027 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 01.028 evs_UT.c:265 - UT_EVS_EventBuf.EventID (19) == CFE_EVS_DISPORT_EID (19)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 Test_Init            TOTAL::28    PASS::28    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 Test_IllegalAppID
+[ INFO] evs_UT.c:278:Begin Test Illegal App ID
+[ PASS] 02.001 evs_UT.c:285 - CFE_EVS_Register(NULL, 0, 0) (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.002 evs_UT.c:288 - CFE_EVS_SendEvent(0, 0, NULL) (-1040187384) == CFE_EVS_INVALID_PARAMETER (-1040187384)
+[ PASS] 02.003 evs_UT.c:289 - CFE_EVS_SendEventWithAppID(0, 0, CFE_ES_APPID_UNDEFINED, NULL) (-1040187384) == CFE_EVS_INVALID_PARAMETER (-1040187384)
+[ PASS] 02.004 evs_UT.c:290 - CFE_EVS_SendTimedEvent(time, 0, 0, NULL) (-1040187384) == CFE_EVS_INVALID_PARAMETER (-1040187384)
+[ PASS] 02.005 evs_UT.c:295 - CFE_EVS_SendEvent(0, 0, "NULL") (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.006 evs_UT.c:300 - EVS_SendEvent(0, 0, "NULL") (0x0) == CFE_SUCCESS
+[ PASS] 02.007 evs_UT.c:305 - CFE_EVS_SendTimedEvent(time, 0, 0, "NULL") (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.008 evs_UT.c:310 - CFE_EVS_SendEventWithAppID(0, 0, CFE_ES_APPID_UNDEFINED, "NULL") (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.009 evs_UT.c:315 - CFE_EVS_ResetFilter(0) (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.010 evs_UT.c:320 - CFE_EVS_ResetAllFilters() (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.011 evs_UT.c:325 - CFE_EVS_CleanUpApp(CFE_RESOURCEID_TO_ULONG(CFE_ES_APPID_UNDEFINED)) (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ PASS] 02.012 evs_UT.c:330 - CFE_EVS_SendEventWithAppID(0, 0, AppID, "NULL") (-1040187389) == CFE_EVS_APP_ILLEGAL_APP_ID (-1040187389)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 Test_IllegalAppID    TOTAL::12    PASS::12    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 Test_UnregisteredApp
+[ INFO] evs_UT.c:345:Begin Test Unregistered App
+[ PASS] 03.001 evs_UT.c:354 - CFE_EVS_SendEvent(0, 0, "NULL") (-1040187390) == CFE_EVS_APP_NOT_REGISTERED (-1040187390)
+[ PASS] 03.002 evs_UT.c:358 - CFE_EVS_ResetFilter(0) (-1040187390) == CFE_EVS_APP_NOT_REGISTERED (-1040187390)
+[ PASS] 03.003 evs_UT.c:362 - CFE_EVS_ResetAllFilters() (-1040187390) == CFE_EVS_APP_NOT_REGISTERED (-1040187390)
+[ PASS] 03.004 evs_UT.c:366 - CFE_EVS_SendEventWithAppID(0, CFE_EVS_EventType_INFORMATION, AppID, "NULL") (-1040187390) == CFE_EVS_APP_NOT_REGISTERED (-1040187390)
+[ PASS] 03.005 evs_UT.c:371 - CFE_EVS_SendTimedEvent(time, CFE_EVS_EventType_INFORMATION, 0, "NULL") (-1040187390) == CFE_EVS_APP_NOT_REGISTERED (-1040187390)
+[ PASS] 03.006 evs_UT.c:376 - CFE_EVS_CleanUpApp(CFE_RESOURCEID_TO_ULONG(AppID)) (0x0) == CFE_SUCCESS
+[ PASS] 03.007 evs_UT.c:380 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 Test_UnregisteredApp TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 04 Test_FilterRegistration
+[ INFO] evs_UT.c:399:Begin Test Filter Registration
+[ PASS] 04.001 evs_UT.c:406 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY + 1) (-1040187391) == CFE_EVS_UNKNOWN_FILTER (-1040187391)
+[ PASS] 04.002 evs_UT.c:410 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 04.003 evs_UT.c:414 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 04.004 evs_UT.c:418 - CFE_EVS_CleanUpApp(CFE_RESOURCEID_TO_ULONG(AppID)) (0x0) == CFE_SUCCESS
+[ PASS] 04.005 evs_UT.c:424 - CFE_EVS_Register(filter, 1, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 04.006 evs_UT.c:435 - CFE_EVS_Register(filter, CFE_PLATFORM_EVS_MAX_EVENT_FILTERS + 1, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 04.007 evs_UT.c:441 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "OK") (0x0) == CFE_SUCCESS
+[ PASS] 04.008 evs_UT.c:442 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (1) == 1 (1)
+[ PASS] 04.009 evs_UT.c:443 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (1) == 1 (1)
+[ PASS] 04.010 evs_UT.c:447 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "FAILED") (0x0) == CFE_SUCCESS
+[ PASS] 04.011 evs_UT.c:448 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (1) == 1 (1)
+[ PASS] 04.012 evs_UT.c:449 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (0) == 0 (0)
+[ PASS] 04.013 evs_UT.c:455 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "OK") (0x0) == CFE_SUCCESS
+[ PASS] 04.014 evs_UT.c:456 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (3) == 3 (3)
+[ PASS] 04.015 evs_UT.c:457 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (2) == 2 (2)
+[ PASS] 04.016 evs_UT.c:458 - FilterPtr->Count (65535) == CFE_EVS_MAX_FILTER_COUNT (65535)
+[ PASS] 04.017 evs_UT.c:462 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "FAILED") (0x0) == CFE_SUCCESS
+[ PASS] 04.018 evs_UT.c:463 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (3) == 3 (3)
+[ PASS] 04.019 evs_UT.c:464 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (0) == 0 (0)
+[ PASS] 04.020 evs_UT.c:465 - FilterPtr->Count (65535) == CFE_EVS_MAX_FILTER_COUNT (65535)
+[ PASS] 04.021 evs_UT.c:469 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "FAILED") (0x0) == CFE_SUCCESS
+[ PASS] 04.022 evs_UT.c:470 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (3) == 3 (3)
+[ PASS] 04.023 evs_UT.c:471 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (0) == 0 (0)
+[ PASS] 04.024 evs_UT.c:472 - FilterPtr->Count (65535) == CFE_EVS_MAX_FILTER_COUNT (65535)
+[ PASS] 04.025 evs_UT.c:476 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 04.026 evs_UT.c:484 - CFE_EVS_SendEventWithAppID(0, CFE_EVS_EventType_INFORMATION, AppID, "NULL") (0x0) == CFE_SUCCESS
+[ PASS] 04.027 evs_UT.c:490 - CFE_EVS_SendTimedEvent(time, CFE_EVS_EventType_INFORMATION, 0, "NULL") (0x0) == CFE_SUCCESS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 04 Test_FilterRegistration TOTAL::27    PASS::27    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 05 Test_FilterReset
+[ INFO] evs_UT.c:500:Begin Test Filter Reset
+[ PASS] 05.001 evs_UT.c:506 - CFE_EVS_Register(&filter, 1, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 05.002 evs_UT.c:510 - CFE_EVS_ResetFilter(CFE_PLATFORM_EVS_MAX_EVENT_FILTERS + 1) (-1040187386) == CFE_EVS_EVT_NOT_REGISTERED (-1040187386)
+[ PASS] 05.003 evs_UT.c:514 - CFE_EVS_ResetFilter(-1) (0x0) == CFE_SUCCESS
+[ PASS] 05.004 evs_UT.c:518 - CFE_EVS_ResetFilter(1) (0x0) == CFE_SUCCESS
+[ PASS] 05.005 evs_UT.c:522 - CFE_EVS_ResetAllFilters() (0x0) == CFE_SUCCESS
+[ PASS] 05.006 evs_UT.c:526 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 05 Test_FilterReset     TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 06 Test_Format
+[ INFO] evs_UT.c:564:Begin Test Format
+[ PASS] 06.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 06.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 06.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 06.004 evs_UT.c:578 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 06.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 06.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 06.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 06.008 evs_UT.c:587 - UT_EVS_EventBuf.EventID (10) == CFE_EVS_ERR_ILLEGALFMTMOD_EID (10)
+[ PASS] 06.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 06.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 06.011 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 06.012 evs_UT.c:598 - UT_EVS_EventBuf.EventID (22) == CFE_EVS_SETEVTFMTMOD_EID (22)
+[ INFO] evs_UT.c:600:Test for short event sent when configured to do so 
+[ PASS] 06.013 evs_UT.c:607 - UT_GetStubCount(UT_KEY(CFE_MSG_Init)) (2) == 2 (2)
+[ PASS] 06.014 evs_UT.c:608 - UT_GetStubCount(UT_KEY(CFE_SB_TransmitMsg)) (1) == 1 (1)
+[ PASS] 06.015 evs_UT.c:609 - CFE_SB_MsgId_Equal(MsgData.MsgId, ShortFmtSnapshotData.MsgId) (1) == true (1)
+[ PASS] 06.016 evs_UT.c:610 - CFE_SB_MsgId_Equal(MsgData.MsgId, LongFmtSnapshotData.MsgId) (0) == false (0)
+[ PASS] 06.017 evs_UT.c:613 - MsgSend (0x7fff2ae83a80) == MsgData.MsgPtr (0x7fff2ae83a80)
+[ PASS] 06.018 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 06.019 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 06.020 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 06.021 evs_UT.c:624 - UT_EVS_EventBuf.EventID (22) == CFE_EVS_SETEVTFMTMOD_EID (22)
+[ PASS] 06.022 evs_UT.c:639 - EventID[0] (0) == ZERO (0)
+[ PASS] 06.023 evs_UT.c:640 - EventID[1] (0) == ZERO (0)
+[ PASS] 06.024 evs_UT.c:641 - CapturedMsg.EventID (0) == ZERO (0)
+[ PASS] 06.025 evs_UT.c:654 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "%s", long_msg) (0x0) == CFE_SUCCESS
+[ PASS] 06.026 evs_UT.c:659 - CFE_EVS_SendEventWithAppID(0, CFE_EVS_EventType_INFORMATION, AppID, "%s", long_msg) (0x0) == CFE_SUCCESS
+[ PASS] 06.027 evs_UT.c:664 - CFE_EVS_SendTimedEvent(time, 0, CFE_EVS_EventType_INFORMATION, "%s", long_msg) (0x0) == CFE_SUCCESS
+[ PASS] 06.028 evs_UT.c:668 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "%s", long_msg) (0x0) == CFE_SUCCESS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 06 Test_Format          TOTAL::28    PASS::28    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 07 Test_Ports
+[ INFO] evs_UT.c:683:Begin Test Ports
+[ PASS] 07.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.004 evs_UT.c:694 - UT_EVS_EventBuf.EventID (18) == CFE_EVS_ENAPORT_EID (18)
+[ PASS] 07.005 evs_UT.c:700 - CFE_EVS_SendEvent(0, CFE_EVS_EventType_INFORMATION, "Test ports message") (0) == CFE_SUCCESS (0)
+[ PASS] 07.006 evs_UT.c:701 - LocalSnapshotData.Count (1) == 1 (1)
+[ PASS] 07.007 evs_UT.c:702 - CallCount: CFE_TIME_Print() (1) == 1 (1)
+[ PASS] 07.008 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.009 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.010 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.011 evs_UT.c:711 - UT_EVS_EventBuf.EventID (19) == CFE_EVS_DISPORT_EID (19)
+[ PASS] 07.012 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.013 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.014 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.015 evs_UT.c:720 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 07.016 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.017 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.018 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.019 evs_UT.c:728 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 07.020 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.021 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.022 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.023 evs_UT.c:737 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 07.024 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.025 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.026 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.027 evs_UT.c:746 - UT_EVS_EventBuf.EventID (18) == CFE_EVS_ENAPORT_EID (18)
+[ PASS] 07.028 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.029 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.030 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.031 evs_UT.c:755 - UT_EVS_EventBuf.EventID (18) == CFE_EVS_ENAPORT_EID (18)
+[ PASS] 07.032 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.033 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.034 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.035 evs_UT.c:764 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 07.036 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.037 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.038 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.039 evs_UT.c:773 - UT_EVS_EventBuf.EventID (19) == CFE_EVS_DISPORT_EID (19)
+[ PASS] 07.040 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 07.041 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 07.042 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 07.043 evs_UT.c:782 - UT_EVS_EventBuf.EventID (19) == CFE_EVS_DISPORT_EID (19)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 07 Test_Ports           TOTAL::43    PASS::43    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 08 Test_Logging
+[ INFO] evs_UT.c:804:Begin Test Logging
+[ PASS] 08.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 08.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 08.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 08.004 evs_UT.c:828 - UT_EVS_EventBuf.EventID (39) == CFE_EVS_ERR_LOGMODE_EID (39)
+[ PASS] 08.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 08.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 08.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 08.008 evs_UT.c:837 - UT_EVS_EventBuf.EventID (38) == CFE_EVS_LOGMODE_EID (38)
+[ PASS] 08.009 evs_UT.c:841 - EVS_ClearLog()
+[ PASS] 08.010 evs_UT.c:853 - CFE_EVS_Global.EVS_LogPtr->LogFullFlag (1) == true (1)
+[ PASS] 08.011 evs_UT.c:854 - CFE_EVS_Global.EVS_LogPtr->LogMode (1) == CFE_EVS_LogMode_DISCARD (1)
+[ PASS] 08.012 evs_UT.c:855 - CFE_EVS_Global.EVS_LogPtr->LogOverflowCounter (1) == LogOverflowCounterExpected (1)
+[ PASS] 08.013 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 08.014 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 08.015 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 08.016 evs_UT.c:866 - CFE_EVS_Global.EVS_LogPtr->LogFullFlag (1) == true (1)
+[ PASS] 08.017 evs_UT.c:867 - CFE_EVS_Global.EVS_LogPtr->LogMode (0) == CFE_EVS_LogMode_OVERWRITE (0)
+[ PASS] 08.018 evs_UT.c:868 - CFE_EVS_Global.EVS_LogPtr->LogOverflowCounter (3) == LogOverflowCounterExpected (3)
+[ PASS] 08.019 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 08.020 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 08.021 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 08.022 evs_UT.c:877 - UT_EVS_EventBuf.EventID (0) == CFE_EVS_NOOP_EID (0)
+[ PASS] 08.023 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 08.024 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 08.025 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 08.026 evs_UT.c:886 - CFE_EVS_Global.EVS_LogPtr->LogFullFlag (0) == false (0)
+[ PASS] 08.027 evs_UT.c:887 - CFE_EVS_Global.EVS_LogPtr->LogOverflowCounter (0) == 0 (0)
+[ PASS] 08.028 evs_UT.c:899 - CFE_EVS_SetLogModeCmd(&CmdBuf.modecmd) (0x0) == CFE_SUCCESS
+[ PASS] 08.029 evs_UT.c:908 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (0x0) == CFE_SUCCESS
+[ PASS] 08.030 evs_UT.c:913 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (-973078526) == CFE_FS_INVALID_PATH (-973078526)
+[ PASS] 08.031 evs_UT.c:919 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (-939524091) == CFE_STATUS_EXTERNAL_RESOURCE_FAIL (-939524091)
+[ PASS] 08.032 evs_UT.c:925 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (0x0) == CFE_SUCCESS
+[ PASS] 08.033 evs_UT.c:932 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (-1040187385) == CFE_EVS_FILE_WRITE_ERROR (-1040187385)
+[ PASS] 08.034 evs_UT.c:941 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (0x0) == CFE_SUCCESS
+[ PASS] 08.035 evs_UT.c:949 - CFE_EVS_WriteLogDataFileCmd(&CmdBuf.logfilecmd) (-1040187385) == CFE_EVS_FILE_WRITE_ERROR (-1040187385)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 08 Test_Logging         TOTAL::35    PASS::35    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 09 Test_WriteApp
+[ INFO] evs_UT.c:964:Begin Test Write App
+[ PASS] 09.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.004 evs_UT.c:979 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 09.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.008 evs_UT.c:987 - UT_EVS_EventBuf.EventID (16) == CFE_EVS_RSTCNT_EID (16)
+[ PASS] 09.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.011 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.012 evs_UT.c:1002 - UT_EVS_EventBuf.EventID (13) == CFE_EVS_ERR_CRDATFILE_EID (13)
+[ PASS] 09.013 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.014 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.015 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.016 evs_UT.c:1011 - UT_EVS_EventBuf.EventID (13) == CFE_EVS_ERR_CRDATFILE_EID (13)
+[ PASS] 09.017 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.018 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.019 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.020 evs_UT.c:1021 - UT_EVS_EventBuf.EventID (12) == CFE_EVS_ERR_WRDATFILE_EID (12)
+[ PASS] 09.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.023 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.024 evs_UT.c:1029 - UT_EVS_EventBuf.EventID (32) == CFE_EVS_WRDAT_EID (32)
+[ PASS] 09.025 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 09.026 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 09.027 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 09.028 evs_UT.c:1044 - UT_EVS_EventBuf.EventID (13) == CFE_EVS_ERR_CRDATFILE_EID (13)
+[ PASS] 09.029 evs_UT.c:1050 - CFE_EVS_WriteAppDataFileCmd(&CmdBuf.AppDataCmd) (-1040187385) == CFE_EVS_FILE_WRITE_ERROR (-1040187385)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 09 Test_WriteApp        TOTAL::29    PASS::29    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 10 Test_BadAppCmd
+[ INFO] evs_UT.c:1064:Begin Test Bad App Command
+[ PASS] 10.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.004 evs_UT.c:1091 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.008 evs_UT.c:1100 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.011 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.012 evs_UT.c:1109 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.013 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.014 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.015 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.016 evs_UT.c:1118 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.017 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.018 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.019 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.020 evs_UT.c:1129 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.023 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.024 evs_UT.c:1138 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.025 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.026 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.027 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.028 evs_UT.c:1147 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.029 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.030 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.031 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.032 evs_UT.c:1153 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.033 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.034 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.035 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.036 evs_UT.c:1159 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.037 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.038 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.039 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.040 evs_UT.c:1168 - UT_EVS_EventBuf.EventID (9) == CFE_EVS_ERR_NOAPPIDFOUND_EID (9)
+[ PASS] 10.041 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.042 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.043 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.044 evs_UT.c:1190 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.045 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.046 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.047 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.048 evs_UT.c:1199 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.049 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.050 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.051 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.052 evs_UT.c:1208 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.053 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.054 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.055 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.056 evs_UT.c:1217 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.057 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.058 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.059 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.060 evs_UT.c:1228 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.061 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.062 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.063 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.064 evs_UT.c:1237 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.065 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.066 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.067 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.068 evs_UT.c:1246 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.069 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.070 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.071 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.072 evs_UT.c:1252 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.073 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.074 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.075 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.076 evs_UT.c:1258 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.077 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.078 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.079 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.080 evs_UT.c:1267 - UT_EVS_EventBuf.EventID (8) == CFE_EVS_ERR_ILLAPPIDRANGE_EID (8)
+[ PASS] 10.081 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.082 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.083 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.084 evs_UT.c:1287 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.085 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.086 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.087 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.088 evs_UT.c:1298 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.089 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.090 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.091 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.092 evs_UT.c:1307 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.093 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.094 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.095 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.096 evs_UT.c:1316 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.097 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.098 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.099 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.100 evs_UT.c:1327 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.101 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.102 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.103 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.104 evs_UT.c:1336 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.105 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.106 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.107 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.108 evs_UT.c:1345 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.109 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.110 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.111 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.112 evs_UT.c:1351 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.113 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.114 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.115 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.116 evs_UT.c:1357 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ PASS] 10.117 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.118 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.119 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.120 evs_UT.c:1366 - UT_EVS_EventBuf.EventID (7) == CFE_EVS_ERR_APPNOREGS_EID (7)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 10 Test_BadAppCmd       TOTAL::120   PASS::120   FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 11 Test_EventCmd
+[ INFO] evs_UT.c:1382:Begin Test Event Command
+[ PASS] 11.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.004 evs_UT.c:1411 - UT_EVS_EventBuf.EventID (65535) == 0xFFFF (65535)
+[ PASS] 11.005 evs_UT.c:1412 - EventCount[0] (0) == ZERO (0)
+[ PASS] 11.006 evs_UT.c:1413 - EventCount[1] (0) == ZERO (0)
+[ PASS] 11.007 evs_UT.c:1414 - EventCount[2] (0) == ZERO (0)
+[ PASS] 11.008 evs_UT.c:1415 - EventCount[3] (0) == ZERO (0)
+[ PASS] 11.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.011 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.012 evs_UT.c:1433 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 11.013 evs_UT.c:1434 - EventCount[0] (1) == 1 (1)
+[ PASS] 11.014 evs_UT.c:1435 - EventCount[1] (2) == 2 (2)
+[ PASS] 11.015 evs_UT.c:1436 - EventCount[2] (3) == 3 (3)
+[ PASS] 11.016 evs_UT.c:1437 - EventCount[3] (4) == 4 (4)
+[ PASS] 11.017 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.018 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.019 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.020 evs_UT.c:1447 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.023 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.024 evs_UT.c:1455 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.025 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.026 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.027 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.028 evs_UT.c:1463 - UT_EVS_EventBuf.EventID (65535) == 0xFFFF (65535)
+[ PASS] 11.029 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.030 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.031 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.032 evs_UT.c:1471 - UT_EVS_EventBuf.EventID (25) == CFE_EVS_ENAAPPEVT_EID (25)
+[ PASS] 11.033 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.034 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.035 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.036 evs_UT.c:1480 - UT_EVS_EventBuf.EventID (21) == CFE_EVS_DISEVTTYPE_EID (21)
+[ PASS] 11.037 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.038 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.039 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.040 evs_UT.c:1488 - UT_EVS_EventBuf.EventID (20) == CFE_EVS_ENAEVTTYPE_EID (20)
+[ PASS] 11.041 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.042 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.043 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.044 evs_UT.c:1496 - UT_EVS_EventBuf.EventID (27) == CFE_EVS_RSTEVTCNT_EID (27)
+[ PASS] 11.045 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.046 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.047 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.048 evs_UT.c:1505 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.049 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.050 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.051 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.052 evs_UT.c:1514 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.053 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.054 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.055 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.056 evs_UT.c:1525 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.057 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.058 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.059 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.060 evs_UT.c:1536 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.061 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.062 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.063 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.064 evs_UT.c:1545 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.065 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.066 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.067 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.068 evs_UT.c:1554 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.069 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.070 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.071 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.072 evs_UT.c:1565 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ PASS] 11.073 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 11.074 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 11.075 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 11.076 evs_UT.c:1576 - UT_EVS_EventBuf.EventID (40) == CFE_EVS_ERR_INVALID_BITMASK_EID (40)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 11 Test_EventCmd        TOTAL::76    PASS::76    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 12 Test_FilterCmd
+[ INFO] evs_UT.c:1590:Begin Test Filter Command
+[ PASS] 12.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.004 evs_UT.c:1617 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 12.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.008 evs_UT.c:1625 - UT_EVS_EventBuf.EventID (6) == CFE_EVS_ERR_EVTIDNOREGS_EID (6)
+[ PASS] 12.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.011 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.012 evs_UT.c:1632 - UT_EVS_EventBuf.EventID (6) == CFE_EVS_ERR_EVTIDNOREGS_EID (6)
+[ PASS] 12.013 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.014 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.015 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.016 evs_UT.c:1639 - UT_EVS_EventBuf.EventID (6) == CFE_EVS_ERR_EVTIDNOREGS_EID (6)
+[ PASS] 12.017 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.018 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.019 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.020 evs_UT.c:1647 - UT_EVS_EventBuf.EventID (29) == CFE_EVS_RSTALLFILTER_EID (29)
+[ PASS] 12.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.023 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.024 evs_UT.c:1655 - UT_EVS_EventBuf.EventID (30) == CFE_EVS_ADDFILTER_EID (30)
+[ PASS] 12.025 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.026 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.027 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.028 evs_UT.c:1665 - UT_EVS_EventBuf.EventID (37) == CFE_EVS_EVT_FILTERED_EID (37)
+[ PASS] 12.029 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.030 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.031 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.032 evs_UT.c:1670 - UT_EVS_EventBuf.EventID (17) == CFE_EVS_SETFILTERMSK_EID (17)
+[ PASS] 12.033 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.034 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.035 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.036 evs_UT.c:1675 - UT_EVS_EventBuf.EventID (28) == CFE_EVS_RSTFILTER_EID (28)
+[ PASS] 12.037 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.038 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.039 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.040 evs_UT.c:1683 - UT_EVS_EventBuf.EventID (29) == CFE_EVS_RSTALLFILTER_EID (29)
+[ PASS] 12.041 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.042 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.043 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.044 evs_UT.c:1691 - UT_EVS_EventBuf.EventID (31) == CFE_EVS_DELFILTER_EID (31)
+[ PASS] 12.045 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.046 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.047 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.048 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.049 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.050 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.051 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.052 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.053 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.054 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.055 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.056 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.057 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.058 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.059 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.060 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.061 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.062 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.063 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.064 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.065 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.066 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.067 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.068 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.069 evs_UT.c:1706 - UT_EVS_EventBuf.EventID (30) == CFE_EVS_ADDFILTER_EID (30)
+[ PASS] 12.070 evs_UT.c:1707 - UT_EVS_EventBuf.Count (8) == CFE_PLATFORM_EVS_MAX_EVENT_FILTERS (8)
+[ PASS] 12.071 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.072 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.073 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.074 evs_UT.c:1715 - UT_EVS_EventBuf.EventID (11) == CFE_EVS_ERR_MAXREGSFILTER_EID (11)
+[ PASS] 12.075 evs_UT.c:1720 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ PASS] 12.076 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.077 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.078 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.079 evs_UT.c:1729 - UT_EVS_EventBuf.EventID (23) == CFE_EVS_ENAAPPEVTTYPE_EID (23)
+[ PASS] 12.080 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.081 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.082 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.083 evs_UT.c:1737 - UT_EVS_EventBuf.EventID (30) == CFE_EVS_ADDFILTER_EID (30)
+[ PASS] 12.084 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.085 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.086 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.087 evs_UT.c:1745 - UT_EVS_EventBuf.EventID (37) == CFE_EVS_EVT_FILTERED_EID (37)
+[ PASS] 12.088 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 12.089 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 12.090 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 12.091 evs_UT.c:1753 - UT_EVS_EventBuf.EventID (31) == CFE_EVS_DELFILTER_EID (31)
+[ PASS] 12.092 evs_UT.c:1757 - CFE_EVS_Register(NULL, 0, CFE_EVS_EventFilter_BINARY) (0x0) == CFE_SUCCESS
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 12 Test_FilterCmd       TOTAL::92    PASS::92    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 13 Test_InvalidCmd
+[ INFO] evs_UT.c:1769:Begin Test Invalid Command
+[ PASS] 13.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.002 evs_UT.c:1774 - UT_EVS_EventBuf.EventID (5) == CFE_EVS_ERR_MSGID_EID (5)
+[ PASS] 13.003 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.004 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.005 evs_UT.c:1779 - UT_EVS_EventBuf.EventID (15) == CFE_EVS_ERR_CC_EID (15)
+[ PASS] 13.006 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.007 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.008 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.010 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.011 evs_UT.c:1784 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.012 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.013 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.014 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.015 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.016 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.017 evs_UT.c:1789 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.018 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.019 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.020 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.021 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.022 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.023 evs_UT.c:1794 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.024 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.025 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.026 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.027 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.028 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.029 evs_UT.c:1799 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.030 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.031 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.032 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.033 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.034 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.035 evs_UT.c:1804 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.036 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.037 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.038 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.039 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.040 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.041 evs_UT.c:1811 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.042 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.043 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.044 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.045 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.046 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.047 evs_UT.c:1818 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.048 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.049 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.050 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.051 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.052 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.053 evs_UT.c:1823 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.054 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.055 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.056 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.057 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.058 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.059 evs_UT.c:1828 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.060 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.061 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.062 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.063 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.064 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.065 evs_UT.c:1833 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.066 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.067 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.068 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.069 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.070 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.071 evs_UT.c:1838 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.072 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.073 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.074 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.075 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.076 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.077 evs_UT.c:1843 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.078 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.079 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.080 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.081 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.082 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.083 evs_UT.c:1848 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.084 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.085 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.086 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.087 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.088 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.089 evs_UT.c:1853 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.090 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.091 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.092 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.093 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.094 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.095 evs_UT.c:1858 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.096 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.097 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.098 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.099 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.100 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.101 evs_UT.c:1863 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.102 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.103 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.104 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.105 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.106 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.107 evs_UT.c:1868 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.108 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.109 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.110 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.111 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.112 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.113 evs_UT.c:1873 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.114 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.115 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.116 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.117 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.118 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.119 evs_UT.c:1879 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.120 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.121 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.122 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.123 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.124 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.125 evs_UT.c:1884 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ PASS] 13.126 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.127 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.128 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 13.129 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 13.130 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 13.131 evs_UT.c:1889 - UT_EVS_EventBuf.EventID (43) == CFE_EVS_LEN_ERR_EID (43)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 13 Test_InvalidCmd      TOTAL::131   PASS::131   FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 14 Test_Squelching
+[ INFO] evs_UT.c:1912:Begin Test Squelching
+[ PASS] 14.001 evs_UT.c:1938 - SnapshotData.Count (1) == i + 1 (1)
+[ PASS] 14.002 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.003 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.004 evs_UT.c:1938 - SnapshotData.Count (2) == i + 1 (2)
+[ PASS] 14.005 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.006 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.007 evs_UT.c:1938 - SnapshotData.Count (3) == i + 1 (3)
+[ PASS] 14.008 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.009 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.010 evs_UT.c:1938 - SnapshotData.Count (4) == i + 1 (4)
+[ PASS] 14.011 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.012 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.013 evs_UT.c:1938 - SnapshotData.Count (5) == i + 1 (5)
+[ PASS] 14.014 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.015 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.016 evs_UT.c:1938 - SnapshotData.Count (6) == i + 1 (6)
+[ PASS] 14.017 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.018 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.019 evs_UT.c:1938 - SnapshotData.Count (7) == i + 1 (7)
+[ PASS] 14.020 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.021 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.022 evs_UT.c:1938 - SnapshotData.Count (8) == i + 1 (8)
+[ PASS] 14.023 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.024 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.025 evs_UT.c:1938 - SnapshotData.Count (9) == i + 1 (9)
+[ PASS] 14.026 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.027 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.028 evs_UT.c:1938 - SnapshotData.Count (10) == i + 1 (10)
+[ PASS] 14.029 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.030 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.031 evs_UT.c:1938 - SnapshotData.Count (11) == i + 1 (11)
+[ PASS] 14.032 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.033 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.034 evs_UT.c:1938 - SnapshotData.Count (12) == i + 1 (12)
+[ PASS] 14.035 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.036 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.037 evs_UT.c:1938 - SnapshotData.Count (13) == i + 1 (13)
+[ PASS] 14.038 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.039 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.040 evs_UT.c:1938 - SnapshotData.Count (14) == i + 1 (14)
+[ PASS] 14.041 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.042 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.043 evs_UT.c:1938 - SnapshotData.Count (15) == i + 1 (15)
+[ PASS] 14.044 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.045 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.046 evs_UT.c:1938 - SnapshotData.Count (16) == i + 1 (16)
+[ PASS] 14.047 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.048 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.049 evs_UT.c:1938 - SnapshotData.Count (17) == i + 1 (17)
+[ PASS] 14.050 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.051 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.052 evs_UT.c:1938 - SnapshotData.Count (18) == i + 1 (18)
+[ PASS] 14.053 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.054 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.055 evs_UT.c:1938 - SnapshotData.Count (19) == i + 1 (19)
+[ PASS] 14.056 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.057 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.058 evs_UT.c:1938 - SnapshotData.Count (20) == i + 1 (20)
+[ PASS] 14.059 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.060 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.061 evs_UT.c:1938 - SnapshotData.Count (21) == i + 1 (21)
+[ PASS] 14.062 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.063 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.064 evs_UT.c:1938 - SnapshotData.Count (22) == i + 1 (22)
+[ PASS] 14.065 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.066 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.067 evs_UT.c:1938 - SnapshotData.Count (23) == i + 1 (23)
+[ PASS] 14.068 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.069 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.070 evs_UT.c:1938 - SnapshotData.Count (24) == i + 1 (24)
+[ PASS] 14.071 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.072 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.073 evs_UT.c:1938 - SnapshotData.Count (25) == i + 1 (25)
+[ PASS] 14.074 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.075 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.076 evs_UT.c:1938 - SnapshotData.Count (26) == i + 1 (26)
+[ PASS] 14.077 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.078 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.079 evs_UT.c:1938 - SnapshotData.Count (27) == i + 1 (27)
+[ PASS] 14.080 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.081 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.082 evs_UT.c:1938 - SnapshotData.Count (28) == i + 1 (28)
+[ PASS] 14.083 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.084 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.085 evs_UT.c:1938 - SnapshotData.Count (29) == i + 1 (29)
+[ PASS] 14.086 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.087 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.088 evs_UT.c:1938 - SnapshotData.Count (30) == i + 1 (30)
+[ PASS] 14.089 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.090 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.091 evs_UT.c:1938 - SnapshotData.Count (31) == i + 1 (31)
+[ PASS] 14.092 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.093 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.094 evs_UT.c:1938 - SnapshotData.Count (32) == i + 1 (32)
+[ PASS] 14.095 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.096 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.097 evs_UT.c:1944 - SnapshotData.Count (33) == i + 1 (33)
+[ PASS] 14.098 evs_UT.c:1945 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.099 evs_UT.c:1946 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.100 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.101 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.102 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.103 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.104 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.105 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.106 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.107 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.108 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.109 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.110 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.111 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.112 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.113 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.114 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.115 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.116 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.117 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.118 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.119 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.120 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.121 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.122 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.123 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.124 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.125 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.126 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.127 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.128 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.129 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.130 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.131 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.132 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.133 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.134 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.135 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.136 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.137 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.138 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.139 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.140 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.141 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.142 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.143 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.144 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.145 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.146 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.147 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.148 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.149 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.150 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.151 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.152 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.153 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.154 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.155 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.156 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.157 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.158 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.159 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.160 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.161 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.162 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.163 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.164 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.165 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.166 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.167 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.168 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.169 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.170 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.171 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.172 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.173 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.174 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.175 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.176 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.177 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.178 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.179 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.180 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.181 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.182 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.183 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.184 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.185 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.186 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.187 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.188 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.189 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.190 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.191 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.192 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.193 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.194 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.195 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.196 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.197 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.198 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.199 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.200 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.201 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.202 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.203 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.204 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.205 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.206 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.207 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.208 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.209 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.210 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.211 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.212 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.213 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.214 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.215 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.216 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.217 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.218 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.219 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.220 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.221 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.222 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.223 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.224 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.225 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.226 evs_UT.c:1964 - SnapshotData.Count (34) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 2 (34)
+[ PASS] 14.227 evs_UT.c:1965 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.228 evs_UT.c:1966 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.229 evs_UT.c:1973 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.230 evs_UT.c:1974 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.231 evs_UT.c:1975 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.232 evs_UT.c:1982 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.233 evs_UT.c:1983 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.234 evs_UT.c:1994 - SnapshotData.Count (36) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 4 (36)
+[ PASS] 14.235 evs_UT.c:1995 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.236 evs_UT.c:1996 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.237 evs_UT.c:1997 - AppDataPtr->SquelchedCount (255) == CFE_EVS_MAX_SQUELCH_COUNT (255)
+[ PASS] 14.238 evs_UT.c:2008 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.239 evs_UT.c:1938 - SnapshotData.Count (1) == i + 1 (1)
+[ PASS] 14.240 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.241 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.242 evs_UT.c:1938 - SnapshotData.Count (2) == i + 1 (2)
+[ PASS] 14.243 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.244 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.245 evs_UT.c:1938 - SnapshotData.Count (3) == i + 1 (3)
+[ PASS] 14.246 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.247 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.248 evs_UT.c:1938 - SnapshotData.Count (4) == i + 1 (4)
+[ PASS] 14.249 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.250 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.251 evs_UT.c:1938 - SnapshotData.Count (5) == i + 1 (5)
+[ PASS] 14.252 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.253 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.254 evs_UT.c:1938 - SnapshotData.Count (6) == i + 1 (6)
+[ PASS] 14.255 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.256 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.257 evs_UT.c:1938 - SnapshotData.Count (7) == i + 1 (7)
+[ PASS] 14.258 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.259 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.260 evs_UT.c:1938 - SnapshotData.Count (8) == i + 1 (8)
+[ PASS] 14.261 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.262 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.263 evs_UT.c:1938 - SnapshotData.Count (9) == i + 1 (9)
+[ PASS] 14.264 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.265 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.266 evs_UT.c:1938 - SnapshotData.Count (10) == i + 1 (10)
+[ PASS] 14.267 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.268 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.269 evs_UT.c:1938 - SnapshotData.Count (11) == i + 1 (11)
+[ PASS] 14.270 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.271 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.272 evs_UT.c:1938 - SnapshotData.Count (12) == i + 1 (12)
+[ PASS] 14.273 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.274 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.275 evs_UT.c:1938 - SnapshotData.Count (13) == i + 1 (13)
+[ PASS] 14.276 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.277 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.278 evs_UT.c:1938 - SnapshotData.Count (14) == i + 1 (14)
+[ PASS] 14.279 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.280 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.281 evs_UT.c:1938 - SnapshotData.Count (15) == i + 1 (15)
+[ PASS] 14.282 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.283 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.284 evs_UT.c:1938 - SnapshotData.Count (16) == i + 1 (16)
+[ PASS] 14.285 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.286 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.287 evs_UT.c:1938 - SnapshotData.Count (17) == i + 1 (17)
+[ PASS] 14.288 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.289 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.290 evs_UT.c:1938 - SnapshotData.Count (18) == i + 1 (18)
+[ PASS] 14.291 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.292 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.293 evs_UT.c:1938 - SnapshotData.Count (19) == i + 1 (19)
+[ PASS] 14.294 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.295 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.296 evs_UT.c:1938 - SnapshotData.Count (20) == i + 1 (20)
+[ PASS] 14.297 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.298 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.299 evs_UT.c:1938 - SnapshotData.Count (21) == i + 1 (21)
+[ PASS] 14.300 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.301 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.302 evs_UT.c:1938 - SnapshotData.Count (22) == i + 1 (22)
+[ PASS] 14.303 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.304 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.305 evs_UT.c:1938 - SnapshotData.Count (23) == i + 1 (23)
+[ PASS] 14.306 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.307 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.308 evs_UT.c:1938 - SnapshotData.Count (24) == i + 1 (24)
+[ PASS] 14.309 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.310 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.311 evs_UT.c:1938 - SnapshotData.Count (25) == i + 1 (25)
+[ PASS] 14.312 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.313 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.314 evs_UT.c:1938 - SnapshotData.Count (26) == i + 1 (26)
+[ PASS] 14.315 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.316 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.317 evs_UT.c:1938 - SnapshotData.Count (27) == i + 1 (27)
+[ PASS] 14.318 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.319 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.320 evs_UT.c:1938 - SnapshotData.Count (28) == i + 1 (28)
+[ PASS] 14.321 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.322 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.323 evs_UT.c:1938 - SnapshotData.Count (29) == i + 1 (29)
+[ PASS] 14.324 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.325 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.326 evs_UT.c:1938 - SnapshotData.Count (30) == i + 1 (30)
+[ PASS] 14.327 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.328 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.329 evs_UT.c:1938 - SnapshotData.Count (31) == i + 1 (31)
+[ PASS] 14.330 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.331 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.332 evs_UT.c:1938 - SnapshotData.Count (32) == i + 1 (32)
+[ PASS] 14.333 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.334 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.335 evs_UT.c:1944 - SnapshotData.Count (33) == i + 1 (33)
+[ PASS] 14.336 evs_UT.c:1945 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.337 evs_UT.c:1946 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.338 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.339 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.340 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.341 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.342 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.343 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.344 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.345 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.346 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.347 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.348 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.349 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.350 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.351 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.352 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.353 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.354 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.355 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.356 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.357 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.358 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.359 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.360 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.361 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.362 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.363 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.364 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.365 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.366 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.367 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.368 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.369 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.370 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.371 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.372 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.373 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.374 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.375 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.376 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.377 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.378 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.379 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.380 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.381 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.382 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.383 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.384 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.385 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.386 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.387 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.388 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.389 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.390 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.391 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.392 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.393 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.394 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.395 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.396 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.397 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.398 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.399 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.400 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.401 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.402 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.403 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.404 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.405 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.406 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.407 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.408 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.409 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.410 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.411 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.412 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.413 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.414 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.415 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.416 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.417 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.418 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.419 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.420 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.421 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.422 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.423 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.424 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.425 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.426 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.427 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.428 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.429 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.430 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.431 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.432 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.433 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.434 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.435 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.436 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.437 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.438 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.439 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.440 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.441 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.442 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.443 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.444 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.445 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.446 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.447 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.448 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.449 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.450 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.451 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.452 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.453 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.454 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.455 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.456 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.457 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.458 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.459 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.460 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.461 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.462 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.463 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.464 evs_UT.c:1964 - SnapshotData.Count (34) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 2 (34)
+[ PASS] 14.465 evs_UT.c:1965 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.466 evs_UT.c:1966 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.467 evs_UT.c:1973 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.468 evs_UT.c:1974 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.469 evs_UT.c:1975 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.470 evs_UT.c:1982 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.471 evs_UT.c:1983 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.472 evs_UT.c:1994 - SnapshotData.Count (36) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 4 (36)
+[ PASS] 14.473 evs_UT.c:1995 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.474 evs_UT.c:1996 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.475 evs_UT.c:1997 - AppDataPtr->SquelchedCount (255) == CFE_EVS_MAX_SQUELCH_COUNT (255)
+[ PASS] 14.476 evs_UT.c:2008 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.477 evs_UT.c:1938 - SnapshotData.Count (1) == i + 1 (1)
+[ PASS] 14.478 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.479 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.480 evs_UT.c:1938 - SnapshotData.Count (2) == i + 1 (2)
+[ PASS] 14.481 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.482 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.483 evs_UT.c:1938 - SnapshotData.Count (3) == i + 1 (3)
+[ PASS] 14.484 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.485 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.486 evs_UT.c:1938 - SnapshotData.Count (4) == i + 1 (4)
+[ PASS] 14.487 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.488 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.489 evs_UT.c:1938 - SnapshotData.Count (5) == i + 1 (5)
+[ PASS] 14.490 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.491 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.492 evs_UT.c:1938 - SnapshotData.Count (6) == i + 1 (6)
+[ PASS] 14.493 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.494 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.495 evs_UT.c:1938 - SnapshotData.Count (7) == i + 1 (7)
+[ PASS] 14.496 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.497 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.498 evs_UT.c:1938 - SnapshotData.Count (8) == i + 1 (8)
+[ PASS] 14.499 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.500 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.501 evs_UT.c:1938 - SnapshotData.Count (9) == i + 1 (9)
+[ PASS] 14.502 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.503 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.504 evs_UT.c:1938 - SnapshotData.Count (10) == i + 1 (10)
+[ PASS] 14.505 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.506 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.507 evs_UT.c:1938 - SnapshotData.Count (11) == i + 1 (11)
+[ PASS] 14.508 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.509 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.510 evs_UT.c:1938 - SnapshotData.Count (12) == i + 1 (12)
+[ PASS] 14.511 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.512 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.513 evs_UT.c:1938 - SnapshotData.Count (13) == i + 1 (13)
+[ PASS] 14.514 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.515 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.516 evs_UT.c:1938 - SnapshotData.Count (14) == i + 1 (14)
+[ PASS] 14.517 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.518 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.519 evs_UT.c:1938 - SnapshotData.Count (15) == i + 1 (15)
+[ PASS] 14.520 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.521 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.522 evs_UT.c:1938 - SnapshotData.Count (16) == i + 1 (16)
+[ PASS] 14.523 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.524 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.525 evs_UT.c:1938 - SnapshotData.Count (17) == i + 1 (17)
+[ PASS] 14.526 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.527 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.528 evs_UT.c:1938 - SnapshotData.Count (18) == i + 1 (18)
+[ PASS] 14.529 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.530 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.531 evs_UT.c:1938 - SnapshotData.Count (19) == i + 1 (19)
+[ PASS] 14.532 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.533 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.534 evs_UT.c:1938 - SnapshotData.Count (20) == i + 1 (20)
+[ PASS] 14.535 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.536 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.537 evs_UT.c:1938 - SnapshotData.Count (21) == i + 1 (21)
+[ PASS] 14.538 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.539 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.540 evs_UT.c:1938 - SnapshotData.Count (22) == i + 1 (22)
+[ PASS] 14.541 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.542 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.543 evs_UT.c:1938 - SnapshotData.Count (23) == i + 1 (23)
+[ PASS] 14.544 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.545 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.546 evs_UT.c:1938 - SnapshotData.Count (24) == i + 1 (24)
+[ PASS] 14.547 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.548 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.549 evs_UT.c:1938 - SnapshotData.Count (25) == i + 1 (25)
+[ PASS] 14.550 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.551 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.552 evs_UT.c:1938 - SnapshotData.Count (26) == i + 1 (26)
+[ PASS] 14.553 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.554 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.555 evs_UT.c:1938 - SnapshotData.Count (27) == i + 1 (27)
+[ PASS] 14.556 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.557 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.558 evs_UT.c:1938 - SnapshotData.Count (28) == i + 1 (28)
+[ PASS] 14.559 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.560 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.561 evs_UT.c:1938 - SnapshotData.Count (29) == i + 1 (29)
+[ PASS] 14.562 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.563 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.564 evs_UT.c:1938 - SnapshotData.Count (30) == i + 1 (30)
+[ PASS] 14.565 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.566 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.567 evs_UT.c:1938 - SnapshotData.Count (31) == i + 1 (31)
+[ PASS] 14.568 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.569 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.570 evs_UT.c:1938 - SnapshotData.Count (32) == i + 1 (32)
+[ PASS] 14.571 evs_UT.c:1939 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.572 evs_UT.c:1940 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.573 evs_UT.c:1944 - SnapshotData.Count (33) == i + 1 (33)
+[ PASS] 14.574 evs_UT.c:1945 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.575 evs_UT.c:1946 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.576 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.577 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.578 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.579 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.580 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.581 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.582 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.583 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.584 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.585 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.586 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.587 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.588 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.589 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.590 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.591 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.592 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.593 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.594 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.595 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.596 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.597 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.598 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.599 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.600 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.601 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.602 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.603 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.604 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.605 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.606 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.607 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.608 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.609 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.610 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.611 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.612 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.613 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.614 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.615 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.616 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.617 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.618 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.619 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.620 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.621 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.622 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.623 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.624 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.625 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.626 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.627 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.628 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.629 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.630 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.631 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.632 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.633 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.634 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.635 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.636 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.637 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.638 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.639 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.640 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.641 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.642 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.643 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.644 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.645 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.646 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.647 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.648 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.649 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.650 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.651 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.652 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.653 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.654 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.655 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.656 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.657 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.658 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.659 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.660 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.661 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.662 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.663 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.664 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.665 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.666 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.667 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.668 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.669 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.670 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.671 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.672 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.673 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.674 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.675 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.676 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.677 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.678 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.679 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.680 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.681 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.682 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.683 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.684 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.685 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.686 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.687 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.688 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.689 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.690 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.691 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.692 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.693 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.694 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.695 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.696 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.697 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.698 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.699 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.700 evs_UT.c:1950 - SnapshotData.Count (33) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 1 (33)
+[ PASS] 14.701 evs_UT.c:1951 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.702 evs_UT.c:1964 - SnapshotData.Count (34) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 2 (34)
+[ PASS] 14.703 evs_UT.c:1965 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.704 evs_UT.c:1966 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.705 evs_UT.c:1973 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.706 evs_UT.c:1974 - CapturedTlm.Payload.PacketID.EventID (44) == CFE_EVS_SQUELCHED_ERR_EID (44)
+[ PASS] 14.707 evs_UT.c:1975 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.708 evs_UT.c:1982 - SnapshotData.Count (35) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 3 (35)
+[ PASS] 14.709 evs_UT.c:1983 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ PASS] 14.710 evs_UT.c:1994 - SnapshotData.Count (36) == CFE_PLATFORM_EVS_MAX_APP_EVENT_BURST + 4 (36)
+[ PASS] 14.711 evs_UT.c:1995 - CapturedTlm.Payload.PacketID.EventID (142) == EVENT_ID (142)
+[ PASS] 14.712 evs_UT.c:1996 - EVS_Retval (0) == CFE_SUCCESS (0)
+[ PASS] 14.713 evs_UT.c:1997 - AppDataPtr->SquelchedCount (255) == CFE_EVS_MAX_SQUELCH_COUNT (255)
+[ PASS] 14.714 evs_UT.c:2008 - EVS_Retval (3254779913) == CFE_EVS_APP_SQUELCHED (3254779913)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 14 Test_Squelching      TOTAL::714   PASS::714   FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 15 Test_Misc
+[ INFO] evs_UT.c:2038:Begin Test Miscellaneous
+[ PASS] 15.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 15.002 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 15.003 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[  N/A] 15.004 evs_UT.c:2058 - No event from WRITE_LOG_DATA_FILE_CC, debug events disabled
+[ PASS] 15.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 15.006 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 15.007 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[  N/A] 15.008 evs_UT.c:2073 - No event from SET_LOG_MODE_CC, debug events disabled
+[ PASS] 15.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 15.010 evs_UT.c:2086 - HK_SnapshotData.Count (1) == 1 (1)
+[ PASS] 15.011 evs_UT.c:2090 - CFE_EVS_CleanUpApp(CFE_RESOURCEID_TO_ULONG(CFE_ES_APPID_UNDEFINED)) (0x0) == CFE_SUCCESS
+[ PASS] 15.012 evs_UT.c:2094 - CFE_EVS_Register(NULL, 1, 0) (-1006632950) == CFE_ES_BAD_ARGUMENT (-1006632950)
+[ PASS] 15.013 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 15.014 evs_UT.c:2102 - HK_SnapshotData.Count (1) == 1 (1)
+[ PASS] 15.015 evs_UT.c:2111 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageSendCounter (65535) == CFE_EVS_MAX_EVENT_SEND_COUNT (65535)
+[ PASS] 15.016 evs_UT.c:2112 - AppDataPtr->EventCount (65535) == CFE_EVS_MAX_EVENT_SEND_COUNT (65535)
+[ PASS] 15.017 evs_UT.c:2130 - CFE_EVS_Global.EVS_TlmPkt.Payload.MessageTruncCounter (1) == 1 (1)
+[ PASS] 15.018 evs_UT.c:2139 - CFE_EVS_SendHkCmd(NULL) (1207959553) == CFE_STATUS_NO_COUNTER_INCREMENT (1207959553)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::2   
+[  END] 15 Test_Misc            TOTAL::18    PASS::16    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 16 Test_SetEvent
+[ PASS] 16.001 evs_UT.c:2154 - AppDataPtr->EventTypesActive[0] (0) == 0 (0)
+[ PASS] 16.002 evs_UT.c:2155 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.003 evs_UT.c:2156 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.004 evs_UT.c:2157 - AppDataPtr->EventTypesActive[3] (0) == 0 (0)
+[ PASS] 16.005 evs_UT.c:2161 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.006 evs_UT.c:2162 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.007 evs_UT.c:2163 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.008 evs_UT.c:2164 - AppDataPtr->EventTypesActive[3] (0) == 0 (0)
+[ PASS] 16.009 evs_UT.c:2166 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.010 evs_UT.c:2167 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.011 evs_UT.c:2168 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.012 evs_UT.c:2169 - AppDataPtr->EventTypesActive[3] (1) == 1 (1)
+[ PASS] 16.013 evs_UT.c:2172 - CFE_EVS_GetTypeEnable(CFE_EVS_EventType_DEBUG) (1) == 1 (1)
+[ PASS] 16.014 evs_UT.c:2173 - CFE_EVS_GetTypeEnable(CFE_EVS_EventType_INFORMATION) (0) == 0 (0)
+[ PASS] 16.015 evs_UT.c:2174 - CFE_EVS_GetTypeEnable(CFE_EVS_EventType_ERROR) (0) == 0 (0)
+[ PASS] 16.016 evs_UT.c:2175 - CFE_EVS_GetTypeEnable(CFE_EVS_EventType_CRITICAL) (1) == 1 (1)
+[ PASS] 16.017 evs_UT.c:2179 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.018 evs_UT.c:2180 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.019 evs_UT.c:2181 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.020 evs_UT.c:2182 - AppDataPtr->EventTypesActive[3] (1) == 1 (1)
+[ PASS] 16.021 evs_UT.c:2185 - CFE_EVS_GetTypeEnable(5) (0) == 0 (0)
+[ PASS] 16.022 evs_UT.c:2191 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.023 evs_UT.c:2192 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.024 evs_UT.c:2193 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.025 evs_UT.c:2194 - AppDataPtr->EventTypesActive[3] (1) == 1 (1)
+[ PASS] 16.026 evs_UT.c:2195 - CFE_EVS_GetTypeEnable(CFE_EVS_EventType_DEBUG) (0) == false (0)
+[ PASS] 16.027 evs_UT.c:2200 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.028 evs_UT.c:2201 - AppDataPtr->EventTypesActive[1] (0) == 0 (0)
+[ PASS] 16.029 evs_UT.c:2202 - AppDataPtr->EventTypesActive[2] (0) == 0 (0)
+[ PASS] 16.030 evs_UT.c:2203 - AppDataPtr->EventTypesActive[3] (1) == 1 (1)
+[ PASS] 16.031 evs_UT.c:2205 - AppDataPtr->EventTypesActive[0] (1) == 1 (1)
+[ PASS] 16.032 evs_UT.c:2206 - AppDataPtr->EventTypesActive[1] (1) == 1 (1)
+[ PASS] 16.033 evs_UT.c:2207 - AppDataPtr->EventTypesActive[2] (1) == 1 (1)
+[ PASS] 16.034 evs_UT.c:2208 - AppDataPtr->EventTypesActive[3] (1) == 1 (1)
+[ PASS] 16.035 evs_UT.c:2211 - EVS_EventArrayToBitMask(NULL) (0) == 0 (0)
+[ PASS] 16.036 evs_UT.c:2217 - EVS_EventArrayToBitMask(AppDataPtr) (1) == 1 (1)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 16 Test_SetEvent        TOTAL::36    PASS::36    FAIL::0     MIR::0     TSF::0     TTF::0   
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::2   
+[  END] 16 SUMMARY              TOTAL::1402  PASS::1400  FAIL::0     MIR::0     TSF::0     TTF::0   
+COMPLETE: 16 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

@@ -1,0 +1,22 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 WIDGET_Compute
+[ PASS] 01.001 widget_test.c:40 - Widget_Init() (0) == 0 (0)
+[ FAIL] 01.002 widget_test.c:41 - Widget_Compute(3) (7) == 9 (9)
+[ FAIL] 01.003 widget_test.c:42 - Widget_Compute(4) (8) == 16 (16)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 WIDGET_Compute       TOTAL::3     PASS::1     FAIL::2     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 WIDGET_Reset
+[ PASS] 02.001 widget_test.c:60 - Widget_Reset() (0) == 0 (0)
+[ PASS] 02.002 widget_test.c:61 - Widget_Count() (0) == 0 (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 WIDGET_Reset         TOTAL::2     PASS::2     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 SUMMARY              TOTAL::5     PASS::3     FAIL::2     MIR::0     TSF::0     TTF::0   
+COMPLETE: 2 tests Segment(s) executed

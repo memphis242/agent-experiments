@@ -1,0 +1,577 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[ INFO] time_UT.c:86:cFE TIME Unit Test Output File
+
+[  END] No test cases
+
+[BEGIN] 01 Test_Main
+[ INFO] time_UT.c:114:Begin Test Main
+[ PASS] 01.001 time_UT.c:119 - CFE_TIME_TaskMain()
+[ PASS] 01.002 time_UT.c:120 - Syslog generated: '%s: Application Init Failed,RC=0x%08X' (1) >  (0)
+[ PASS] 01.003 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 01.004 time_UT.c:129 - Syslog generated: '%s: Error reading cmd pipe,RC=0x%08X' (1) >  (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 Test_Main            TOTAL::4     PASS::4     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 Test_Init
+[ INFO] time_UT.c:145:Begin Test Init
+[ PASS] 02.001 time_UT.c:161 - CallCount: CFE_MSG_Init() (6) == ExpRtn (6)
+[ PASS] 02.002 time_UT.c:165 - CFE_TIME_TaskInit() (0x0) == CFE_SUCCESS
+[ PASS] 02.003 time_UT.c:170 - CFE_TIME_TaskInit() (-1) == -1 (-1)
+[ PASS] 02.004 time_UT.c:175 - CFE_TIME_TaskInit() (-3) == -3 (-3)
+[ PASS] 02.005 time_UT.c:180 - CFE_TIME_TaskInit() (-1) == -1 (-1)
+[ PASS] 02.006 time_UT.c:186 - CFE_TIME_TaskInit() (-1) == -SubErrCnt (-1)
+[ PASS] 02.007 time_UT.c:204 - CFE_TIME_TaskInit() (-1) == ExpRtn (-1)
+[ PASS] 02.008 time_UT.c:224 - CFE_TIME_TaskInit() (-2) == ExpRtn (-2)
+[ PASS] 02.009 time_UT.c:244 - CFE_TIME_TaskInit() (-3) == ExpRtn (-3)
+[ PASS] 02.010 time_UT.c:254 - CFE_TIME_TaskInit() (-2) == ExpRtn (-2)
+[ PASS] 02.011 time_UT.c:267 - CFE_TIME_TaskInit() (-3) == ExpRtn (-3)
+[ PASS] 02.012 time_UT.c:272 - CFE_TIME_TaskInit() (-939524091) == CFE_STATUS_EXTERNAL_RESOURCE_FAIL (-939524091)
+[ PASS] 02.013 time_UT.c:277 - CFE_TIME_TaskInit() (-939524091) == CFE_STATUS_EXTERNAL_RESOURCE_FAIL (-939524091)
+[ PASS] 02.014 time_UT.c:282 - CFE_TIME_TaskInit() (-1) == -1 (-1)
+[ PASS] 02.015 time_UT.c:287 - CFE_TIME_TaskInit() (-1) == -1 (-1)
+[ PASS] 02.016 time_UT.c:293 - CallCount: CFE_ES_WriteToSysLog() (0) == 0 (0)
+[ PASS] 02.017 time_UT.c:302 - CallCount: CFE_ES_WriteToSysLog() (1) == 1 (1)
+[ PASS] 02.018 time_UT.c:303 - Syslog generated: '%s: 1Hz OS_TimerAdd failed:RC=%ld' (1) >  (0)
+[ PASS] 02.019 time_UT.c:308 - CallCount: CFE_ES_WriteToSysLog() (1) == 1 (1)
+[ PASS] 02.020 time_UT.c:309 - Syslog generated: '%s: 1Hz OS_TimerSet failed:RC=%ld' (1) >  (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 Test_Init            TOTAL::20    PASS::20    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 Test_GetTime
+[ INFO] time_UT.c:329:Begin Test Get Time
+[ PASS] 03.001 time_UT.c:349 - time.Seconds (1041472994) == expectedMET.Seconds (1041472994)
+[ PASS] 03.002 time_UT.c:350 - time.Subseconds (2439068978) == expectedMET.Subseconds (2439068978)
+[ PASS] 03.003 time_UT.c:358 - CFE_TIME_GetMETseconds() (1041472994) == result (1041472994)
+[ PASS] 03.004 time_UT.c:366 - CFE_TIME_GetMETsubsecs() (-1855898318) == result (-1855898318)
+[ PASS] 03.005 time_UT.c:370 - CFE_TIME_GetLeapSeconds() (32) == RefState->AtToneLeapSeconds (32)
+[ PASS] 03.006 time_UT.c:376 - time.Seconds (1041476594) == expectedTAI.Seconds (1041476594)
+[ PASS] 03.007 time_UT.c:377 - time.Subseconds (2439068978) == expectedTAI.Subseconds (2439068978)
+[ PASS] 03.008 time_UT.c:383 - time.Seconds (1041476562) == expectedUTC.Seconds (1041476562)
+[ PASS] 03.009 time_UT.c:384 - time.Subseconds (2439068978) == expectedUTC.Subseconds (2439068978)
+[ PASS] 03.010 time_UT.c:392 - time.Seconds (1041476594) == expectedTAI.Seconds (1041476594)
+[ PASS] 03.011 time_UT.c:393 - time.Subseconds (2439068978) == expectedTAI.Subseconds (2439068978)
+[ PASS] 03.012 time_UT.c:405 - time.Seconds (3600) == expectedSTCF.Seconds (3600)
+[ PASS] 03.013 time_UT.c:406 - time.Subseconds (0) == expectedSTCF.Subseconds (0)
+[ PASS] 03.014 time_UT.c:410 - CFE_TIME_GetClockState() (-1) == CFE_TIME_ClockState_INVALID (-1)
+[ PASS] 03.015 time_UT.c:432 - CFE_TIME_GetClockInfo() (64) == StateFlags (64)
+[ PASS] 03.016 time_UT.c:458 - CFE_TIME_GetClockInfo() (65520) == StateFlags (65520)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 Test_GetTime         TOTAL::16    PASS::16    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 04 Test_TimeOp
+[ INFO] time_UT.c:470:Begin Test Time Operations
+[ PASS] 04.001 time_UT.c:482 - CFE_TIME_Add, Time A = time B = 0 seconds/subseconds
+[ PASS] 04.002 time_UT.c:489 - CFE_TIME_Subtract, Time A = time B = 0 seconds/subseconds
+[ PASS] 04.003 time_UT.c:495 - CFE_TIME_Compare(time1, time2) (0) == CFE_TIME_EQUAL (0)
+[ PASS] 04.004 time_UT.c:508 - CFE_TIME_Add, Time A = time B = maximum seconds/subseconds (rollover)
+[ PASS] 04.005 time_UT.c:518 - CFE_TIME_Subtract, Time A = time B = maximum seconds/subseconds (zero result)
+[ PASS] 04.006 time_UT.c:524 - CFE_TIME_Compare(time1, time2) (0) == CFE_TIME_EQUAL (0)
+[ PASS] 04.007 time_UT.c:539 - CFE_TIME_Add, Time A > time B (rollover)
+[ PASS] 04.008 time_UT.c:546 - CFE_TIME_Subtract, Time A > time B
+[ PASS] 04.009 time_UT.c:551 - CFE_TIME_Compare(time1, time2) (-1) == CFE_TIME_A_LT_B (-1)
+[ PASS] 04.010 time_UT.c:558 - CFE_TIME_Add, Time A < time B
+[ PASS] 04.011 time_UT.c:565 - CFE_TIME_Subtract, Time A < time B (rollover)
+[ PASS] 04.012 time_UT.c:570 - CFE_TIME_Compare(time2, time1) (1) == CFE_TIME_A_GT_B (1)
+[ PASS] 04.013 time_UT.c:586 - CFE_TIME_Add, Time A subseconds > time B subseconds (seconds same)
+[ PASS] 04.014 time_UT.c:598 - CFE_TIME_Subtract, Time A subseconds > time B subseconds (seconds same)
+[ PASS] 04.015 time_UT.c:606 - CFE_TIME_Compare(time1, time2) (1) == CFE_TIME_A_GT_B (1)
+[ PASS] 04.016 time_UT.c:615 - CFE_TIME_Add, Time A subseconds < time B subseconds (seconds same)
+[ PASS] 04.017 time_UT.c:627 - CFE_TIME_Subtract, Time A subseconds < time B subseconds (seconds same)
+[ PASS] 04.018 time_UT.c:635 - CFE_TIME_Compare(time2, time1) (-1) == CFE_TIME_A_LT_B (-1)
+[ PASS] 04.019 time_UT.c:652 - CFE_TIME_Add, Time A seconds > time B seconds (subseconds same)
+[ PASS] 04.020 time_UT.c:664 - CFE_TIME_Subtract, Time A seconds > time B seconds (subseconds same)
+[ PASS] 04.021 time_UT.c:672 - CFE_TIME_Compare(time1, time2) (1) == CFE_TIME_A_GT_B (1)
+[ PASS] 04.022 time_UT.c:681 - CFE_TIME_Add, Time A seconds < time B seconds (subseconds same)
+[ PASS] 04.023 time_UT.c:693 - CFE_TIME_Subtract, Time A seconds < time B seconds (subseconds same)
+[ PASS] 04.024 time_UT.c:702 - CFE_TIME_Compare(time2, time1) (-1) == CFE_TIME_A_LT_B (-1)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 04 Test_TimeOp          TOTAL::24    PASS::24    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 05 Test_ConvertTime
+[ INFO] time_UT.c:715:Begin Test Convert Time
+[ PASS] 05.001 time_UT.c:735 - resultTime.Seconds (7240) == expectedMET2SCTime.Seconds (7240)
+[ PASS] 05.002 time_UT.c:736 - resultTime.Subseconds (45) == expectedMET2SCTime.Subseconds (45)
+[ PASS] 05.003 time_UT.c:747 - CFE_TIME_Sub2MicroSecs(0) (0) == 0 (0)
+[ PASS] 05.004 time_UT.c:750 - CFE_TIME_Sub2MicroSecs(0x80000000) (500000) == 500000 (500000)
+[ PASS] 05.005 time_UT.c:755 - CFE_TIME_Sub2MicroSecs(0xffffffff) (999999) == 999999 (999999)
+[ PASS] 05.006 time_UT.c:758 - CFE_TIME_Micro2SubSecs(0) (0) == 0 (0)
+[ PASS] 05.007 time_UT.c:763 - CFE_TIME_Micro2SubSecs(0xffffffff) (4294967295) == 0xffffffff (4294967295)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 05 Test_ConvertTime     TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 06 Test_Print
+[ INFO] time_UT.c:782:Begin Test Print
+[ PASS] 06.001 time_UT.c:794 - CFE_TIME_Print(NULL, time) (-838860795) == CFE_TIME_BAD_ARGUMENT (-838860795)
+[ PASS] 06.002 time_UT.c:797 - CFE_TIME_Print(timeBuf, time) (0x0) == CFE_SUCCESS
+[ PASS] 06.003 time_UT.c:801 - String: '1980-001-00:00:00.00000' == '1980-001-00:00:00.00000'
+[ PASS] 06.004 time_UT.c:817 - CFE_TIME_Print(timeBuf, time) (0x0) == CFE_SUCCESS
+[ PASS] 06.005 time_UT.c:821 - String: '1980-001-00:00:59.00000' == '1980-001-00:00:59.00000'
+[ PASS] 06.006 time_UT.c:835 - CFE_TIME_Print(timeBuf, time) (0x0) == CFE_SUCCESS
+[ PASS] 06.007 time_UT.c:839 - String: '2013-001-02:03:04.00005' == '2013-001-02:03:04.00005'
+[ PASS] 06.008 time_UT.c:853 - CFE_TIME_Print(timeBuf, time) (0x0) == CFE_SUCCESS
+[ PASS] 06.009 time_UT.c:857 - String: '2048-019-03:14:07.49999' == '2048-019-03:14:07.49999'
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 06 Test_Print           TOTAL::9     PASS::9     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 07 Test_RegisterSyncCallbackTrue
+[ INFO] time_UT.c:884:Begin Test Register Synch Callback
+[ PASS] 07.001 time_UT.c:892 - CFE_TIME_RegisterSynchCallback(NULL) (-838860795) == CFE_TIME_BAD_ARGUMENT (-838860795)
+[ PASS] 07.002 time_UT.c:897 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (-1) == -1 (-1)
+[ PASS] 07.003 time_UT.c:902 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (-2) == -2 (-2)
+[ PASS] 07.004 time_UT.c:914 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (0x0) == CFE_SUCCESS
+[ PASS] 07.005 time_UT.c:916 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (-838860797) == CFE_TIME_TOO_MANY_SYNCH_CALLBACKS (-838860797)
+[ PASS] 07.006 time_UT.c:921 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (0x0) == CFE_SUCCESS
+[ PASS] 07.007 time_UT.c:930 - CFE_TIME_RegisterSynchCallback(&ut_time_MyCallbackFunc) (-838860797) == CFE_TIME_TOO_MANY_SYNCH_CALLBACKS (-838860797)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 07 Test_RegisterSyncCallbackTrue TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 08 Test_ExternalTone
+[ INFO] time_UT.c:938:Begin Test External Tone
+[ PASS] 08.001 time_UT.c:947 - CFE_TIME_Global.ToneSignalLatch.Seconds (123) == 123 (123)
+[ PASS] 08.002 time_UT.c:948 - CFE_TIME_Global.ToneSignalLatch.Subseconds (0) == 0 (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 08 Test_ExternalTone    TOTAL::2     PASS::2     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 09 Test_External
+[ INFO] time_UT.c:962:Begin Test External Time Set
+[  N/A] 09.001 time_UT.c:1055 - *Not tested* External MET - external source and clock state not set
+[  N/A] 09.002 time_UT.c:1056 - *Not tested* External MET - external source and time out of range (low)
+[  N/A] 09.003 time_UT.c:1057 - *Not tested* External MET - external source and time out of range (high)
+[  N/A] 09.004 time_UT.c:1058 - *Not tested* External MET - external source and time in range
+[  N/A] 09.005 time_UT.c:1059 - *Not tested* External MET (internal source)
+[  N/A] 09.006 time_UT.c:1155 - *Not tested* External GPS - external source and clock state not set
+[  N/A] 09.007 time_UT.c:1156 - *Not tested* External GPS - external source and time out of range (low)
+[  N/A] 09.008 time_UT.c:1157 - *Not tested* External GPS - external source and time out of range (high)
+[  N/A] 09.009 time_UT.c:1158 - *Not tested* External GPS - external source and time in range
+[  N/A] 09.010 time_UT.c:1159 - *Not tested* External GPS (internal source)
+[  N/A] 09.011 time_UT.c:1256 - *Not tested* External Time - external source and clock state not set
+[  N/A] 09.012 time_UT.c:1257 - *Not tested* External Time - external source and time out of range (low)
+[  N/A] 09.013 time_UT.c:1258 - *Not tested* External Time - external source and time out of range (high)
+[  N/A] 09.014 time_UT.c:1259 - *Not tested* External Time - external source and time in range
+[  N/A] 09.015 time_UT.c:1260 - *Not tested* External Time (internal source)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::15  
+[  END] 09 Test_External        TOTAL::15    PASS::0     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 10 Test_PipeCmds
+[ INFO] time_UT.c:1304:Begin Test Pipe Commands
+[ PASS] 10.001 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.002 time_UT.c:1311 - LocalSnapshotData.Count (1) == 1 (1)
+[ PASS] 10.003 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.004 time_UT.c:1318 - CFE_TIME_Global.ToneSignalCounter (1) == 1 (1)
+[ PASS] 10.005 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.006 time_UT.c:1325 - CFE_TIME_Global.ToneDataCounter (1) == 1 (1)
+[ PASS] 10.007 time_UT.c:1334 - CFE_TIME_Global.ToneSignalLatch.Seconds (123) == 123 (123)
+[ PASS] 10.008 time_UT.c:1335 - CFE_TIME_Global.ToneSignalLatch.Subseconds (0) == 0 (0)
+[ PASS] 10.009 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.010 time_UT.c:1348 - CFE_TIME_Global.InternalCount (1) == count + 1 (1)
+[ PASS] 10.011 time_UT.c:1349 - Event Not Generated: CFE_TIME_ID_ERR_EID (0) ==  (0)
+[ PASS] 10.012 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.013 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.014 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.015 time_UT.c:1358 - Event Generated: CFE_TIME_NOOP_EID (1) !=  (0)
+[ PASS] 10.016 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.017 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.018 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.019 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.020 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.021 time_UT.c:1366 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.022 time_UT.c:1367 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.023 time_UT.c:1368 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.024 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.025 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.026 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.027 time_UT.c:1386 - Event Generated: CFE_TIME_RESET_EID (1) !=  (0)
+[ PASS] 10.028 time_UT.c:1389 - CFE_TIME_Global.ToneMatchCounter (0) == ZERO (0)
+[ PASS] 10.029 time_UT.c:1390 - CFE_TIME_Global.ToneMatchErrorCounter (0) == ZERO (0)
+[ PASS] 10.030 time_UT.c:1391 - CFE_TIME_Global.ToneSignalCounter (0) == ZERO (0)
+[ PASS] 10.031 time_UT.c:1392 - CFE_TIME_Global.ToneDataCounter (0) == ZERO (0)
+[ PASS] 10.032 time_UT.c:1393 - CFE_TIME_Global.ToneIntCounter (0) == ZERO (0)
+[ PASS] 10.033 time_UT.c:1394 - CFE_TIME_Global.ToneIntErrorCounter (0) == ZERO (0)
+[ PASS] 10.034 time_UT.c:1395 - CFE_TIME_Global.ToneTaskCounter (0) == ZERO (0)
+[ PASS] 10.035 time_UT.c:1396 - CFE_TIME_Global.LocalIntCounter (0) == ZERO (0)
+[ PASS] 10.036 time_UT.c:1397 - CFE_TIME_Global.LocalTaskCounter (0) == ZERO (0)
+[ PASS] 10.037 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.038 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.039 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.040 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.041 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.042 time_UT.c:1405 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.043 time_UT.c:1406 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.044 time_UT.c:1407 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.045 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.046 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.047 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.048 time_UT.c:1416 - Event Generated: CFE_TIME_DIAG_EID (1) !=  (0)
+[ PASS] 10.049 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.050 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.051 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.052 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.053 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.054 time_UT.c:1424 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.055 time_UT.c:1425 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.056 time_UT.c:1426 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.057 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.058 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.059 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.060 time_UT.c:1433 - Event Generated: CFE_TIME_STATE_EID (1) !=  (0)
+[ PASS] 10.061 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.062 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.063 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.064 time_UT.c:1440 - Event Generated: CFE_TIME_STATE_EID (1) !=  (0)
+[ PASS] 10.065 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.066 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.067 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.068 time_UT.c:1447 - Event Generated: CFE_TIME_STATE_EID (1) !=  (0)
+[ PASS] 10.069 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.070 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.071 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.072 time_UT.c:1456 - Event Generated: CFE_TIME_STATE_ERR_EID (1) !=  (0)
+[ PASS] 10.073 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.074 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.075 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.076 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.077 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.078 time_UT.c:1464 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.079 time_UT.c:1465 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.080 time_UT.c:1466 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.081 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.082 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.083 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.084 time_UT.c:1477 - Event Generated: CFE_TIME_SOURCE_CFG_EID (1) !=  (0)
+[ PASS] 10.085 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.086 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.087 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.088 time_UT.c:1489 - Event Generated: CFE_TIME_SOURCE_CFG_EID (1) !=  (0)
+[ PASS] 10.089 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.090 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.091 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.092 time_UT.c:1499 - Event Generated: CFE_TIME_SOURCE_ERR_EID (1) !=  (0)
+[ PASS] 10.093 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.094 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.095 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.096 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.097 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.098 time_UT.c:1507 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.099 time_UT.c:1508 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.100 time_UT.c:1509 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.101 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.102 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.103 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.104 time_UT.c:1524 - Event Generated: CFE_TIME_SIGNAL_CFG_EID (1) !=  (0)
+[ PASS] 10.105 time_UT.c:1525 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.106 time_UT.c:1526 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.107 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.108 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.109 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.110 time_UT.c:1542 - Event Generated: CFE_TIME_SIGNAL_CFG_EID (1) !=  (0)
+[ PASS] 10.111 time_UT.c:1543 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.112 time_UT.c:1544 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.113 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.114 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.115 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.116 time_UT.c:1555 - Event Generated: CFE_TIME_SIGNAL_ERR_EID (1) !=  (0)
+[ PASS] 10.117 time_UT.c:1556 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.118 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.119 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.120 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.121 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.122 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.123 time_UT.c:1564 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.124 time_UT.c:1565 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.125 time_UT.c:1566 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.126 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.127 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.128 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.129 time_UT.c:1582 - Event Generated: CFE_TIME_DELAY_CFG_EID (1) !=  (0)
+[ PASS] 10.130 time_UT.c:1583 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.131 time_UT.c:1584 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.132 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.133 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.134 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.135 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.136 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.137 time_UT.c:1593 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.138 time_UT.c:1594 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.139 time_UT.c:1595 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.140 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.141 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.142 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.143 time_UT.c:1609 - Event Generated: CFE_TIME_DELAY_CFG_EID (1) !=  (0)
+[ PASS] 10.144 time_UT.c:1610 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.145 time_UT.c:1611 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.146 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.147 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.148 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.149 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.150 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.151 time_UT.c:1620 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.152 time_UT.c:1621 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.153 time_UT.c:1622 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.154 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.155 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.156 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.157 time_UT.c:1632 - Event Generated: CFE_TIME_TIME_EID (1) !=  (0)
+[ PASS] 10.158 time_UT.c:1633 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.159 time_UT.c:1634 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.160 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.161 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.162 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.163 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.164 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.165 time_UT.c:1647 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.166 time_UT.c:1648 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.167 time_UT.c:1649 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.168 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.169 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.170 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.171 time_UT.c:1659 - Event Generated: CFE_TIME_MET_EID (1) !=  (0)
+[ PASS] 10.172 time_UT.c:1660 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.173 time_UT.c:1661 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.174 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.175 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.176 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.177 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.178 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.179 time_UT.c:1674 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.180 time_UT.c:1675 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.181 time_UT.c:1676 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.182 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.183 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.184 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.185 time_UT.c:1686 - Event Generated: CFE_TIME_STCF_EID (1) !=  (0)
+[ PASS] 10.186 time_UT.c:1687 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.187 time_UT.c:1688 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.188 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.189 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.190 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.191 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.192 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.193 time_UT.c:1701 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.194 time_UT.c:1702 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.195 time_UT.c:1703 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.196 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.197 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.198 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.199 time_UT.c:1713 - Event Generated: CFE_TIME_DELTA_EID (1) !=  (0)
+[ PASS] 10.200 time_UT.c:1714 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.201 time_UT.c:1715 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.202 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.203 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.204 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.205 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.206 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.207 time_UT.c:1728 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.208 time_UT.c:1729 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.209 time_UT.c:1730 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.210 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.211 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.212 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.213 time_UT.c:1740 - Event Generated: CFE_TIME_DELTA_EID (1) !=  (0)
+[ PASS] 10.214 time_UT.c:1741 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.215 time_UT.c:1742 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.216 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.217 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.218 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.219 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.220 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.221 time_UT.c:1755 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.222 time_UT.c:1756 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.223 time_UT.c:1757 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.224 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.225 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.226 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.227 time_UT.c:1770 - Event Generated: CFE_TIME_ONEHZ_EID (1) !=  (0)
+[ PASS] 10.228 time_UT.c:1771 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.229 time_UT.c:1772 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.230 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.231 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.232 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.233 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.234 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.235 time_UT.c:1785 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.236 time_UT.c:1786 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.237 time_UT.c:1787 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.238 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.239 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.240 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.241 time_UT.c:1800 - Event Generated: CFE_TIME_ONEHZ_EID (1) !=  (0)
+[ PASS] 10.242 time_UT.c:1801 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.243 time_UT.c:1802 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.244 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.245 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.246 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.247 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.248 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.249 time_UT.c:1815 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.250 time_UT.c:1816 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.251 time_UT.c:1817 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.252 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.253 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.254 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.255 time_UT.c:1824 - Event Generated: CFE_TIME_DELAY_ERR_EID (1) !=  (0)
+[ PASS] 10.256 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.257 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.258 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.259 time_UT.c:1831 - Event Generated: CFE_TIME_TIME_ERR_EID (1) !=  (0)
+[ PASS] 10.260 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.261 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.262 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.263 time_UT.c:1838 - Event Generated: CFE_TIME_MET_ERR_EID (1) !=  (0)
+[ PASS] 10.264 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.265 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.266 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.267 time_UT.c:1845 - Event Generated: CFE_TIME_STCF_ERR_EID (1) !=  (0)
+[ PASS] 10.268 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.269 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.270 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.271 time_UT.c:1852 - Event Generated: CFE_TIME_DELTA_ERR_EID (1) !=  (0)
+[ PASS] 10.272 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.273 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.274 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.275 time_UT.c:1866 - Event Generated: CFE_TIME_LEAPS_EID (1) !=  (0)
+[ PASS] 10.276 time_UT.c:1867 - CFE_TIME_Global.CommandCounter (1) == 1 (1)
+[ PASS] 10.277 time_UT.c:1868 - CFE_TIME_Global.CommandErrorCounter (0) == 0 (0)
+[ PASS] 10.278 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.279 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.280 cfe_msg_handlers.c:268 - UT_DefaultHandler_CFE_MSG_GetSize: Check for get value provided by test
+[ PASS] 10.281 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.282 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.283 time_UT.c:1881 - Event Generated: CFE_TIME_LEN_ERR_EID (1) !=  (0)
+[ PASS] 10.284 time_UT.c:1882 - CFE_TIME_Global.CommandCounter (0) == 0 (0)
+[ PASS] 10.285 time_UT.c:1883 - CFE_TIME_Global.CommandErrorCounter (1) == 1 (1)
+[ PASS] 10.286 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.287 cfe_msg_handlers.c:114 - UT_DefaultHandler_CFE_MSG_GetFcnCode: Check for get value provided by test
+[ PASS] 10.288 time_UT.c:1889 - Event Generated: CFE_TIME_CC_ERR_EID (1) !=  (0)
+[ PASS] 10.289 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.290 time_UT.c:1895 - Event Generated: CFE_TIME_ID_ERR_EID (1) !=  (0)
+[ PASS] 10.291 cfe_msg_handlers.c:173 - UT_DefaultHandler_CFE_MSG_GetMsgId: Check for get value provided by test
+[ PASS] 10.292 time_UT.c:1902 - UT_GetStubCount(UT_KEY(CFE_PSP_GetTime)) (2) != ZERO (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 10 Test_PipeCmds        TOTAL::292   PASS::292   FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 11 Test_ResetArea
+[ INFO] time_UT.c:1914:Begin Test Reset Area
+[ PASS] 11.001 time_UT.c:1922 - UT_GetResetDataPtr()->TimeResetVars.ClockSignal (1) == CFE_TIME_Global.ClockSignal (1)
+[ PASS] 11.002 time_UT.c:1928 - CFE_TIME_Global.DataStoreStatus (4) == CFE_TIME_RESET_AREA_EXISTING (4)
+[ PASS] 11.003 time_UT.c:1934 - CFE_TIME_Global.DataStoreStatus (4) == CFE_TIME_RESET_AREA_EXISTING (4)
+[ PASS] 11.004 time_UT.c:1940 - CFE_TIME_Global.DataStoreStatus (2) == CFE_TIME_RESET_AREA_BAD (2)
+[ PASS] 11.005 time_UT.c:1946 - CFE_TIME_Global.DataStoreStatus (3) == CFE_TIME_RESET_AREA_NEW (3)
+[ PASS] 11.006 time_UT.c:1952 - CFE_TIME_Global.DataStoreStatus (3) == CFE_TIME_RESET_AREA_NEW (3)
+[ PASS] 11.007 time_UT.c:1960 - UT_GetResetDataPtr()->TimeResetVars.ClockSignal (2) == CFE_TIME_ToneSignalSelect_REDUNDANT (2)
+[ PASS] 11.008 time_UT.c:1969 - UT_GetResetDataPtr()->TimeResetVars.ClockSignal (2) == CFE_TIME_ToneSignalSelect_REDUNDANT (2)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 11 Test_ResetArea       TOTAL::8     PASS::8     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 12 Test_State
+[ INFO] time_UT.c:1981:Begin Test Time State
+[ PASS] 12.001 time_UT.c:1990 - CFE_TIME_CalculateState(&Reference) (0) == CFE_TIME_ClockState_VALID (0)
+[ PASS] 12.002 time_UT.c:2002 - CFE_TIME_CalculateState(&Reference) (0) == CFE_TIME_ClockState_VALID (0)
+[ PASS] 12.003 time_UT.c:2008 - CFE_TIME_CalculateState(&Reference) (1) == CFE_TIME_ClockState_FLYWHEEL (1)
+[ PASS] 12.004 time_UT.c:2013 - CFE_TIME_CalculateState(&Reference) (-1) == CFE_TIME_ClockState_INVALID (-1)
+[ PASS] 12.005 time_UT.c:2034 - CFE_TIME_GetClockInfo() (64704) == flag (64704)
+[ PASS] 12.006 time_UT.c:2042 - CFE_TIME_GetClockInfo() (15424) == flag (15424)
+[ PASS] 12.007 time_UT.c:2056 - CFE_TIME_GetClockInfo() (64) == flag (64)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 12 Test_State           TOTAL::7     PASS::7     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 13 Test_GetReference
+[ INFO] time_UT.c:2071:Begin Test Get Reference
+[ PASS] 13.001 time_UT.c:2090 - Reference.CurrentMET.Seconds (1010) == 1010 (1010)
+[ PASS] 13.002 time_UT.c:2091 - Reference.CurrentMET.Subseconds (0) == 0 (0)
+[ PASS] 13.003 time_UT.c:2109 - Reference.CurrentMET.Seconds (25) == 25 (25)
+[ PASS] 13.004 time_UT.c:2110 - Reference.CurrentMET.Subseconds (0) == 0 (0)
+[ PASS] 13.005 time_UT.c:2124 - CFE_TIME_Global.GetReferenceFail (0) == false (0)
+[ PASS] 13.006 time_UT.c:2125 - Reference.CurrentMET.Seconds (19) == 19 (19)
+[ PASS] 13.007 time_UT.c:2126 - Reference.CurrentMET.Subseconds (429497) == 429497 (429497)
+[ PASS] 13.008 time_UT.c:2127 - Reference.ClockSetState (1) == CFE_TIME_SetState_WAS_SET (1)
+[ PASS] 13.009 time_UT.c:2134 - CFE_TIME_Global.GetReferenceFail (1) == true (1)
+[ PASS] 13.010 time_UT.c:2135 - Reference.CurrentMET.Seconds (0) == 0 (0)
+[ PASS] 13.011 time_UT.c:2136 - Reference.CurrentMET.Subseconds (0) == 0 (0)
+[ PASS] 13.012 time_UT.c:2137 - Reference.ClockSetState (0) == CFE_TIME_SetState_NOT_SET (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 13 Test_GetReference    TOTAL::12    PASS::12    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 14 Test_Tone
+[ INFO] time_UT.c:2161:Begin Test Tone
+[ PASS] 14.001 time_UT.c:2191 - CFE_TIME_Global.ToneDataCmd.Payload.AtToneMET.Seconds (7654321) == seconds (7654321)
+[ PASS] 14.002 time_UT.c:2192 - CFE_TIME_Global.ToneDataCmd.Payload.AtToneMET.Subseconds (0) == 0 (0)
+[ PASS] 14.003 time_UT.c:2211 - CFE_TIME_Global.ToneDataCmd.Payload.AtToneMET.Seconds (1234567) == virtualSeconds (1234567)
+[ PASS] 14.004 time_UT.c:2212 - CFE_TIME_Global.ToneDataCmd.Payload.AtToneMET.Subseconds (0) == 0 (0)
+[ PASS] 14.005 time_UT.c:2238 - CFE_TIME_Global.LastVersionCounter (4149) == VersionSave + 1 (4149)
+[ PASS] 14.006 time_UT.c:2239 - CFE_TIME_Global.ToneMatchCounter (1) == 1 (1)
+[ PASS] 14.007 time_UT.c:2248 - CFE_TIME_ToneVerify(time1, time2)
+[ PASS] 14.008 time_UT.c:2249 - CFE_TIME_Global.LastVersionCounter (4149) == VersionSave (4149)
+[ PASS] 14.009 time_UT.c:2250 - CFE_TIME_Global.ToneMatchCounter (0) == 0 (0)
+[ PASS] 14.010 time_UT.c:2256 - CFE_TIME_Global.ToneMatchErrorCounter (1) == 1 (1)
+[ PASS] 14.011 time_UT.c:2262 - CFE_TIME_Global.ToneMatchErrorCounter (1) == 1 (1)
+[ PASS] 14.012 time_UT.c:2274 - CFE_TIME_Global.ToneMatchCounter (1) == 1 (1)
+[ PASS] 14.013 time_UT.c:2286 - CFE_TIME_Global.ToneMatchErrorCounter (1) == 1 (1)
+[ PASS] 14.014 time_UT.c:2300 - CFE_TIME_Global.ToneMatchErrorCounter (1) == 1 (1)
+[ PASS] 14.015 time_UT.c:2314 - CFE_TIME_Global.ToneMatchErrorCounter (1) == 1 (1)
+[ PASS] 14.016 time_UT.c:2335 - CFE_TIME_Global.LastVersionCounter (4150) == VersionSave + 1 (4150)
+[ PASS] 14.017 time_UT.c:2336 - CFE_TIME_Global.ToneMatchCounter (1) == 1 (1)
+[ PASS] 14.018 time_UT.c:2337 - CFE_TIME_Global.VirtualMET (5) == 5 (5)
+[ PASS] 14.019 time_UT.c:2348 - CFE_TIME_ToneUpdate()
+[ PASS] 14.020 time_UT.c:2349 - CFE_TIME_Global.VirtualMET (5) == 5 (5)
+[  N/A] 14.021 time_UT.c:2369 - *Not tested* CFE_TIME_ToneUpdate() Invalid pending state, requires client configuration
+[  N/A] 14.022 time_UT.c:2370 - *Not tested* CFE_TIME_ToneUpdate() Pending state is FLYWHEEL, requires client configuration
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::2   
+[  END] 14 Test_Tone            TOTAL::22    PASS::20    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 15 Test_1Hz
+[ PASS] 15.001 time_UT.c:2399 - RefState->AtToneSTCF.Seconds (30) == 30 (30)
+[ PASS] 15.002 time_UT.c:2400 - RefState->AtToneSTCF.Subseconds (90) == 90 (90)
+[ PASS] 15.003 time_UT.c:2407 - RefState->AtToneSTCF.Seconds (20) == 20 (20)
+[ PASS] 15.004 time_UT.c:2408 - RefState->AtToneSTCF.Subseconds (60) == 60 (60)
+[ PASS] 15.005 time_UT.c:2431 - CFE_TIME_Global.AutoStartFly (1) == true (1)
+[ PASS] 15.006 time_UT.c:2455 - RefState->AtToneMET.Seconds (21) == time1.Seconds + CFE_PLATFORM_TIME_CFG_LATCH_FLY + delSec - time2.Seconds (21)
+[ PASS] 15.007 time_UT.c:2457 - RefState->AtToneLatch.Seconds (0) == 0 (0)
+[ PASS] 15.008 time_UT.c:2468 - CFE_TIME_Global.IsToneGood (0) == false (0)
+[ PASS] 15.009 time_UT.c:2490 - ut_time_CallbackCalled (3) == 3 (3)
+[ PASS] 15.010 time_UT.c:2495 - CFE_TIME_Local1HzISR()
+[ PASS] 15.011 time_UT.c:2496 - CallCount: OS_BinSemGive() (1) == 1 (1)
+[ PASS] 15.012 time_UT.c:2497 - CFE_TIME_Global.LocalIntCounter (2) == 2 (2)
+[ PASS] 15.013 time_UT.c:2507 - CFE_TIME_Global.LocalTaskCounter (1) == 1 (1)
+[ PASS] 15.014 time_UT.c:2516 - CFE_TIME_Global.ToneTaskCounter (1) == 1 (1)
+[ PASS] 15.015 time_UT.c:2527 - CFE_TIME_Global.IsToneGood (0) == false (0)
+[ PASS] 15.016 time_UT.c:2536 - CFE_TIME_Global.IsToneGood (1) == true (1)
+[ PASS] 15.017 time_UT.c:2545 - CFE_TIME_Global.IsToneGood (0) == false (0)
+[ PASS] 15.018 time_UT.c:2561 - CFE_TIME_Global.AutoStartFly (1) == true (1)
+[ PASS] 15.019 time_UT.c:2575 - RefState->ClockFlyState (0) == CFE_TIME_FlywheelState_NO_FLY (0)
+[ PASS] 15.020 time_UT.c:2584 - RefState->ClockFlyState (0) == CFE_TIME_FlywheelState_NO_FLY (0)
+[ PASS] 15.021 time_UT.c:2585 - Event Not Generated: CFE_TIME_FLY_ON_EID (0) ==  (0)
+[ PASS] 15.022 time_UT.c:2597 - CFE_TIME_Global.LocalIntCounter (2) == 2 (2)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 15 Test_1Hz             TOTAL::22    PASS::22    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 16 Test_UnregisterSynchCallback
+[ INFO] time_UT.c:2610:Begin Test Unregister Callback
+[ PASS] 16.001 time_UT.c:2614 - CFE_TIME_UnregisterSynchCallback(NULL) (-838860795) == CFE_TIME_BAD_ARGUMENT (-838860795)
+[ PASS] 16.002 time_UT.c:2637 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (-838860796) == CFE_TIME_CALLBACK_NOT_REGISTERED (-838860796)
+[ PASS] 16.003 time_UT.c:2647 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (0x0) == CFE_SUCCESS
+[ PASS] 16.004 time_UT.c:2650 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (-838860796) == CFE_TIME_CALLBACK_NOT_REGISTERED (-838860796)
+[ PASS] 16.005 time_UT.c:2655 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (-1) == -1 (-1)
+[ PASS] 16.006 time_UT.c:2660 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (-2) == -2 (-2)
+[ PASS] 16.007 time_UT.c:2665 - CFE_TIME_UnregisterSynchCallback(&ut_time_MyCallbackFunc) (-838860796) == CFE_TIME_CALLBACK_NOT_REGISTERED (-838860796)
+[ PASS] 16.008 time_UT.c:2675 - ut_time_CallbackCalled (0) == 0 (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 16 Test_UnregisterSynchCallback TOTAL::8     PASS::8     FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 17 Test_CleanUpApp
+[ INFO] time_UT.c:2688:Begin Test Cleanup App
+[ PASS] 17.001 time_UT.c:2713 - CFE_TIME_CleanUpApp(CFE_RESOURCEID_TO_ULONG(TestAppId)) (0x0) == CFE_SUCCESS
+[ PASS] 17.002 time_UT.c:2725 - Count (3) == 3 (3)
+[ PASS] 17.003 time_UT.c:2730 - CFE_TIME_CleanUpApp(CFE_RESOURCEID_TO_ULONG(TestAppId)) (0x0) == CFE_SUCCESS
+[ PASS] 17.004 time_UT.c:2741 - Count (2) == 2 (2)
+[ PASS] 17.005 time_UT.c:2747 - CFE_TIME_CleanUpApp(CFE_RESOURCEID_TO_ULONG(CFE_ES_APPID_UNDEFINED)) (-838860796) == CFE_TIME_CALLBACK_NOT_REGISTERED (-838860796)
+[ PASS] 17.006 time_UT.c:2753 - CFE_TIME_CleanUpApp(CFE_RESOURCEID_TO_ULONG(CFE_ES_APPID_UNDEFINED)) (-2) == -2 (-2)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 17 Test_CleanUpApp      TOTAL::6     PASS::6     FAIL::0     MIR::0     TSF::0     TTF::0   
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::17  
+[  END] 17 SUMMARY              TOTAL::481   PASS::464   FAIL::0     MIR::0     TSF::0     TTF::0   
+COMPLETE: 17 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

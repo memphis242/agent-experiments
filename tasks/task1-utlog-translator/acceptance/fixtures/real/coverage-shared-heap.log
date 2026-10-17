@@ -1,0 +1,14 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 OS_HeapGetInfo
+[ PASS] 01.001 coveragetest-heap.c:38 - OS_HeapGetInfo() (0) == OS_SUCCESS
+[ PASS] 01.002 coveragetest-heap.c:43 - OS_HeapGetInfo() (-2) == OS_INVALID_POINTER
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 OS_HeapGetInfo       TOTAL::2     PASS::2     FAIL::0     MIR::0     TSF::0     TTF::0   
+COMPLETE: 1 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

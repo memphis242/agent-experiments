@@ -1,0 +1,15 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+[  END] No test cases
+
+[BEGIN] 01 GADGET_Startup
+[  TSF] 01.001 gadget_test.c:22 - Gadget_Open() (-1) == 0 (0)
+[ PASS] 01.002 gadget_test.c:25 - Gadget_Version() (3) == 3 (3)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 GADGET_Startup       TOTAL::2     PASS::1     FAIL::0     MIR::0     TSF::1     TTF::0   
+
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 SUMMARY              TOTAL::2     PASS::1     FAIL::0     MIR::0     TSF::1     TTF::0   
+COMPLETE: 1 tests Segment(s) executed

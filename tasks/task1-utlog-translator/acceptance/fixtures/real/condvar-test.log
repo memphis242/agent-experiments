@@ -1,0 +1,161 @@
+
+[BEGIN] UNIT TEST
+
+[BEGIN] 01 SETUP
+OS_Posix_GetSchedulerParams():208:Policy 1: available, min-max: 1-99
+OS_Posix_GetSchedulerParams():208:Policy 2: available, min-max: 1-99
+OS_Posix_TaskAPI_Impl_Init():401:Selected policy 2 for RT tasks, root task = 99
+OS_Posix_TaskAPI_Impl_Init():419:Could not setschedparam in main thread: Operation not permitted (1)
+[  END] No test cases
+
+[BEGIN] 01 CondVarOps
+[ PASS] 01.001 condvar-test.c:350 - OS_CondVarCreate(NULL, "cvex", 0) (-2) == OS_INVALID_POINTER (-2)
+
+**BUG** OS_CondVarCreate():87:check '(var_id) != NULL' FAILED --> OS_INVALID_POINTER
+
+
+**BUG** OS_CondVarCreate():88:check '(var_name) != NULL' FAILED --> OS_INVALID_POINTER
+
+[ PASS] 01.002 condvar-test.c:351 - OS_CondVarCreate(&cv_extra, NULL, 0) (-2) == OS_INVALID_POINTER (-2)
+[ PASS] 01.003 condvar-test.c:356 - OS_CondVarCreate(&cv_id[i], cv_name, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.004 condvar-test.c:356 - OS_CondVarCreate(&cv_id[i], cv_name, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.005 condvar-test.c:356 - OS_CondVarCreate(&cv_id[i], cv_name, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.006 condvar-test.c:356 - OS_CondVarCreate(&cv_id[i], cv_name, 0) (0) == OS_SUCCESS (0)
+[ PASS] 01.007 condvar-test.c:359 - OS_CondVarCreate(&cv_extra, "cvex", 0) (-14) == OS_ERR_NO_FREE_IDS (-14)
+[ PASS] 01.008 condvar-test.c:360 - OS_CondVarDelete(cv_id[OS_MAX_CONDVARS - 1]) (0) == OS_SUCCESS (0)
+[ PASS] 01.009 condvar-test.c:361 - OS_CondVarCreate(&cv_extra, "cv000", 0) (-15) == OS_ERR_NAME_TAKEN (-15)
+[ PASS] 01.010 condvar-test.c:363 - OS_CondVarGetIdByName(&cv_extra, "cv000") (0) == OS_SUCCESS (0)
+[ PASS] 01.011 condvar-test.c:364 - objid (851970) == cv_id[0] (851970)
+[ PASS] 01.012 condvar-test.c:368 - OS_CondVarGetIdByName(&cv_extra, "cvex") (-17) == OS_ERR_NAME_NOT_FOUND (-17)
+[ PASS] 01.013 condvar-test.c:370 - OS_CondVarGetInfo(cv_id[0], &cv_prop) (0) == OS_SUCCESS (0)
+[ PASS] 01.014 condvar-test.c:371 - String: 'cv000' == 'cv000'
+[ PASS] 01.015 condvar-test.c:372 - OS_CondVarGetInfo(cv_id[OS_MAX_CONDVARS - 1], &cv_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.016 condvar-test.c:373 - OS_CondVarGetInfo(OS_OBJECT_ID_UNDEFINED, &cv_prop) (-16) == OS_ERR_INVALID_ID (-16)
+[ PASS] 01.017 condvar-test.c:378 - OS_CondVarDelete(cv_id[i]) (0) == OS_SUCCESS (0)
+[ PASS] 01.018 condvar-test.c:378 - OS_CondVarDelete(cv_id[i]) (0) == OS_SUCCESS (0)
+[ PASS] 01.019 condvar-test.c:378 - OS_CondVarDelete(cv_id[i]) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 01 CondVarOps           TOTAL::19    PASS::19    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 02 CondVarBasic
+[ PASS] 02.001 condvar-test.c:127 - OS_CondVarCreate(&condvar_id, "CondVar", 0) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:128:CondVar create Id=851974
+[ PASS] 02.002 condvar-test.c:136 - OS_TaskCreate(&task_states[i].task_id, task_name, task_entry_points[i], OSAL_STACKPTR_C(&task_stacks[i]), sizeof(task_stacks[i]), OSAL_PRIORITY_C(10 + (i * 10)), 0) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:144:Task1 create Id=65537
+[ INFO] condvar-test.c:69:Starting task 0, mask=0x1
+[ PASS] 02.004 condvar-test.c:136 - OS_TaskCreate(&task_states[i].task_id, task_name, task_entry_points[i], OSAL_STACKPTR_C(&task_stacks[i]), sizeof(task_stacks[i]), OSAL_PRIORITY_C(10 + (i * 10)), 0) (0) == OS_SUCCESS (0)
+[ PASS] 02.003 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:144:Task2 create Id=65538
+[ INFO] condvar-test.c:69:Starting task 1, mask=0x2
+[ PASS] 02.005 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.006 condvar-test.c:136 - OS_TaskCreate(&task_states[i].task_id, task_name, task_entry_points[i], OSAL_STACKPTR_C(&task_stacks[i]), sizeof(task_stacks[i]), OSAL_PRIORITY_C(10 + (i * 10)), 0) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:144:Task3 create Id=65539
+[ INFO] condvar-test.c:69:Starting task 2, mask=0x4
+[ PASS] 02.007 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.008 condvar-test.c:160 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.009 condvar-test.c:161 - total_work (0) == num_signals (0)
+[ PASS] 02.010 condvar-test.c:163 - OS_CondVarSignal(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.011 condvar-test.c:167 - curr_condition (0x7) & ALL_RUN_CONDITION (0x7)
+[ PASS] 02.012 condvar-test.c:168 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.013 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.014 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 0, mask=0x1 condition was=7
+[ PASS] 02.015 condvar-test.c:174 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.016 condvar-test.c:175 - total_work (1) == num_signals (1)
+[ PASS] 02.017 condvar-test.c:176 - curr_condition (6) != ALL_RUN_CONDITION (7)
+[ PASS] 02.018 condvar-test.c:177 - curr_condition (6) != 0 (0)
+[ PASS] 02.019 condvar-test.c:178 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.020 condvar-test.c:180 - OS_CondVarSignal(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.021 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.022 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 1, mask=0x2 condition was=6
+[ PASS] 02.023 condvar-test.c:174 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.024 condvar-test.c:175 - total_work (2) == num_signals (2)
+[ PASS] 02.025 condvar-test.c:176 - curr_condition (4) != ALL_RUN_CONDITION (7)
+[ PASS] 02.026 condvar-test.c:177 - curr_condition (4) != 0 (0)
+[ PASS] 02.027 condvar-test.c:178 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.028 condvar-test.c:180 - OS_CondVarSignal(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.029 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.030 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 2, mask=0x4 condition was=4
+[ PASS] 02.031 condvar-test.c:187 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.032 condvar-test.c:190 - task_states[i].run_count (1) == 1 (1)
+[ PASS] 02.033 condvar-test.c:190 - task_states[i].run_count (1) == 1 (1)
+[ PASS] 02.034 condvar-test.c:190 - task_states[i].run_count (1) == 1 (1)
+[ PASS] 02.035 condvar-test.c:192 - total_work (3) == num_signals (3)
+[ PASS] 02.036 condvar-test.c:193 - curr_condition (0x0) &~ ALL_RUN_CONDITION (0x7)
+[ PASS] 02.037 condvar-test.c:195 - OS_CondVarBroadcast(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.038 condvar-test.c:196 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.039 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.040 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 0, mask=0x1 condition was=7
+[ PASS] 02.041 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.042 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 1, mask=0x2 condition was=6
+[ PASS] 02.043 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.044 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 2, mask=0x4 condition was=4
+[ PASS] 02.045 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.046 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.047 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.048 condvar-test.c:201 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.049 condvar-test.c:202 - curr_condition (0x0) &~ ALL_RUN_CONDITION (0x7)
+[ PASS] 02.050 condvar-test.c:205 - task_states[i].run_count (2) == 2 (2)
+[ PASS] 02.051 condvar-test.c:205 - task_states[i].run_count (2) == 2 (2)
+[ PASS] 02.052 condvar-test.c:205 - task_states[i].run_count (2) == 2 (2)
+[ PASS] 02.053 condvar-test.c:207 - total_work (6) == NUM_TASKS * 2 (6)
+[ PASS] 02.054 condvar-test.c:209 - OS_CondVarBroadcast(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.055 condvar-test.c:210 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.056 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.057 condvar-test.c:88 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:91:Doing Work task 0, mask=0x1 condition was=1
+[ PASS] 02.058 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.059 condvar-test.c:78 - OS_CondVarWait(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.060 condvar-test.c:74 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.061 condvar-test.c:215 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.062 condvar-test.c:216 - total_work (7) == (NUM_TASKS * 2) + 1 (7)
+[ PASS] 02.063 condvar-test.c:217 - task_states[0].run_count (3) == 3 (3)
+[ PASS] 02.064 condvar-test.c:218 - curr_condition (0x0) &~ ALL_RUN_CONDITION (0x7)
+[ PASS] 02.065 condvar-test.c:219 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.066 condvar-test.c:231 - OS_TaskDelete(task_states[i].task_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:232:Task1 delete Id=65537
+[ PASS] 02.067 condvar-test.c:231 - OS_TaskDelete(task_states[i].task_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:232:Task2 delete Id=65538
+[ PASS] 02.068 condvar-test.c:231 - OS_TaskDelete(task_states[i].task_id) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:232:Task3 delete Id=65539
+[ PASS] 02.069 condvar-test.c:236 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.070 condvar-test.c:237 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 02.071 condvar-test.c:239 - OS_CondVarDelete(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 02 CondVarBasic         TOTAL::71    PASS::71    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 03 CondVarTimed
+[ PASS] 03.001 condvar-test.c:288 - OS_CondVarCreate(&condvar_id, "CondVar", 0) (0) == OS_SUCCESS (0)
+[ PASS] 03.002 condvar-test.c:290 - OS_TaskCreate(&task_states[0].task_id, "timedwait", condvar_timedtask_entry, OSAL_STACKPTR_C(&task_stacks[0]), sizeof(task_stacks[0]), OSAL_PRIORITY_C(10), 0) (0) == OS_SUCCESS (0)
+[ INFO] condvar-test.c:251:Starting OS_CondVarTimedWait task
+[ PASS] 03.003 condvar-test.c:253 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.004 condvar-test.c:305 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.005 condvar-test.c:259 - OS_CondVarTimedWait(condvar_id, &endtm) (-4) == OS_ERROR_TIMEOUT (-4)
+[ PASS] 03.006 condvar-test.c:265 - OS_TimeGetTotalMilliseconds(elapsed) (200) >= 200 (200)
+[ PASS] 03.007 condvar-test.c:316 - total_work (1) == 1 (1)
+[ PASS] 03.008 condvar-test.c:317 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.009 condvar-test.c:321 - OS_CondVarSignal(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.010 condvar-test.c:269 - OS_CondVarTimedWait(condvar_id, &endtm) (0) == OS_SUCCESS (0)
+[ PASS] 03.011 condvar-test.c:275 - OS_TimeGetTotalMilliseconds(elapsed) (7) < 200 (200)
+[ PASS] 03.012 condvar-test.c:326 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.013 condvar-test.c:327 - total_work (2) == 2 (2)
+[ PASS] 03.014 condvar-test.c:328 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.015 condvar-test.c:333 - OS_TaskDelete(task_states[0].task_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.016 condvar-test.c:336 - OS_CondVarLock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.017 condvar-test.c:337 - OS_CondVarUnlock(condvar_id) (0) == OS_SUCCESS (0)
+[ PASS] 03.018 condvar-test.c:339 - OS_CondVarDelete(condvar_id) (0) == OS_SUCCESS (0)
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 CondVarTimed         TOTAL::18    PASS::18    FAIL::0     MIR::0     TSF::0     TTF::0   
+
+[BEGIN] 04 Cleanup
+[  END] No test cases
+[ INFO]                        ABORT::0     WARN::0     FLOW::0     DEBUG::0     N/A::0   
+[  END] 03 SUMMARY              TOTAL::108   PASS::108   FAIL::0     MIR::0     TSF::0     TTF::0   
+COMPLETE: 3 tests Segment(s) executed
+
+OS_BSP_Initialize():Maximum user msg queue depth = 10

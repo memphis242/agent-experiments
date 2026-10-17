@@ -25,10 +25,10 @@ utlog2junit.py [--junit OUT.xml] [--markdown OUT.md] [--strict] PATH [PATH ...]
   Files given explicitly are processed whatever their extension.
 - At least one of `--junit` or `--markdown` must be given; otherwise print
   usage to stderr and exit 2.
-- Exit status: 0 when every parsed test segment passed, 1 when any segment
-  failed or any log was incomplete, 2 on usage errors, unreadable input, or
-  (with `--strict`) any line that is not recognized by the grammar below.
-  Without `--strict`, unrecognized lines are ignored.
+- Exit status, regardless of which outputs were requested: 0 when every
+  parsed test segment passed and every log was complete, 1 when any segment
+  failed (FAIL, TSF or TTF) or any log was incomplete, 2 on usage errors,
+  unreadable input, or (with `--strict`) any unrecognized line.
 - An empty directory or a set of inputs yielding no logs is a usage error
   (exit 2) with a clear message naming the path.
 
@@ -49,15 +49,24 @@ A log consists of lines. Lines are classified by their first bracketed tag
   segment with its counts. `[  END] No test cases` closes an empty segment.
 - `[  END] NN SUMMARY TOTAL::t PASS::p ...` is the whole-log summary.
 - `COMPLETE: N tests Segment(s) executed` ends the log.
-- Any other line (blank, `**BUG**` diagnostics, OSAL startup chatter) is
-  ignored unless `--strict` is given.
+- The following are recognized and ignored, also under `--strict`: blank
+  lines, the opening `[BEGIN] UNIT TEST` line, and lines starting with
+  `**BUG**` (OSAL diagnostics).
+- Any other line (for example OSAL startup chatter) is unrecognized: ignored
+  without `--strict`, a usage error (exit 2) with `--strict`.
 
-A log without a `COMPLETE:` line is incomplete (truncated run or crash).
+The SUMMARY line is optional; some runners omit it. A log without a
+`COMPLETE:` line is incomplete (truncated run or crash). When two inputs
+would produce the same suite name, use each path as given (without `.log`)
+as the suite name instead.
 
 ### JUnit XML output
 
 - One `<testsuite>` per log file, `name` = file name without `.log`,
-  with `tests`, `failures`, `errors`, `skipped`, and `time="0"` attributes.
+  with `tests` (number of `<testcase>` elements in the suite, including
+  skipped and error cases), `failures` (number of `<failure>` elements),
+  `errors` (number of `<error>` elements), `skipped` (number of
+  `<skipped/>` elements), and `time="0"` attributes.
 - One `<testcase>` per segment, `classname` = suite name, `name` = NAME,
   excluding the SUMMARY segment and the `SETUP` segment when it has no
   assertions.
@@ -67,17 +76,21 @@ A log without a `COMPLETE:` line is incomplete (truncated run or crash).
 - A segment closed by `No test cases` gets a `<skipped/>`.
 - An incomplete log gets one additional `<testcase name="(log complete)">`
   with an `<error message="incomplete log: no COMPLETE line">`.
-- MIR counts are recorded as a `<properties>` entry `mir` on the suite.
+- MIR and N/A counts are recorded on the suite as
+  `<properties><property name="mir" value="N"/><property name="na" value="N"/></properties>`.
 - The root element is `<testsuites>` with aggregated attributes. Output must
   be well-formed XML and parse with `xml.etree.ElementTree`.
 
 ### Markdown output
 
-A table with one row per log: suite name, segments, assertions total, pass,
-fail, MIR, TSF, TTF, and status (`pass`, `FAIL`, `INCOMPLETE`). Below it, a
-section "Failures" listing every failing or error assertion as
-`suite / segment: FILE:LINE - TEXT`, or the sentence "No failures." The
-Markdown must render in GitHub without raw HTML.
+A table with one row per log and these columns in this order: suite name,
+segments (same count as the JUnit `tests` attribute), assertions total,
+pass, fail, MIR, TSF, TTF, N/A, and status (`pass`, `FAIL`, `INCOMPLETE`).
+Below it, a heading (any level) containing the word "Failures" followed by
+one line per FAIL, TSF or TTF assertion as `suite / segment: FILE:LINE - TEXT`
+and one line per incomplete log as `suite: incomplete log`, or the sentence
+"No failures." when there are none. The Markdown must render in GitHub
+without raw HTML.
 
 ### Example input
 
