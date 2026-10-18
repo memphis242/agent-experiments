@@ -301,7 +301,10 @@ class OutcomeTest(unittest.TestCase):
 
 class CommandTest(unittest.TestCase):
     def test_flags(self):
-        _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--autocompact", "100000"])
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "task1-utlog-translator").mkdir()
+            _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--autocompact", "100000",
+                                     "--tasks-dir", tmp])
         self.assertEqual((cfg.task, cfg.task_dir), ("task1", "task1-utlog-translator"))
         cmd = run.build_claude_command(cfg, "RID", "hi", "sess")
         self.assertEqual(cmd[:5], ["claude", "-p", "--resume", "sess", "hi"])

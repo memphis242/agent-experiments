@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import acceptance
+import analysis
 import arms
 import cost
 import proc
@@ -482,87 +483,17 @@ class Runner:
             self.leak_hits.extend({**h, "round": round_no} for h in hits)
         self.record["leak_check"] = list(self.leak_hits)
 
-    def reconcile(self, requests: Sequence[cost.Request]) -> dict[str, Any]:
-        """Billed cost per round against the CLI-reported figure (report only)."""
-        rounds = [r for r in self.record["rounds"] if r.get("started_epoch") is not None]
-        if not rounds:
-            return {}
-        billed = cost.billed_by_round(requests, [r["started_epoch"] for r in rounds])
-        rows = []
-        cumulative = 0.0
-        for r, usd in zip(rounds, billed):
-            cumulative += usd
-            cli = (r.get("cli") or {}).get("total_cost_usd")  # cumulative for the session
-            diff = None if cli is None else cumulative - cli
-            rows.append({"round": r["round"], "billed_usd": round(usd, 6),
-                         "billed_cumulative_usd": round(cumulative, 6), "cli_cumulative_usd": cli,
-                         "diff_usd": None if diff is None else round(diff, 6),
-                         "rel_diff": None if not cli else round(diff / cli, 6)})
-        return {"rounds": rows, "total_billed_usd": round(sum(billed), 6)}
-
-    def summarize_delegation(self, behavior: dict[str, Any]) -> None:
-        """Spawns per round, assigned by the spawn's transcript timestamp."""
-        rounds = [r for r in self.record["rounds"] if r.get("started_epoch") is not None]
-        for r in rounds:
-            r["delegation"] = {"spawns": 0, "by_type": {}}
-        for call in behavior["subagent_spawn_calls"]:
-            ts = call.get("timestamp")
-            if ts is None or not rounds:
-                continue
-            owner = rounds[0]
-            for r in rounds:
-                if ts + 1.0 >= r["started_epoch"]:
-                    owner = r
-            owner["delegation"]["spawns"] += 1
-            by_type = owner["delegation"]["by_type"]
-            by_type[call["subagent_type"]] = by_type.get(call["subagent_type"], 0) + 1
-
     def analyze(self, round_no: int) -> None:
         """Refresh cost, behavior, validation, and totals; failures are recorded, not fatal."""
         try:
             mains, sub_dirs = self.transcripts()
             self.archive_transcripts(mains)
             self.scan_leaks(mains, sub_dirs, round_no)
-            gaps: tuple[float, ...] | None = None
-            warnings: list[str] = []
-            if self.resume_indices:
-                if self.cfg.gaps_path.is_file():
-                    gaps = cost.load_gaps(self.cfg.gaps_path)
-                else:
-                    warnings.append(f"pause samples {self.cfg.gaps_path} missing; scenarios computed without pauses")
-            requests = cost.load_requests(mains, sub_dirs)
-            pauses = cost.sample_pauses(self.resume_indices, gaps, self.cfg.seed) if self.resume_indices and gaps else {}
-            report = cost.compute_cost(requests, pauses)
-            self.record["cost"] = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO,
-                                   "seed": self.cfg.seed, "warnings": warnings,
-                                   "reconciliation": self.reconcile(requests)}
-            behavior = transcript.summarize_behavior(mains, sub_dirs)
-            behavior["agent_definition_models"] = arms.agent_models(self.arm_root)
-            self.record["behavior"] = behavior
-            self.summarize_delegation(behavior)
-            arm = arms.get_arm(self.cfg.arm)
-            forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
-            violations = transcript.validate_models(mains, sub_dirs, arms.MAIN_MODEL, arm.subagent_model,
-                                                    arms.EFFORT_BY_MODEL, forbidden)
-            inventory = [{k: v for k, v in i.items() if k != "path"} for i in transcript.subagent_inventory(sub_dirs)]
-            self.record["validation"] = {"ok": not violations, "violations": violations, "subagents": inventory}
-            self.record["analysis_error"] = None
-        except (cost.CostError, transcript.TranscriptError, OSError) as exc:
+        except (transcript.TranscriptError, OSError) as exc:
             self.record["analysis_error"] = str(exc)
-        rounds = self.record["rounds"]
-        billed = ((self.record.get("cost") or {}).get("scenarios", {}).get(cost.PRIMARY_SCENARIO, {}).get("total_usd"))
-        self.record["totals"] = {
-            "billed_usd": billed,
-            # The CLI figure is cumulative for the session on resumed rounds; stored as reported.
-            "cli_reported_by_round_usd": [(r.get("cli") or {}).get("total_cost_usd") for r in rounds],
-            "cli_reported_cumulative_usd": next(
-                ((r.get("cli") or {}).get("total_cost_usd") for r in reversed(rounds)
-                 if (r.get("cli") or {}).get("total_cost_usd") is not None), None),
-            "turns": sum((r.get("cli") or {}).get("num_turns") or 0 for r in rounds),
-            "api_time_ms": sum((r.get("cli") or {}).get("duration_api_ms") or 0 for r in rounds),
-            "cli_duration_ms": sum((r.get("cli") or {}).get("duration_ms") or 0 for r in rounds),
-            "wall_time_s": round(sum(r["wall_time_s"] for r in rounds), 3),
-        }
+            return
+        analysis.update_record(self.record, mains, sub_dirs, self.resume_indices, self.cfg.gaps_path,
+                               self.cfg.seed, arms.agent_models(self.arm_root))
 
     # -- main loop ---------------------------------------------------------
     def run(self, prompt: str) -> None:

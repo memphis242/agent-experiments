@@ -49,7 +49,7 @@ The run directory `<runs-dir>/<nonce>/` holds `repo/`, `config/`, `run.json` (re
 
 `status` in `run.json`: `completed` (acceptance passed, or the round cap was hit), `usage_limit` (subscription limit; exit code 3), `infra_error` (acceptance pack exit 2 or contract violation, or the CTF setup failed), `cli_error` (claude failed or timed out), `error`. Only `completed` exits 0. An acceptance timeout is a failed round (spend kept, generic feedback, the run continues). `run.json` also records `provenance` (claude version, harness git SHA and dirty flag, spec and pack hashes, template HEAD), `validation` (model, effort, and forbidden-tool violations per transcript; report only), `leak_check` (transcript lines mentioning `acceptance/`, `selftest`, `reference/`, or `agent-experiments-runs`; report only), and `cost`.
 
-Cost: `cost.scenarios.billed` prices every token as recorded and is the primary figure (`totals.billed_usd`). `none`, `5m`, and `1h` reprice the main agent only; subagent requests keep recorded pricing. `uniform_1h` reprices subagent writes at the 1h price. `cost.reconciliation` compares cumulative billed cost through each round with the CLI's `total_cost_usd` (report only; the CLI figure is kept as `totals.cli_reported_cumulative_usd` (the CLI figure is cumulative per session; per-round values are in `totals.cli_reported_by_round_usd`)).
+Cost: `cost.scenarios.billed` prices the CLI's session-total `modelUsage` token counts (which include compaction summary requests the transcripts omit) with the price table; each model's 5m/1h cache-write split comes from its transcript writes (main model 1h, subagent models 5m when there are none). It is the primary figure (`totals.billed_usd`). `cost.billed_transcript_usd` is the transcript-only figure and `cost.untranscribed` the per-model CLI minus transcript remainder. If `modelUsage` is missing, billed falls back to the transcript with a warning. `none`, `5m`, and `1h` reprice the main agent only; subagent requests keep recorded pricing. `uniform_1h` reprices subagent writes at the 1h price. `cost.reconciliation` compares cumulative billed cost through each round with the CLI's `total_cost_usd` (report only; the CLI figure is kept as `totals.cli_reported_cumulative_usd` (the CLI figure is cumulative per session; per-round values are in `totals.cli_reported_by_round_usd`)).
 
 ## Run isolation
 
@@ -116,3 +116,9 @@ message id, counted from 0 across the session transcripts in order).
 ## Tests
 
     python -m unittest discover -s harness/tests
+
+## Reanalyze
+
+    python harness/reanalyze.py <runs-dir> [--run ID]
+
+Recomputes `cost`, `behavior`, `validation`, and `totals` of existing `run.json` files from `transcripts/` and `cli-round*.stdout.json`, leaves everything else intact, rewrites atomically, sets `reanalyzed_with` (harness SHA), and prints billed before and after per run.

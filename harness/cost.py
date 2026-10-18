@@ -291,6 +291,58 @@ def compute_cost(requests: Sequence[Request], pauses: Mapping[int, float] | None
     return CostReport(MappingProxyType(scenarios), MappingProxyType(tokens), len(requests), MappingProxyType(pauses))
 
 
+_MU_FIELDS = (("input", "inputTokens"), ("output", "outputTokens"), ("cache_read", "cacheReadInputTokens"),
+              ("cache_creation", "cacheCreationInputTokens"))
+
+
+def _price_tokens(model: str, t: Mapping[str, float], share_1h: float) -> float:
+    p = price_for(model)
+    creation_price = share_1h * p.write_1h + (1.0 - share_1h) * p.write_5m
+    return (t["input"] * p.input + t["output"] * p.output + t["cache_read"] * p.cache_read
+            + t["cache_creation"] * creation_price) / _PER_MILLION
+
+
+def billed_from_model_usage(report: CostReport, model_usage: Mapping[str, Mapping[str, object]],
+                            main_model: str) -> dict[str, object]:
+    """Billed cost from the CLI's session-total modelUsage token counts.
+
+    The CLI counts include requests the transcripts omit (compaction summaries).
+    Its 5m/1h creation split is unknown, so each model's split is taken from the
+    transcript's writes; a model with no transcript writes uses 1h for the main
+    model and 5m otherwise. Returns total, per-model figures, and the
+    untranscribed remainder (CLI minus transcript) per model.
+    """
+    transcript_tokens: dict[str, dict[str, int]] = {}
+    writes: dict[str, list[int]] = {}
+    for key, t in report.tokens.items():
+        model = key.split("|", 1)[0].split("[", 1)[0]
+        acc = transcript_tokens.setdefault(model, {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0})
+        acc["input"] += t["input"]
+        acc["output"] += t["output"]
+        acc["cache_read"] += t["cache_read"]
+        acc["cache_creation"] += t["cache_write_5m"] + t["cache_write_1h"]
+        w = writes.setdefault(model, [0, 0])
+        w[0] += t["cache_write_5m"]
+        w[1] += t["cache_write_1h"]
+    by_model: dict[str, float] = {}
+    untranscribed: dict[str, dict[str, object]] = {}
+    for raw_model, usage in model_usage.items():
+        model = raw_model.split("[", 1)[0]
+        cli = {name: float(usage.get(field) or 0) for name, field in _MU_FIELDS}
+        w5m, w1h = writes.get(model, [0, 0])
+        share_1h = w1h / (w5m + w1h) if w5m + w1h else (1.0 if model == main_model else 0.0)
+        have = transcript_tokens.get(model, {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0})
+        by_model[model] = by_model.get(model, 0.0) + _price_tokens(model, cli, share_1h)
+        gap = {name: cli[name] - have[name] for name in cli}
+        untranscribed[model] = {"tokens": {k: int(v) for k, v in gap.items()},
+                                "usd": round(_price_tokens(model, gap, share_1h), 6)}
+    for model, have in transcript_tokens.items():  # models seen only in transcripts still count
+        if model not in by_model:
+            w5m, w1h = writes.get(model, [0, 0])
+            by_model[model] = _price_tokens(model, have, w1h / (w5m + w1h) if w5m + w1h else 0.0)
+    return {"total_usd": sum(by_model.values()), "by_model": by_model, "untranscribed": untranscribed}
+
+
 def load_gaps(path: Path) -> tuple[float, ...]:
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
