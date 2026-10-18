@@ -31,6 +31,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# A coverage figure: a percentage ("97.5%", "100 percent") or covered/total lines ("44 / 44", "176 of 176").
+COVERAGE_FIGURE_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|percent\b)|\b\d+\s*(?:/|of)\s*\d+\b", re.IGNORECASE)
+
 PACK = Path(__file__).resolve().parent
 HIDDEN = PACK / "hidden_tests"
 BASELINE_FILE = PACK / "baseline_coverage.json"
@@ -456,7 +459,7 @@ def check_report(repo: Path) -> None:
     low = text.lower()
     wanted: dict[str, bool] = {
         "unit tests": bool(re.search(r"unit[ -]?tests?", low)) and bool(re.search(r"segment|assertion|pass", low)),
-        "coverage": "coverage" in low and bool(re.search(r"\d+(\.\d+)?\s*%", text)),
+        "coverage": "coverage" in low and bool(COVERAGE_FIGURE_RE.search(text)),
         "CTF": bool(re.search(r"\bctf\b", low)),
         "changes": "sample_app" in low and bool(re.search(r"changed|changes|interface|files", low)),
         "open issues": bool(re.search(r"open issue|known issue|issues|limitation|none", low)),

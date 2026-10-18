@@ -16,6 +16,9 @@ import spec
 import tables as tb
 from common import Fail, InfraError, Problems
 
+# A coverage figure: a percentage ("97.5%", "100 percent") or covered/total lines ("44 / 44", "176 of 176").
+COVERAGE_FIGURE_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|percent\b)|\b\d+\s*(?:/|of)\s*\d+\b", re.IGNORECASE)
+
 if TYPE_CHECKING:
     from check import Ctx
 
@@ -499,7 +502,7 @@ def judge_report(text: str) -> list[str]:
         p.check(not names and re.search(r"\d", body) is not None, f"the Unit tests section gives no counts for {names}")
     if "Coverage" in secs:
         body = secs["Coverage"]
-        p.check(len(re.findall(r"\w+\.c\b", body)) >= 6 and re.search(r"\d+(\.\d+)?\s*%", body) is not None,
+        p.check(len(re.findall(r"\w+\.c\b", body)) >= 6 and COVERAGE_FIGURE_RE.search(body) is not None,
                 "the Coverage section does not give coverage per source file")
     if "System tests" in secs:
         p.check("run_system_tests.sh" in secs["System tests"], "the System tests section does not refer to ctf/run_system_tests.sh")

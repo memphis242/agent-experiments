@@ -30,6 +30,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# A coverage figure: a percentage ("97.5%", "100 percent") or covered/total lines ("44 / 44", "176 of 176").
+COVERAGE_FIGURE_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|percent\b)|\b\d+\s*(?:/|of)\s*\d+\b", re.IGNORECASE)
+
 PACK = Path(__file__).resolve().parent
 BASELINE_FILE = PACK / "baseline_coverage.json"
 HIDDEN_TEST = PACK / "hidden_tests" / "hk_hidden_tests.c"
@@ -1062,8 +1065,8 @@ def c_report_doc(ctx: Ctx) -> None:
         problems.append("report is nearly empty")
     if not re.search(r"unit[ -]?tests?", low) or not re.search(r"\d", low):
         problems.append("no unit test counts")
-    if "coverage" not in low or not re.search(r"\d+(\.\d+)?\s*%", text):
-        problems.append("no coverage figures (percentages)")
+    if "coverage" not in low or not COVERAGE_FIGURE_RE.search(text):
+        problems.append("no coverage figures (percentages or covered/total lines)")
     if "ctf" not in low:
         problems.append("no CTF results")
     if problems:

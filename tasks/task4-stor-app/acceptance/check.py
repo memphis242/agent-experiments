@@ -29,6 +29,9 @@ sys.path.insert(0, str(PACK))
 import stor_live as sl  # noqa: E402
 from stor_live import Fail, InfraError, Problems  # noqa: E402
 
+# A coverage figure: a percentage ("97.5%", "100 percent") or covered/total lines ("44 / 44", "176 of 176").
+COVERAGE_FIGURE_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|percent\b)|\b\d+\s*(?:/|of)\s*\d+\b", re.IGNORECASE)
+
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TOTAL_BUDGET_S = 29 * 60
 JOBS = "-j16"
@@ -1111,7 +1114,7 @@ def c_report_present(ctx: Ctx) -> None:
     p.check(len(text.strip()) >= 800, f"report is only {len(text.strip())} characters")
     p.check("design" in low, "no design content")
     p.check("unit test" in low or "unit-test" in low or "coverage test" in low, "no unit test content")
-    p.check("coverage" in low and re.search(r"\d+(\.\d+)?\s*%", text) is not None, "no coverage figures")
+    p.check("coverage" in low and COVERAGE_FIGURE_RE.search(text) is not None, "no coverage figures")
     p.check("ctf" in low, "no CTF content")
     p.check("limitation" in low, "no limitations section")
     p.raise_if()
