@@ -115,7 +115,7 @@ class CostTest(unittest.TestCase):
         with self.assertRaises(cost.CostError):
             cost.compute_cost(reqs, {5: 1000.0})
         with self.assertRaises(cost.CostError):
-            cost.price_for("claude-mystery-9")
+            cost.price_for("claude-mystery-9", 0)
         bad = Path(self.tmp.name) / "bad.jsonl"
         bad.write_text("{not json\n", encoding="utf-8")
         with self.assertRaises(transcript.TranscriptError):
@@ -131,6 +131,53 @@ class CostTest(unittest.TestCase):
         self.assertEqual(b["subagent_spawns"], 1)
         self.assertEqual(b["subagent_spawns_by_type"], {"explorer": 1})
         self.assertEqual(b["tool_calls_main"], {"Agent": 1, "Bash": 1})
+
+
+HAIKU = "claude-haiku-5-5"
+T0 = "2026-10-17T10:00:00Z"
+
+
+def priced(model, inp, out, read=0, w1h=0, w5m=0):
+    """Billed USD of one recorded request."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "s.jsonl"
+        write_jsonl(path, [asst("m", model, T0, inp, out, read, w1h=w1h, w5m=w5m)])
+        return cost.compute_cost(cost.load_requests(path)).scenarios["billed"].total_usd
+
+
+class PromptTierTest(unittest.TestCase):
+    def test_haiku_threshold(self):
+        self.assertAlmostEqual(priced(HAIKU, 100_000, 1000), (100_000 * 0.10 + 1000 * 0.50) / 1e6, places=12)
+        self.assertAlmostEqual(priced(HAIKU, 100_001, 1000), (100_001 * 0.50 + 1000 * 2.50) / 1e6, places=12)
+
+    def test_cache_tokens_count_toward_threshold(self):
+        self.assertAlmostEqual(priced(HAIKU, 1, 0, read=100_000), (1 * 0.50 + 100_000 * 0.05) / 1e6, places=12)
+        self.assertAlmostEqual(priced(HAIKU, 0, 0, read=50_000, w1h=50_000, w5m=1),
+                               (50_000 * 0.05 + 50_000 * 1.00 + 1 * 0.625) / 1e6, places=12)
+
+    def test_counterfactuals_keep_prompt_length(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.jsonl"
+            write_jsonl(path, [asst("m", HAIKU, T0, 10, 100, 150_000, w5m=1000)])
+            report = cost.compute_cost(cost.load_requests(path))
+        self.assertAlmostEqual(report.scenarios["none"].total_usd, (151_010 * 0.50 + 100 * 2.50) / 1e6, places=12)
+
+    def test_untiered_model_ignores_length(self):
+        self.assertAlmostEqual(priced(OPUS, 500_000, 1000), (500_000 * 4 + 1000 * 20) / 1e6, places=12)
+        self.assertIs(cost.price_for(OPUS, 0), cost.price_for(OPUS, 10_000_000))
+
+    def test_model_usage_transcript_and_remainder(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "s.jsonl"
+            write_jsonl(path, [asst("a", HAIKU, T0, 200_000, 1000, 0),
+                               asst("b", HAIKU, T0, 1000, 1000, 0)])
+            report = cost.compute_cost(cost.load_requests(path))
+        usage = {HAIKU: {"inputTokens": 201_000 + 300_000, "outputTokens": 2000 + 500}}
+        mu = cost.billed_from_model_usage(report, usage, OPUS)
+        transcript_usd = (200_000 * 0.50 + 1000 * 2.50 + 1000 * 0.10 + 1000 * 0.50) / 1e6
+        remainder_usd = (300_000 * 0.50 + 500 * 2.50) / 1e6
+        self.assertAlmostEqual(mu["untranscribed"][HAIKU]["usd"], remainder_usd, places=6)
+        self.assertAlmostEqual(mu["by_model"][HAIKU], transcript_usd + remainder_usd, places=12)
 
 
 if __name__ == "__main__":

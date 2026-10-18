@@ -23,7 +23,7 @@ import argparse
 import json
 import random
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from pathlib import Path
 from types import MappingProxyType
 from typing import Mapping, Sequence
@@ -55,22 +55,58 @@ class ModelPrice:
     output: float
 
 
-PRICES: Mapping[str, ModelPrice] = MappingProxyType({
-    "claude-opus-5-5": ModelPrice(4.00, 0.20, 5.00, 8.00, 20.00),
-    "claude-sonnet-5-5": ModelPrice(2.00, 0.10, 2.50, 4.00, 10.00),
-    "claude-sonnet-5": ModelPrice(2.00, 0.20, 2.50, 4.00, 10.00),
-    "claude-sonnet-4-6": ModelPrice(3.00, 0.30, 3.75, 6.00, 15.00),
-    "claude-haiku-5-5": ModelPrice(0.10, 0.01, 0.125, 0.20, 0.50),
+@dataclass(frozen=True)
+class ModelPricing:
+    """A model's price card, plus an optional card for prompts longer than a threshold.
+
+    A request is priced on its own prompt length (see context_tokens): above
+    long_threshold tokens the whole request, output included, uses long_card.
+    """
+    base: ModelPrice
+    long_threshold: int = 0
+    long_card: ModelPrice | None = None
+
+    def __post_init__(self) -> None:
+        assert (self.long_card is None) == (self.long_threshold == 0)
+        if self.long_card is not None:
+            assert self.long_threshold > 0
+            assert all(getattr(self.long_card, f.name) >= getattr(self.base, f.name) for f in fields(ModelPrice))
+
+    def at(self, prompt_tokens: int) -> ModelPrice:
+        """Card for a request whose prompt has prompt_tokens tokens."""
+        assert prompt_tokens >= 0
+        if self.long_card is not None and prompt_tokens > self.long_threshold:
+            return self.long_card
+        return self.base
+
+    @property
+    def longest(self) -> ModelPrice:
+        """Card for the longest prompts; the base card when the model has no tier."""
+        return self.long_card or self.base
+
+
+PRICING: Mapping[str, ModelPricing] = MappingProxyType({
+    "claude-opus-5-5": ModelPricing(ModelPrice(4.00, 0.20, 5.00, 8.00, 20.00)),
+    "claude-sonnet-5-5": ModelPricing(ModelPrice(2.00, 0.10, 2.50, 4.00, 10.00)),
+    "claude-sonnet-5": ModelPricing(ModelPrice(2.00, 0.20, 2.50, 4.00, 10.00)),
+    "claude-sonnet-4-6": ModelPricing(ModelPrice(3.00, 0.30, 3.75, 6.00, 15.00)),
+    "claude-haiku-5-5": ModelPricing(ModelPrice(0.10, 0.01, 0.125, 0.20, 0.50),
+                                     100_000, ModelPrice(0.50, 0.05, 0.625, 1.00, 2.50)),
 })
 
 
-def price_for(model: str) -> ModelPrice:
-    """Price lookup; a context-window suffix such as '[1m]' is ignored."""
+def pricing_for(model: str) -> ModelPricing:
+    """Pricing lookup; a context-window suffix such as '[1m]' is ignored."""
     key = model.split("[", 1)[0]
     try:
-        return PRICES[key]
+        return PRICING[key]
     except KeyError:
-        raise CostError(f"no price for model {model!r}; known models: {', '.join(PRICES)}") from None
+        raise CostError(f"no price for model {model!r}; known models: {', '.join(PRICING)}") from None
+
+
+def price_for(model: str, prompt_tokens: int) -> ModelPrice:
+    """Price card that applies to a request with the given prompt length."""
+    return pricing_for(model).at(prompt_tokens)
 
 
 @dataclass(frozen=True)
@@ -186,7 +222,7 @@ def main_request_count(main_paths: Path | Sequence[Path]) -> int:
 
 
 def _recorded_cost(req: Request) -> float:
-    p = price_for(req.model)
+    p = price_for(req.model, context_tokens(req))
     return (req.input_tokens * p.input + req.output_tokens * p.output + req.cache_read_tokens * p.cache_read
             + req.cache_write_5m_tokens * p.write_5m + req.cache_write_1h_tokens * p.write_1h) / _PER_MILLION
 
@@ -212,7 +248,7 @@ def context_peaks(requests: Sequence[Request]) -> dict[str, object]:
 def request_cost(req: Request, scenario: str, pause_s: float = 0.0) -> float:
     """USD for one request under a scenario; pause_s is the pause just before it."""
     assert scenario in SCENARIOS and pause_s >= 0.0
-    p = price_for(req.model)
+    p = price_for(req.model, context_tokens(req))  # the scenarios reprice cache treatment, not prompt size
     writes = req.cache_write_5m_tokens + req.cache_write_1h_tokens
     read = req.cache_read_tokens
     if scenario == "billed":
@@ -319,8 +355,7 @@ _MU_FIELDS = (("input", "inputTokens"), ("output", "outputTokens"), ("cache_read
               ("cache_creation", "cacheCreationInputTokens"))
 
 
-def _price_tokens(model: str, t: Mapping[str, float], share_1h: float) -> float:
-    p = price_for(model)
+def _price_tokens(p: ModelPrice, t: Mapping[str, float], share_1h: float) -> float:
     creation_price = share_1h * p.write_1h + (1.0 - share_1h) * p.write_5m
     return (t["input"] * p.input + t["output"] * p.output + t["cache_read"] * p.cache_read
             + t["cache_creation"] * creation_price) / _PER_MILLION
@@ -331,10 +366,13 @@ def billed_from_model_usage(report: CostReport, model_usage: Mapping[str, Mappin
     """Billed cost from the CLI's session-total modelUsage token counts.
 
     The CLI counts include requests the transcripts omit (compaction summaries).
-    Its 5m/1h creation split is unknown, so each model's split is taken from the
-    transcript's writes; a model with no transcript writes uses 1h for the main
-    model and 5m otherwise. Returns total, per-model figures, and the
-    untranscribed remainder (CLI minus transcript) per model.
+    Transcript requests are priced one by one, each at the card for its own
+    prompt length. The untranscribed remainder (CLI minus transcript) is priced
+    in aggregate at the model's longest-prompt card, since summary prompts are
+    large. The CLI's 5m/1h creation split is unknown, so each model's split is
+    taken from the transcript's writes; a model with no transcript writes uses
+    1h for the main model and 5m otherwise. Returns total, per-model figures, and
+    the untranscribed remainder (CLI minus transcript) per model.
     """
     transcript_tokens: dict[str, dict[str, int]] = {}
     writes: dict[str, list[int]] = {}
@@ -348,22 +386,27 @@ def billed_from_model_usage(report: CostReport, model_usage: Mapping[str, Mappin
         w = writes.setdefault(model, [0, 0])
         w[0] += t["cache_write_5m"]
         w[1] += t["cache_write_1h"]
+    transcript_usd: dict[str, float] = {}
+    for model_key, usd in report.scenarios[PRIMARY_SCENARIO].by_model.items():
+        model = model_key.split("[", 1)[0]
+        transcript_usd[model] = transcript_usd.get(model, 0.0) + usd
+    cli_tokens: dict[str, dict[str, float]] = {}
+    for raw_model, usage in model_usage.items():
+        acc = cli_tokens.setdefault(raw_model.split("[", 1)[0], {name: 0.0 for name, _ in _MU_FIELDS})
+        for name, field in _MU_FIELDS:
+            acc[name] += float(usage.get(field) or 0)
     by_model: dict[str, float] = {}
     untranscribed: dict[str, dict[str, object]] = {}
-    for raw_model, usage in model_usage.items():
-        model = raw_model.split("[", 1)[0]
-        cli = {name: float(usage.get(field) or 0) for name, field in _MU_FIELDS}
+    for model, cli in cli_tokens.items():
         w5m, w1h = writes.get(model, [0, 0])
         share_1h = w1h / (w5m + w1h) if w5m + w1h else (1.0 if model == main_model else 0.0)
         have = transcript_tokens.get(model, {"input": 0, "output": 0, "cache_read": 0, "cache_creation": 0})
-        by_model[model] = by_model.get(model, 0.0) + _price_tokens(model, cli, share_1h)
         gap = {name: cli[name] - have[name] for name in cli}
-        untranscribed[model] = {"tokens": {k: int(v) for k, v in gap.items()},
-                                "usd": round(_price_tokens(model, gap, share_1h), 6)}
-    for model, have in transcript_tokens.items():  # models seen only in transcripts still count
-        if model not in by_model:
-            w5m, w1h = writes.get(model, [0, 0])
-            by_model[model] = _price_tokens(model, have, w1h / (w5m + w1h) if w5m + w1h else 0.0)
+        gap_usd = _price_tokens(pricing_for(model).longest, gap, share_1h)
+        by_model[model] = transcript_usd.get(model, 0.0) + gap_usd
+        untranscribed[model] = {"tokens": {k: int(v) for k, v in gap.items()}, "usd": round(gap_usd, 6)}
+    for model, usd in transcript_usd.items():  # models seen only in transcripts still count
+        by_model.setdefault(model, usd)
     return {"total_usd": sum(by_model.values()), "by_model": by_model, "untranscribed": untranscribed}
 
 
