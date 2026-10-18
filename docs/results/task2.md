@@ -1,7 +1,8 @@
-# Task 2 results (SAMPLE_APP status command), 90 runs, 2026-10-18
+# Task 2 results (SAMPLE_APP status command), 120 runs, 2026-10-18
 
-All 90 runs passed acceptance (10 repetitions per arm; the first three were run on
-three parallel slots, the remaining seven on six). Billed cost includes compaction
+All 120 runs passed acceptance (10 repetitions per arm; for A1 to A9 the first three
+were run on three parallel slots and the remaining seven on six; A10 to A12 were added
+later and run on six). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
@@ -26,9 +27,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A7 | Sonnet 5 subagents, conservative | task2 | 10/10 | 3.68 | 3.18 to 4.29 | 1.11 | 12.3 to 17.9 | 52 to 74 | 0 | 1 | 0 | 154.2 to 186.9 | - |
 | A8 | Sonnet 4.6 subagents, eager | task2 | 10/10 | 5.56 | 4.59 to 7.18 | 2.59 | 14.7 to 25.6 | 2 to 17 | 2 to 4 | 1 | 0 | 97.2 to 169.9 | 77.2 to 129.5 |
 | A9 | Sonnet 4.6 subagents, conservative | task2 | 10/10 | 3.81 | 3.18 to 4.89 | 1.71 | 10.3 to 17.8 | 3 to 75 | 0 | 1 to 2 | 0 | 150.7 to 203.3 | - |
+| A10 | solo Sonnet 5.5, xhigh effort | task2 | 10/10 | 3.13 | 2.61 to 4.09 | 1.48 | 17.3 to 25.1 | 66 to 99 | 0 | 1 | 0 | 218.1 to 290.6 | - |
+| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task2 | 10/10 | 1.25 | 1.02 to 2.02 | 1.00 | 7.3 to 20.7 | 1 to 52 | 0 to 1 | 1 | 0 | 118.6 to 169.4 | 140.6 to 154.4 |
+| A12 | solo Sonnet 5.5, high effort | task2 | 10/10 | 1.39 | 1.13 to 1.96 | 0.83 | 7.8 to 21.6 | 37 to 52 | 0 | 1 to 2 | 0 | 124.3 to 169.3 | - |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A4 0.83, A3 0.93, A7 0.93,
-A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.73.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.32, A12 0.35, A10 0.79,
+A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.73.
 
 Notes:
 
@@ -47,8 +51,28 @@ Notes:
   cost and wall-time spreads.
 - No run compacted at the default window, although several solo and conservative runs
   peaked above 190K tokens of main-agent context.
-- Second acceptance rounds: A2 one run, A6 four runs, A9 one run; all other runs passed
-  on the first round.
+- Second acceptance rounds: A2 one run, A6 four runs, A9 one run, A12 one run; all
+  other runs passed on the first round.
 - The aggregate warns that Task 1 runs carry a different run-code hash. The difference
   is the move of post-run analysis out of the run module between the two waves; the
   run pipeline itself was unchanged.
+- A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs
+  about a third of solo Opus 5.5 with similar wall time (7.8 to 21.6 min). At xhigh
+  effort (A10) the cost rises 2.3-fold (0.79 of A1), wall time roughly doubles (17.3 to
+  25.1 min) and the main context peaks at 218 to 291K tokens, above every other arm.
+- A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester only) is the cheapest arm at
+  0.32 of A1. It spawned a Haiku tester in 2 of 10 runs (to write coverage tests) and
+  otherwise worked alone; the two delegating runs cost 1.14 and 1.34 USD, within its
+  solo runs' range.
+- Grader fix: the report check required a literal `%` sign in the coverage figures,
+  and its feedback did not say so. Three Sonnet 5.5 runs stated coverage as a Percent
+  column or "100 percent" and failed that check in every round (A10 reps 2 and 4, A12
+  rep 5). The check now also accepts "percent" and covered/total line fractions (it
+  only relaxes the rule, so no earlier verdict changes); the three runs were set aside
+  under `/workspace/agent-experiments-superseded/grader-coverage-pct/` and their cells
+  rerun. The A12 rerun needed a second round for a genuine defect (no status packets
+  at the default divisor).
+- Turn counts of 1 (A11's "1 to 52") are a counting artefact: when a background job's
+  completion notification triggers a short final turn, the CLI's reported turn count
+  covers only that turn. The transcripts show the full tool activity; the column will
+  be recomputed from transcripts.
