@@ -489,13 +489,33 @@ class Runner:
             return {}
         billed = cost.billed_by_round(requests, [r["started_epoch"] for r in rounds])
         rows = []
+        cumulative = 0.0
         for r, usd in zip(rounds, billed):
-            cli = (r.get("cli") or {}).get("total_cost_usd")
-            diff = None if cli is None else usd - cli
-            rows.append({"round": r["round"], "billed_usd": round(usd, 6), "cli_usd": cli,
+            cumulative += usd
+            cli = (r.get("cli") or {}).get("total_cost_usd")  # cumulative for the session
+            diff = None if cli is None else cumulative - cli
+            rows.append({"round": r["round"], "billed_usd": round(usd, 6),
+                         "billed_cumulative_usd": round(cumulative, 6), "cli_cumulative_usd": cli,
                          "diff_usd": None if diff is None else round(diff, 6),
                          "rel_diff": None if not cli else round(diff / cli, 6)})
         return {"rounds": rows, "total_billed_usd": round(sum(billed), 6)}
+
+    def summarize_delegation(self, behavior: dict[str, Any]) -> None:
+        """Spawns per round, assigned by the spawn's transcript timestamp."""
+        rounds = [r for r in self.record["rounds"] if r.get("started_epoch") is not None]
+        for r in rounds:
+            r["delegation"] = {"spawns": 0, "by_type": {}}
+        for call in behavior["subagent_spawn_calls"]:
+            ts = call.get("timestamp")
+            if ts is None or not rounds:
+                continue
+            owner = rounds[0]
+            for r in rounds:
+                if ts + 1.0 >= r["started_epoch"]:
+                    owner = r
+            owner["delegation"]["spawns"] += 1
+            by_type = owner["delegation"]["by_type"]
+            by_type[call["subagent_type"]] = by_type.get(call["subagent_type"], 0) + 1
 
     def analyze(self, round_no: int) -> None:
         """Refresh cost, behavior, validation, and totals; failures are recorded, not fatal."""
@@ -519,6 +539,7 @@ class Runner:
             behavior = transcript.summarize_behavior(mains, sub_dirs)
             behavior["agent_definition_models"] = arms.agent_models(self.arm_root)
             self.record["behavior"] = behavior
+            self.summarize_delegation(behavior)
             arm = arms.get_arm(self.cfg.arm)
             forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
             violations = transcript.validate_models(mains, sub_dirs, arms.MAIN_MODEL, arm.subagent_model,
@@ -532,7 +553,11 @@ class Runner:
         billed = ((self.record.get("cost") or {}).get("scenarios", {}).get(cost.PRIMARY_SCENARIO, {}).get("total_usd"))
         self.record["totals"] = {
             "billed_usd": billed,
-            "cli_reported_per_round_usd": round(sum((r.get("cli") or {}).get("total_cost_usd") or 0.0 for r in rounds), 6),
+            # The CLI figure is cumulative for the session on resumed rounds; stored as reported.
+            "cli_reported_by_round_usd": [(r.get("cli") or {}).get("total_cost_usd") for r in rounds],
+            "cli_reported_cumulative_usd": next(
+                ((r.get("cli") or {}).get("total_cost_usd") for r in reversed(rounds)
+                 if (r.get("cli") or {}).get("total_cost_usd") is not None), None),
             "turns": sum((r.get("cli") or {}).get("num_turns") or 0 for r in rounds),
             "api_time_ms": sum((r.get("cli") or {}).get("duration_api_ms") or 0 for r in rounds),
             "cli_duration_ms": sum((r.get("cli") or {}).get("duration_ms") or 0 for r in rounds),

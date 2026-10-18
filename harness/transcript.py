@@ -220,7 +220,9 @@ def summarize_behavior(main_paths: Sequence[Path], subagent_dirs: Sequence[Path]
                     for model in observed or ["(no transcript)"]:
                         spawns_by_model[model] += 1
                     spawn_calls.append({"source": source, "subagent_type": subagent_type,
-                                        "model_arg": tool_input.get("model"), "observed_models": observed})
+                                        "model_arg": tool_input.get("model"), "observed_models": observed,
+                                        "timestamp": parse_timestamp(entry["timestamp"])
+                                        if isinstance(entry.get("timestamp"), str) else None})
     return {
         "tool_calls_main": dict(sorted(tool_calls["main"].items())),
         "tool_calls_subagent": dict(sorted(tool_calls["subagent"].items())),
