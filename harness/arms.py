@@ -83,6 +83,7 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A9", SONNET_46, "conservative"),
         ArmSpec("A10", None, None, main_model=SONNET_55, main_effort="xhigh"),
         ArmSpec("A11", HAIKU_55, "roles", main_model=SONNET_55, agents=("implementer", "tester")),
+        ArmSpec("A12", None, None, main_model=SONNET_55, main_effort="high"),
     )
 })
 

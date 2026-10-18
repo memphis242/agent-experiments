@@ -17,8 +17,8 @@ CONSERVATIVE = ("Delegate sparingly. Do the work yourself by default and spawn a
 EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": "claude-sonnet-5-5",
             "A5": "claude-sonnet-5-5", "A6": "claude-sonnet-5", "A7": "claude-sonnet-5",
             "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6", "A10": None,
-            "A11": "claude-haiku-5-5"}
-MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high")}
+            "A11": "claude-haiku-5-5", "A12": None}
+MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high")}
 ROLES = ("Delegate selectively. Do exploration, planning, design decisions, debugging, review, and "
          "integration yourself.")
 
@@ -34,7 +34,7 @@ class ArmsTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def test_eleven_roots(self):
+    def test_twelve_roots(self):
         self.assertEqual(sorted(p.name for p in self.base.iterdir()), sorted(EXPECTED))
 
     def test_settings_and_models(self):
@@ -85,7 +85,7 @@ class ArmsTest(unittest.TestCase):
 
     def test_unknown_arm(self):
         with self.assertRaises(arms.ArmError):
-            arms.get_arm("A12")
+            arms.get_arm("A13")
 
     def test_effort_map(self):
         self.assertEqual(dict(arms.effort_map(arms.ARMS["A1"])), {"claude-opus-5-5": "high"})

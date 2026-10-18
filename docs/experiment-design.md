@@ -34,9 +34,11 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A9 | Opus 5.5 | Sonnet 4.6 | conservative |
 | A10 | Sonnet 5.5 (xhigh effort) | none (Agent tool disallowed) | n/a |
 | A11 | Sonnet 5.5 | Haiku 5.5 (implementer and tester only) | roles |
+| A12 | Sonnet 5.5 (high effort) | none (Agent tool disallowed) | n/a |
 
 A10 asks whether a cheaper frontier model at maximum effort matches solo
-Opus. A11 is the preferred tiered setup: a frontier orchestrator with the
+Opus. A12 is the same model at high effort, the owner's everyday choice for
+small tasks, isolating the effort factor. A11 is the preferred tiered setup: a frontier orchestrator with the
 cheapest model doing bounded implementation and testing; its main agent
 explores, plans, debugs, reviews and integrates itself.
 
