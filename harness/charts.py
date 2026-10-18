@@ -30,15 +30,15 @@ CARD_STROKE = "#30363d"
 PAD_X = 28                      # card edge to content
 GUTTER_WIDTH = 250              # arm id / description column
 PLOT_WIDTH = 518                # x extent of the plot area (value 0 to the axis limit)
-PLOT_RIGHT_PAD = 100            # room right of the axis end for the range text
+PLOT_RIGHT_PAD = 120            # room right of the axis end for the range text
 ANNOT_GAP = 14                  # gap between the range-text zone and the annotation column
-ANNOT_FIELD_WIDTHS = (62, 66, 88, 66)   # in / out / cached / ctx cell widths
+ANNOT_FIELD_WIDTHS = (62, 66, 88, 66, 84)   # in / out / cached / ctx / sub ctx cell widths
 ANNOT_FONT_SIZE = 11
 ANNOT_FONT_STACK = 'ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace'
-ANNOT_HEADER = "max per arm: input / output / cache read / main ctx"
+ANNOT_HEADER = "max per arm: input / output / cache read / main ctx / subagent ctx"
 RANGE_CHAR_WIDTH = 6.6          # approximate glyph width of the range text
-WIDTH = (2 * CARD_MARGIN + 2 * PAD_X + GUTTER_WIDTH + PLOT_WIDTH + PLOT_RIGHT_PAD + ANNOT_GAP
-         + sum(ANNOT_FIELD_WIDTHS))
+WIDTH = 2 * CARD_MARGIN + 2 * PAD_X + GUTTER_WIDTH + PLOT_WIDTH + PLOT_RIGHT_PAD
+WIDTH_ANNOTATED = WIDTH + ANNOT_GAP + sum(ANNOT_FIELD_WIDTHS)   # cost chart: room for the annotation column
 HEADER_TOP = 40                 # card top to the title baseline
 TITLE_SIZE = 20
 SUBTITLE_SIZE = 13
@@ -107,6 +107,7 @@ class Maxima:
     output: float | None = None
     cache_read: float | None = None
     ctx: float | None = None
+    sub_ctx: float | None = None
 
 
 @dataclass(frozen=True)
@@ -158,16 +159,18 @@ def run_figures(run: dict[str, Any]) -> Maxima:
     """One run's token totals summed over every model and thread, and its main-agent context peak."""
     tokens = (run.get("cost") or {}).get("tokens") or {}
     totals = {k: sum(float(t.get(k) or 0) for t in tokens.values()) for k in ("input", "output", "cache_read")}
-    ctx = (run.get("behavior") or {}).get("max_context_main")
+    behavior = run.get("behavior") or {}
+    ctx, sub_ctx = behavior.get("max_context_main"), behavior.get("max_context_subagent")
     return Maxima(totals["input"] if tokens else None, totals["output"] if tokens else None,
-                  totals["cache_read"] if tokens else None, float(ctx) if ctx is not None else None)
+                  totals["cache_read"] if tokens else None, float(ctx) if ctx is not None else None,
+                  float(sub_ctx) if sub_ctx is not None else None)
 
 
 def max_figures(per_run: Sequence[Maxima]) -> Maxima:
     def top(name: str) -> float | None:
         found = [getattr(m, name) for m in per_run if getattr(m, name) is not None]
         return max(found) if found else None
-    return Maxima(top("input"), top("output"), top("cache_read"), top("ctx"))
+    return Maxima(top("input"), top("output"), top("cache_read"), top("ctx"), top("sub_ctx"))
 
 
 def humanize(value: float | None) -> str:
@@ -264,11 +267,14 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     n_runs = sum(len(r.points) for r in rows)
 
     card_x, card_y = CARD_MARGIN, CARD_MARGIN
-    card_w = WIDTH - 2 * CARD_MARGIN
+    annotate = unit == "cost"
+    width = WIDTH_ANNOTATED if annotate else WIDTH
+    card_w = width - 2 * CARD_MARGIN
     plot_left = card_x + PAD_X + GUTTER_WIDTH
     plot_right = plot_left + PLOT_WIDTH
     annot_x = plot_right + PLOT_RIGHT_PAD + ANNOT_GAP
-    assert annot_x + sum(ANNOT_FIELD_WIDTHS) <= card_x + card_w - PAD_X + 1e-6
+    assert not annotate or annot_x + sum(ANNOT_FIELD_WIDTHS) <= card_x + card_w - PAD_X + 1e-6
+    range_limit = annot_x - ANNOT_GAP if annotate else plot_right + PLOT_RIGHT_PAD
     scale = (plot_right - plot_left) / limit
     rows_top = card_y + HEADER_TOP + SUBTITLE_GAP + LEGEND_GAP + LEGEND_TO_ROWS
     rows_bottom = rows_top + ROW_HEIGHT * len(rows)
@@ -281,8 +287,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     out: list[str] = []
     add = out.append
     add('<?xml version="1.0" encoding="UTF-8"?>')
-    add(f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{_num(height)}" '
-        f'viewBox="0 0 {WIDTH} {_num(height)}" role="img" aria-label="{escape(title)}" '
+    add(f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{_num(height)}" '
+        f'viewBox="0 0 {width} {_num(height)}" role="img" aria-label="{escape(title)}" '
         f'font-family=\'{FONT_STACK.replace(chr(34), "&quot;")}\'>')
     add(f'<title>{escape(title)}</title>')
     add(f'<rect x="{card_x}" y="{card_y}" width="{card_w}" height="{_num(card_h)}" rx="{CARD_RADIUS}" '
@@ -307,9 +313,10 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
         f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
     add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, "did not pass", LEGEND_FONT_SIZE, MUTED_COLOR))
-    add(_text(annot_x - ANNOT_GAP, legend_y + 4, "light tint = conservative", LEGEND_FONT_SIZE, FAINT_COLOR,
+    add(_text(range_limit, legend_y + 4, "light tint = conservative", LEGEND_FONT_SIZE, FAINT_COLOR,
               anchor="end"))
-    add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
+    if annotate:
+        add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
 
     # Row stripes, grid and axis.
     for i in range(len(rows)):
@@ -353,15 +360,17 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
         low_t, high_t = fmt.format(lo), fmt.format(hi)
         label = low_t if low_t == high_t else f"{low_t} to {high_t}"
         label_x = min(x_of(hi) + BAR_HEIGHT / 2 + 8,
-                      annot_x - ANNOT_GAP - len(label) * RANGE_CHAR_WIDTH)
+                      range_limit - len(label) * RANGE_CHAR_WIDTH)
         add(_text(label_x, cy + 4, label, RANGE_TEXT_SIZE, TEXT_COLOR))
-        cells = (f"in {humanize(row.maxima.input)}", f"out {humanize(row.maxima.output)}",
-                 f"cached {humanize(row.maxima.cache_read)}", f"ctx {humanize(row.maxima.ctx)}")
-        cell_x = float(annot_x)
-        for cell, cell_w in zip(cells, ANNOT_FIELD_WIDTHS):
-            add(f'<text x="{_num(cell_x)}" y="{_num(cy + 4)}" font-size="{ANNOT_FONT_SIZE}" fill="{MUTED_COLOR}" '
-                f'font-family=\'{ANNOT_FONT_STACK.replace(chr(34), "&quot;")}\'>{escape(cell)}</text>')
-            cell_x += cell_w
+        if annotate:
+            cells = (f"in {humanize(row.maxima.input)}", f"out {humanize(row.maxima.output)}",
+                     f"cached {humanize(row.maxima.cache_read)}", f"ctx {humanize(row.maxima.ctx)}",
+                     f"sub ctx {humanize(row.maxima.sub_ctx)}")
+            cell_x = float(annot_x)
+            for cell, cell_w in zip(cells, ANNOT_FIELD_WIDTHS):
+                add(f'<text x="{_num(cell_x)}" y="{_num(cy + 4)}" font-size="{ANNOT_FONT_SIZE}" fill="{MUTED_COLOR}" '
+                    f'font-family=\'{ANNOT_FONT_STACK.replace(chr(34), "&quot;")}\'>{escape(cell)}</text>')
+                cell_x += cell_w
     add('</svg>')
     return "\n".join(out) + "\n"
 

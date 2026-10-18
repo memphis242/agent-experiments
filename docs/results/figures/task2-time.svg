@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1236" height="586.0" viewBox="0 0 1236 586.0" role="img" aria-label="Task 2: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="586.0" viewBox="0 0 960 586.0" role="img" aria-label="Task 2: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 2: wall time per run</title>
-<rect x="8" y="8" width="1220" height="570.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="944" height="570.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 2: wall time per run</text>
 <text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">90 runs across 9 arms; bar = min to max, dot = one run, tick = median</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#a78bfa"/>
@@ -16,13 +16,12 @@
 <text x="434.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo</text>
 <circle cx="487.0" cy="96.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
 <text x="498.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
-<text x="904.0" y="100.0" font-size="12" font-weight="400" fill="#7d8590" text-anchor="end">light tint = conservative</text>
-<text x="918.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">max per arm: input / output / cache read / main ctx</text>
-<rect x="28" y="122.0" width="1180.0" height="44" rx="6" fill="#161b22"/>
-<rect x="28" y="210.0" width="1180.0" height="44" rx="6" fill="#161b22"/>
-<rect x="28" y="298.0" width="1180.0" height="44" rx="6" fill="#161b22"/>
-<rect x="28" y="386.0" width="1180.0" height="44" rx="6" fill="#161b22"/>
-<rect x="28" y="474.0" width="1180.0" height="44" rx="6" fill="#161b22"/>
+<text x="924.0" y="100.0" font-size="12" font-weight="400" fill="#7d8590" text-anchor="end">light tint = conservative</text>
+<rect x="28" y="122.0" width="904.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="210.0" width="904.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="298.0" width="904.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="386.0" width="904.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="474.0" width="904.0" height="44" rx="6" fill="#161b22"/>
 <line x1="286.0" y1="122.0" x2="286.0" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
 <text x="286.0" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
 <line x1="389.6" y1="122.0" x2="389.6" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
@@ -52,10 +51,6 @@
 <circle cx="476.3" cy="144.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
 <line x1="438.8" y1="133.0" x2="438.8" y2="155.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="492.3" y="148.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">11.5 to 18.4</text>
-<text x="918.0" y="148.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 156</text>
-<text x="980.0" y="148.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 67K</text>
-<text x="1046.0" y="148.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 9.7M</text>
-<text x="1134.0" y="148.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 196K</text>
 <text x="36.0" y="185.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A2</text>
 <text x="66.0" y="185.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, eager</text>
 <text x="66.0" y="199.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -72,10 +67,6 @@
 <circle cx="554.0" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
 <line x1="437.6" y1="177.0" x2="437.6" y2="199.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="570.0" y="192.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.7 to 25.9</text>
-<text x="918.0" y="192.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 266</text>
-<text x="980.0" y="192.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 114K</text>
-<text x="1046.0" y="192.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 8.2M</text>
-<text x="1134.0" y="192.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 133K</text>
 <text x="36.0" y="229.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A3</text>
 <text x="66.0" y="229.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, conservative</text>
 <text x="66.0" y="243.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -92,10 +83,6 @@
 <circle cx="461.2" cy="232.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
 <line x1="440.0" y1="221.0" x2="440.0" y2="243.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="477.2" y="236.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">11.9 to 16.9</text>
-<text x="918.0" y="236.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 154</text>
-<text x="980.0" y="236.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 60K</text>
-<text x="1046.0" y="236.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 8.6M</text>
-<text x="1134.0" y="236.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 191K</text>
 <text x="36.0" y="273.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A4</text>
 <text x="66.0" y="273.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, eager</text>
 <text x="66.0" y="287.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -112,10 +99,6 @@
 <circle cx="581.1" cy="276.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
 <line x1="417.3" y1="265.0" x2="417.3" y2="287.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="597.1" y="280.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">9.8 to 28.5</text>
-<text x="918.0" y="280.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 278</text>
-<text x="980.0" y="280.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 110K</text>
-<text x="1046.0" y="280.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 8.8M</text>
-<text x="1134.0" y="280.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 140K</text>
 <text x="36.0" y="317.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A5</text>
 <text x="66.0" y="317.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, conservative</text>
 <text x="66.0" y="331.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -132,10 +115,6 @@
 <circle cx="510.8" cy="320.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
 <line x1="431.8" y1="309.0" x2="431.8" y2="331.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="526.8" y="324.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">11.1 to 21.7</text>
-<text x="918.0" y="324.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 156</text>
-<text x="980.0" y="324.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 63K</text>
-<text x="1046.0" y="324.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 9.7M</text>
-<text x="1134.0" y="324.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 199K</text>
 <text x="36.0" y="361.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A6</text>
 <text x="66.0" y="361.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, eager</text>
 <text x="66.0" y="375.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -152,10 +131,6 @@
 <circle cx="750.4" cy="364.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
 <line x1="552.2" y1="353.0" x2="552.2" y2="375.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="766.4" y="368.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">15.6 to 44.8</text>
-<text x="918.0" y="368.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 546</text>
-<text x="980.0" y="368.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 155K</text>
-<text x="1046.0" y="368.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 37M</text>
-<text x="1134.0" y="368.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 138K</text>
 <text x="36.0" y="405.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A7</text>
 <text x="66.0" y="405.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, conservative</text>
 <text x="66.0" y="419.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -172,10 +147,6 @@
 <circle cx="471.9" cy="408.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
 <line x1="429.8" y1="397.0" x2="429.8" y2="419.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="487.9" y="412.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">12.3 to 17.9</text>
-<text x="918.0" y="412.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 136</text>
-<text x="980.0" y="412.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 64K</text>
-<text x="1046.0" y="412.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 7.9M</text>
-<text x="1134.0" y="412.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 187K</text>
 <text x="36.0" y="449.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A8</text>
 <text x="66.0" y="449.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, eager</text>
 <text x="66.0" y="463.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -192,10 +163,6 @@
 <circle cx="550.9" cy="452.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
 <line x1="474.7" y1="441.0" x2="474.7" y2="463.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="566.9" y="456.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">14.7 to 25.6</text>
-<text x="918.0" y="456.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 226</text>
-<text x="980.0" y="456.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 128K</text>
-<text x="1046.0" y="456.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 12M</text>
-<text x="1134.0" y="456.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 170K</text>
 <text x="36.0" y="493.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A9</text>
 <text x="66.0" y="493.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, conservative</text>
 <text x="66.0" y="507.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -212,8 +179,4 @@
 <circle cx="470.8" cy="496.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
 <line x1="429.8" y1="485.0" x2="429.8" y2="507.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="486.8" y="500.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.3 to 17.8</text>
-<text x="918.0" y="500.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 142</text>
-<text x="980.0" y="500.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 82K</text>
-<text x="1046.0" y="500.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 8.4M</text>
-<text x="1134.0" y="500.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 203K</text>
 </svg>

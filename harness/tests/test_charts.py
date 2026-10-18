@@ -6,13 +6,13 @@ import _support  # noqa: F401
 import charts
 
 
-def run(arm, cost_usd, minutes, passed=True, task="task1", status="completed", tokens=None, ctx=None):
+def run(arm, cost_usd, minutes, passed=True, task="task1", status="completed", tokens=None, ctx=None, sub_ctx=None):
     cost = None if cost_usd is None else {"scenarios": {"billed": {"total_usd": cost_usd}}}
     if cost is not None and tokens is not None:
         cost["tokens"] = tokens
     return {"arm": arm, "task": task, "status": status, "passed": passed,
             "rounds": [{"wall_time_s": minutes * 60.0}], "cost": cost,
-            "behavior": {"max_context_main": ctx}}
+            "behavior": {"max_context_main": ctx, "max_context_subagent": sub_ctx}}
 
 
 def rows_for(runs, metric="cost", drop=()):
@@ -116,16 +116,26 @@ class AnnotationTest(unittest.TestCase):
         def toks(i, o, c):
             return {"m|main": {"input": i, "output": o, "cache_read": c},
                     "s|subagent": {"input": 1, "output": 2, "cache_read": 3}}
-        runs = [run("A1", 1.0, 1.0, tokens=toks(100, 50, 1000), ctx=9000),
+        runs = [run("A1", 1.0, 1.0, tokens=toks(100, 50, 1000), ctx=9000, sub_ctx=300),
                 run("A1", 2.0, 2.0, tokens=toks(10, 500, 10), ctx=7000)]
         m = rows_for(runs)[0].maxima
         self.assertEqual((m.input, m.output, m.cache_read, m.ctx), (101, 502, 1003, 9000))
+        self.assertEqual(m.sub_ctx, 300)
+        self.assertIsNone(rows_for([run("A1", 1.0, 1.0, ctx=5)])[0].maxima.sub_ctx)
 
     def test_missing_token_data_gives_none_and_label_stays_clear_of_the_column(self):
         m = rows_for([run("A1", 1.0, 1.0)])[0].maxima
         self.assertEqual((m.input, m.ctx), (None, None))
         svg = charts.render_chart(rows_for([run("A1", 1.0, 1.0), run("A1", 99999.0, 1.0)]), "T", "cost")
         ET.fromstring(svg)
+
+    def test_only_the_cost_chart_carries_the_annotation_column(self):
+        rows = rows_for([run("A1", 1.0, 1.0, tokens={"m|main": {"input": 1}}, ctx=5)])
+        cost_svg, time_svg = charts.render_chart(rows, "T", "cost"), charts.render_chart(rows, "T", "time")
+        self.assertIn(charts.ANNOT_HEADER, cost_svg)
+        self.assertNotIn(charts.ANNOT_HEADER, time_svg)
+        self.assertEqual(ET.fromstring(cost_svg).get("width"), str(charts.WIDTH_ANNOTATED))
+        self.assertEqual(ET.fromstring(time_svg).get("width"), str(charts.WIDTH))
 
 
 if __name__ == "__main__":
