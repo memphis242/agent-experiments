@@ -6,6 +6,7 @@ from pathlib import Path
 import _support  # noqa: F401
 import aggregate
 import matrix
+import provenance
 import transcript
 from test_cost import asst, write_jsonl
 
@@ -102,6 +103,12 @@ class AggregateMatrixTest(unittest.TestCase):
         self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "c", "code2", resolve))
         limited = self.run_rec("b", "usage_limit", False, 1.0)
         self.assertFalse(matrix.is_completed([limited], "A1", "task1", 1, "c", "code1", resolve))
+
+    def test_equivalent_run_code_counts_as_completed(self):
+        done = self.run_rec("a", "completed", True, 1.0, sha="old")
+        equivalent = next(iter(provenance.EQUIVALENT_RUN_CODES))
+        self.assertTrue(matrix.is_completed([done], "A1", "task1", 1, "c", "code1", {"old": equivalent}.get))
+        self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "c", "code1", {"old": "unreviewed"}.get))
 
     def test_docs_only_commits_keep_runs_reusable(self):
         done = self.run_rec("a", "completed", True, 1.0, sha="docs")

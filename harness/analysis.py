@@ -83,7 +83,7 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         data["billed_transcript_usd"] = transcript_billed
         usage = session_model_usage(record)
         if usage:
-            mu = cost.billed_from_model_usage(report, usage, arms.MAIN_MODEL)
+            mu = cost.billed_from_model_usage(report, usage, arms.get_arm(record["arm"]).main_model)
             data["scenarios"]["billed"]["total_usd"] = round(mu["total_usd"], 6)
             data["scenarios"]["billed"]["by_model"] = {k: round(v, 6) for k, v in sorted(mu["by_model"].items())}
             data["untranscribed"] = mu["untranscribed"]
@@ -102,8 +102,8 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         summarize_delegation(record, behavior)
         arm = arms.get_arm(record["arm"])
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
-        violations = transcript.validate_models(list(mains), list(sub_dirs), arms.MAIN_MODEL, arm.subagent_model,
-                                                arms.EFFORT_BY_MODEL, forbidden)
+        violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model, arm.subagent_model,
+                                                arms.effort_map(arm), forbidden)
         inventory = [{**{k: v for k, v in i.items() if k != "path"},
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]

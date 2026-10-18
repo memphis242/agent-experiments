@@ -290,6 +290,12 @@ class OutcomeTest(unittest.TestCase):
         self.assertEqual(rc, run.EXIT_USAGE_LIMIT)
         self.assertEqual(rec["status"], "usage_limit")
 
+    def test_usage_limit_pattern(self):
+        for text in ("You've hit your session limit", "You have hit your weekly limit", "usage limit reached"):
+            self.assertTrue(run.USAGE_LIMIT_RE.search(text), text)
+        for text in ("error: unknown option --foo", "I hit the target; limit of 3 retries is fine"):
+            self.assertFalse(run.USAGE_LIMIT_RE.search(text), text)
+
     def test_acceptance_timeout_is_a_failed_round(self):
         rc, rec = self.one_run(SLOW_PACK, FAKE_CLAUDE, ["--acceptance-timeout", "2"])
         self.assertEqual(rc, 0)

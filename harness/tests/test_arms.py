@@ -16,7 +16,11 @@ CONSERVATIVE = ("Delegate sparingly. Do the work yourself by default and spawn a
                 "at a time.")
 EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": "claude-sonnet-5-5",
             "A5": "claude-sonnet-5-5", "A6": "claude-sonnet-5", "A7": "claude-sonnet-5",
-            "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6"}
+            "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6", "A10": None,
+            "A11": "claude-haiku-5-5", "A12": None}
+MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high")}
+ROLES = ("Delegate selectively. Do exploration, planning, design decisions, debugging, review, and "
+         "integration yourself.")
 
 
 class ArmsTest(unittest.TestCase):
@@ -30,15 +34,17 @@ class ArmsTest(unittest.TestCase):
     def tearDownClass(cls):
         cls.tmp.cleanup()
 
-    def test_nine_roots(self):
+    def test_twelve_roots(self):
         self.assertEqual(sorted(p.name for p in self.base.iterdir()), sorted(EXPECTED))
 
     def test_settings_and_models(self):
         for arm, sub_model in EXPECTED.items():
             root = self.base / arm
             s = json.loads((root / "settings.json").read_text())
-            self.assertEqual(s["model"], "claude-opus-5-5")
-            self.assertEqual(s["effortLevel"], "high")
+            main_model, main_effort = MAIN.get(arm, ("claude-opus-5-5", "high"))
+            self.assertEqual(s["model"], main_model)
+            self.assertEqual(s["effortLevel"], main_effort)
+            self.assertEqual(s["modelSettings"][main_model], {"effortLevel": main_effort})
             self.assertEqual((s["promptCacheTtl"], s["subagentPromptCacheTtl"]), ("1h", "5m"))
             self.assertIs(s["autoMemoryEnabled"], False)
             deny = s["permissions"]["deny"]
@@ -56,7 +62,8 @@ class ArmsTest(unittest.TestCase):
                                             "CLAUDE_CODE_SUBAGENT_MODEL_FORCE": "1"})
                 self.assertEqual(s["modelSettings"][sub_model]["effortLevel"], "high")
                 names = sorted(p.stem for p in (root / "agents").glob("*.md"))
-                self.assertEqual(names, sorted(arms.SUBAGENT_NAMES))
+                expected_names = ["implementer", "tester"] if arm == "A11" else sorted(arms.SUBAGENT_NAMES)
+                self.assertEqual(names, expected_names)
                 self.assertEqual(set(arms.agent_models(root).values()), {sub_model})
 
     def test_claude_md_delegation(self):
@@ -67,6 +74,7 @@ class ArmsTest(unittest.TestCase):
             spec = arms.ARMS[arm]
             self.assertEqual(EAGER in text, spec.delegation == "eager")
             self.assertEqual(CONSERVATIVE in text, spec.delegation == "conservative")
+            self.assertEqual(ROLES in text, spec.delegation == "roles")
 
     def test_readonly_agents_have_no_write_tools(self):
         for name in ("explorer", "reviewer"):
@@ -77,7 +85,13 @@ class ArmsTest(unittest.TestCase):
 
     def test_unknown_arm(self):
         with self.assertRaises(arms.ArmError):
-            arms.get_arm("A10")
+            arms.get_arm("A13")
+
+    def test_effort_map(self):
+        self.assertEqual(dict(arms.effort_map(arms.ARMS["A1"])), {"claude-opus-5-5": "high"})
+        self.assertEqual(dict(arms.effort_map(arms.ARMS["A10"])), {"claude-sonnet-5-5": "xhigh"})
+        self.assertEqual(dict(arms.effort_map(arms.ARMS["A11"])),
+                         {"claude-sonnet-5-5": "high", "claude-haiku-5-5": "high"})
 
 
 if __name__ == "__main__":

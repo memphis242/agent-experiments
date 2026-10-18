@@ -19,19 +19,14 @@ from typing import Mapping
 TEMPLATES_DIR: Path = Path(__file__).resolve().parent / "arms" / "templates"
 DEFAULT_ARMS_DIR: Path = Path("/workspace/agent-experiments-arms")
 
-MAIN_MODEL = "claude-opus-5-5"
 OPUS_55 = "claude-opus-5-5"
 SONNET_55 = "claude-sonnet-5-5"
 SONNET_5 = "claude-sonnet-5"
 SONNET_46 = "claude-sonnet-4-6"
+HAIKU_55 = "claude-haiku-5-5"
 
-# Effort is pinned to high for every model, main agent and subagents alike.
-EFFORT_BY_MODEL: Mapping[str, str] = MappingProxyType({
-    OPUS_55: "high",
-    SONNET_55: "high",
-    SONNET_5: "high",
-    SONNET_46: "high",
-})
+KNOWN_MODELS: frozenset[str] = frozenset({OPUS_55, SONNET_55, SONNET_5, SONNET_46, HAIKU_55})
+EFFORT_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 SUBAGENT_NAMES: tuple[str, ...] = ("explorer", "implementer", "tester", "debugger", "reviewer")
 # Tools denied in every arm. Agent, Skill, WebSearch, and WebFetch stay available;
@@ -51,12 +46,28 @@ SUBAGENT_PROMPT_CACHE_TTL = "5m"
 class ArmSpec:
     arm_id: str
     subagent_model: str | None  # None: the Agent tool is denied
-    delegation: str | None      # "eager", "conservative", or None
+    delegation: str | None      # "eager", "conservative", "roles", or None
+    main_model: str = OPUS_55
+    main_effort: str = "high"
+    subagent_effort: str = "high"
+    agents: tuple[str, ...] = SUBAGENT_NAMES  # subagent definitions written for the arm
 
     def __post_init__(self) -> None:
         assert (self.subagent_model is None) == (self.delegation is None)
-        assert self.delegation in (None, "eager", "conservative")
-        assert self.subagent_model is None or self.subagent_model in EFFORT_BY_MODEL
+        assert self.delegation in (None, "eager", "conservative", "roles")
+        assert self.main_model in KNOWN_MODELS
+        assert self.subagent_model is None or self.subagent_model in KNOWN_MODELS
+        assert self.main_effort in EFFORT_LEVELS and self.subagent_effort in EFFORT_LEVELS
+        assert set(self.agents) <= set(SUBAGENT_NAMES) and len(set(self.agents)) == len(self.agents)
+        assert self.subagent_model != self.main_model or self.subagent_effort == self.main_effort
+
+
+def effort_map(arm: ArmSpec) -> Mapping[str, str]:
+    """Model to effort level for the arm's main agent and, when present, its subagents."""
+    efforts = {arm.main_model: arm.main_effort}
+    if arm.subagent_model is not None:
+        efforts[arm.subagent_model] = arm.subagent_effort
+    return MappingProxyType(efforts)
 
 
 ARMS: Mapping[str, ArmSpec] = MappingProxyType({
@@ -70,6 +81,9 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A7", SONNET_5, "conservative"),
         ArmSpec("A8", SONNET_46, "eager"),
         ArmSpec("A9", SONNET_46, "conservative"),
+        ArmSpec("A10", None, None, main_model=SONNET_55, main_effort="xhigh"),
+        ArmSpec("A11", HAIKU_55, "roles", main_model=SONNET_55, agents=("implementer", "tester")),
+        ArmSpec("A12", None, None, main_model=SONNET_55, main_effort="high"),
     )
 })
 
@@ -95,12 +109,10 @@ def _read_template(relative: str) -> str:
 
 def build_settings(arm: ArmSpec) -> dict[str, object]:
     """The settings.json content for an arm."""
-    model_settings: dict[str, dict[str, str]] = {MAIN_MODEL: {"effortLevel": EFFORT_BY_MODEL[MAIN_MODEL]}}
-    if arm.subagent_model is not None:
-        model_settings[arm.subagent_model] = {"effortLevel": EFFORT_BY_MODEL[arm.subagent_model]}
+    model_settings = {model: {"effortLevel": effort} for model, effort in effort_map(arm).items()}
     settings: dict[str, object] = {
-        "model": MAIN_MODEL,
-        "effortLevel": EFFORT_BY_MODEL[MAIN_MODEL],
+        "model": arm.main_model,
+        "effortLevel": arm.main_effort,
         "modelSettings": model_settings,
         "promptCacheTtl": PROMPT_CACHE_TTL,
         "subagentPromptCacheTtl": SUBAGENT_PROMPT_CACHE_TTL,
@@ -136,7 +148,7 @@ def build_agents(arm: ArmSpec) -> dict[str, str]:
     if arm.subagent_model is None:
         return {}
     agents: dict[str, str] = {}
-    for name in SUBAGENT_NAMES:
+    for name in arm.agents:
         text = _read_template(f"agents/{name}.md")
         assert "{{MODEL}}" in text
         agents[f"{name}.md"] = text.replace("{{MODEL}}", arm.subagent_model)

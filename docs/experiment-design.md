@@ -19,7 +19,7 @@ against a baseline. Started 2026-10-17.
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (9 arms)
+## Experiment A: model tiering (12 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -32,14 +32,23 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A7 | Opus 5.5 | Sonnet 5 | conservative |
 | A8 | Opus 5.5 | Sonnet 4.6 | eager |
 | A9 | Opus 5.5 | Sonnet 4.6 | conservative |
+| A10 | Sonnet 5.5 (xhigh effort) | none (Agent tool disallowed) | n/a |
+| A11 | Sonnet 5.5 | Haiku 5.5 (implementer and tester only) | roles |
+| A12 | Sonnet 5.5 (high effort) | none (Agent tool disallowed) | n/a |
+
+A10 asks whether a cheaper frontier model at maximum effort matches solo
+Opus. A12 is the same model at high effort, the owner's everyday choice for
+small tasks, isolating the effort factor. A11 is the preferred tiered setup: a frontier orchestrator with the
+cheapest model doing bounded implementation and testing; its main agent
+explores, plans, debugs, reviews and integrates itself.
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
-`claude-sonnet-5`, `claude-sonnet-4-6`), effort pinned to `high` for the
-main agent and every subagent, default auto-compaction window,
+`claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
+main agent and every subagent (except A10's `xhigh`), default auto-compaction window,
 `promptCacheTtl` pinned to `1h` and `subagentPromptCacheTtl` to `5m`, same
 subagent roster (explorer, implementer, tester, debugger, reviewer)
 differing only in `model:`. Built-in agents (Explore, Plan,
-general-purpose) stay available in A2-A9 and are forced onto the arm's
+general-purpose) stay available in A2-A9 and A11 and are forced onto the arm's
 subagent model with `CLAUDE_CODE_SUBAGENT_MODEL` and
 `CLAUDE_CODE_SUBAGENT_MODEL_FORCE=1` in the arm's settings. WebSearch,
 WebFetch and Skill stay available in every arm, because the experiment is
@@ -53,7 +62,7 @@ drops a run.
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
 
-Runs: 9 arms x 4 tasks x 3 repetitions = 108 runs, plus repair rounds.
+Runs: 12 arms x 4 tasks x 3 repetitions = 144 runs, plus repair rounds.
 Budget is not a constraint: a run that hits a subscription usage limit is
 dropped and rerun after the limit is raised. Run order is the plain
 arm x task x repetition product; the experiment is short enough that
@@ -196,11 +205,3 @@ agent type and observed model, compaction counts, layer 2 cost.
   recorded per run.
 - Pack validation under heavy parallel load: not pursued; three slots on a
   32-thread machine.
-- Usage-limit classifier: the subscription session limit surfaces as
-  "You've hit your session limit", which the run module's pattern does not
-  match, so such runs are recorded as `cli_error` and the driver keeps
-  launching cells. Fixing the pattern changes the run-code hash and would
-  invalidate finished cells, so it waits until all waves are complete.
-  Affected attempts (19 in the first Task 3 wave on 2026-10-18) are
-  excluded from reports with `aggregate.py --drop-status cli_error` and
-  rerun from scratch.

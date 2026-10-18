@@ -4,10 +4,10 @@ Stdlib-only Python (3.12+). Run everything from the repository root.
 
 ## 1. Generate the arm config roots
 
-    python harness/arms.py                        # writes /workspace/agent-experiments-arms/A1..A9
+    python harness/arms.py                        # writes /workspace/agent-experiments-arms/A1..A12
     python harness/arms.py --arms-dir DIR --arm A4
 
-Each root holds exactly `settings.json`, `CLAUDE.md`, and `agents/` (absent for A1); a run refuses to start if the root holds anything else. Every arm denies a fixed set of tools (`arms.DENIED_TOOLS`); A2-A9 also set `CLAUDE_CODE_SUBAGENT_MODEL` (with `_FORCE=1`) in `settings.json` `env`, so built-in agent types run on the arm's subagent model. Regenerate the roots after pulling harness changes: matrix and aggregate compare hashes.
+Each root holds exactly `settings.json`, `CLAUDE.md`, and `agents/` (absent for A1, A10 and A12); a run refuses to start if the root holds anything else. Every arm denies a fixed set of tools (`arms.DENIED_TOOLS`); A2-A9 and A11 also set `CLAUDE_CODE_SUBAGENT_MODEL` (with `_FORCE=1`) in `settings.json` `env`, so built-in agent types run on the arm's subagent model. Regenerate the roots after pulling harness changes: matrix and aggregate compare hashes.
 Review the sources under `harness/arms/templates/`. Re-running overwrites those
 files.
 
