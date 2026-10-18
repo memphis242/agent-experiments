@@ -28,6 +28,9 @@ EQUIVALENT_RUN_CODES: frozenset[str] = frozenset({
     # 68ce5b2 (Tasks 2 to 4 waves): the current change parameterises the main model per arm;
     # for the arms that existed then it yields the same model, effort and records.
     "36554411e09c7994e2238f6ac7f095e084f894be058043c9110211bd92da03db",
+    # 84adedf (A10 to A12 waves and the full Task 4 wave): the current change adds per-agent
+    # subagent models and tiered arms; A1 to A12 config roots and validation results are unchanged.
+    "6614d502a0031f6b92920ea6754a322c30c6882a48cff7fca34d72a2b4151fb6",
 })
 
 
