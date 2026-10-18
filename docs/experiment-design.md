@@ -19,7 +19,7 @@ against a baseline. Started 2026-10-17.
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (15 arms)
+## Experiment A: model tiering (17 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -38,6 +38,8 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A13 | Opus 5.5 (medium effort) | none (Agent tool disallowed) | n/a |
 | A14 | Opus 5.5 (low effort) | Sonnet 5.5 implementer; Haiku 5.5 small-implementer and tester | tiered |
 | A15 | Opus 5.5 (medium effort) | Sonnet 5.5 implementer; Haiku 5.5 small-implementer and tester | tiered |
+| A16 | Haiku 5.5 (high effort) | none (Agent tool disallowed) | n/a |
+| A17 | Haiku 5.5 (xhigh effort) | none (Agent tool disallowed) | n/a |
 
 A10 asks whether a cheaper frontier model at maximum effort matches solo
 Opus. A12 is the same model at high effort, the owner's everyday choice for
@@ -56,9 +58,14 @@ one model, these arms cannot use `CLAUDE_CODE_SUBAGENT_MODEL_FORCE`; the
 built-in agent types are instead denied with `Agent(<type>)` permission rules,
 so only the arm's own agents can be spawned.
 
+A16 and A17 ask how far the cheapest model gets on its own, at high and
+xhigh effort. They advance task by task: an arm runs Task N+1 only if at
+least one of its Task N runs passed acceptance (any run gets the usual five
+rounds).
+
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
-main agent and every subagent (except A10's `xhigh`, A13 and A15's `medium` and A14's `low` main agent), default auto-compaction window,
+main agent and every subagent (except A10's `xhigh`, A13 and A15's `medium`, A14's `low` and A17's `xhigh` main agent), default auto-compaction window,
 `promptCacheTtl` pinned to `1h` and `subagentPromptCacheTtl` to `5m`, same
 subagent roster (explorer, implementer, tester, debugger, reviewer)
 differing only in `model:`. Built-in agents (Explore, Plan,
@@ -76,7 +83,9 @@ drops a run.
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
 
-Runs: 15 arms x 4 tasks x 3 repetitions = 180 runs, plus repair rounds.
+Runs: 10 repetitions per arm on Tasks 1 and 2 and 3 on Tasks 3 and 4, so 26 runs per
+arm: 390 for A1 to A15, plus up to 52 for A16 and A17 (fewer if one stops advancing),
+plus repair rounds.
 Budget is not a constraint: a run that hits a subscription usage limit is
 dropped and rerun after the limit is raised. Run order is the plain
 arm x task x repetition product; the experiment is short enough that
