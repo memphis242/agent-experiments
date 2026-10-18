@@ -59,9 +59,11 @@ built-in agent types are instead denied with `Agent(<type>)` permission rules,
 so only the arm's own agents can be spawned.
 
 A16 and A17 ask how far the cheapest model gets on its own, at high and
-xhigh effort. They advance task by task: an arm runs Task N+1 only if at
-least one of its Task N runs passed acceptance (any run gets the usual five
-rounds).
+xhigh effort. They advance task by task. An arm runs Task N+1 only once all
+of its Task N repetitions are done and it qualified on them: it is
+disqualified if any run failed all five acceptance rounds, or if more than
+30 percent of its repetitions needed the fifth round to pass (on three
+repetitions, a single fifth-round pass disqualifies).
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
