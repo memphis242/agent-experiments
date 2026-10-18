@@ -18,6 +18,8 @@ All 27 runs passed acceptance. Billed cost includes compaction requests (none oc
 
 ![Task 1 billed cost per run](figures/task1-cost.svg)
 
+The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
+
 ![Task 1 wall time per run](figures/task1-time.svg)
 
 Notes: every conservative arm spawned zero subagents on this task, so A3, A5, A7, A9 are
