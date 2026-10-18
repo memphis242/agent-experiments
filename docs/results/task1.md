@@ -2,6 +2,16 @@
 
 All 36 runs passed acceptance. Billed cost includes compaction requests (none occurred). Ranges are min to max over the three repetitions; spend per pass is total spend over all attempts divided by passes.
 
+## Spread across arms
+
+![Task 1 billed cost per run](figures/task1-cost.svg)
+
+The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
+
+![Task 1 wall time per run](figures/task1-time.svg)
+
+## Full results
+
 | Arm | Description | Task | Passes/attempts | Spend per pass USD | Cost per run USD | Cost spread USD | Wall min per run | Turns per run | Spawns | Rounds | Compactions | Main ctx peak (K tokens) | Subagent ctx peak (K tokens) |
 |-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|
 | A1 | solo Opus 5.5 | task1 | 3/3 | 1.42 | 1.15 to 1.66 | 0.50 | 4.2 to 6.0 | 25 to 32 | 0 | 1 | 0 | 61.7 to 81.3 | - |
@@ -16,14 +26,6 @@ All 36 runs passed acceptance. Billed cost includes compaction requests (none oc
 | A10 | solo Sonnet 5.5, xhigh effort | task1 | 3/3 | 1.32 | 1.25 to 1.41 | 0.16 | 8.0 to 9.5 | 30 to 31 | 0 | 1 | 0 | 105.1 to 118.3 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task1 | 3/3 | 0.45 | 0.31 to 0.55 | 0.24 | 1.6 to 2.9 | 15 to 19 | 0 | 1 | 0 | 37.7 to 63.4 | - |
 | A12 | solo Sonnet 5.5, high effort | task1 | 3/3 | 0.52 | 0.50 to 0.55 | 0.05 | 3.0 to 9.1 | 1 to 21 | 0 | 1 | 0 | 52.2 to 56.4 | - |
-
-## Spread across arms
-
-![Task 1 billed cost per run](figures/task1-cost.svg)
-
-The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
-
-![Task 1 wall time per run](figures/task1-time.svg)
 
 Notes: every conservative arm spawned zero subagents on this task, so A3, A5, A7, A9 are
 behaviourally solo runs. One A5 run needed four rounds on the Markdown failures section

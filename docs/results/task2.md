@@ -5,6 +5,16 @@ three parallel slots, the remaining seven on six). Billed cost includes compacti
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
+## Spread across arms
+
+![Task 2 billed cost per run](figures/task2-cost.svg)
+
+The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
+
+![Task 2 wall time per run](figures/task2-time.svg)
+
+## Full results
+
 | Arm | Description | Task | Passes/attempts | Spend per pass USD | Cost per run USD | Cost spread USD | Wall min per run | Turns per run | Spawns | Rounds | Compactions | Main ctx peak (K tokens) | Subagent ctx peak (K tokens) |
 |-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|
 | A1 | solo Opus 5.5 | task2 | 10/10 | 3.95 | 2.99 to 4.73 | 1.73 | 11.5 to 18.4 | 53 to 80 | 0 | 1 | 0 | 146.8 to 196.0 | - |
@@ -19,14 +29,6 @@ pass is total spend over all attempts divided by passes.
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A4 0.83, A3 0.93, A7 0.93,
 A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.73.
-
-## Spread across arms
-
-![Task 2 billed cost per run](figures/task2-cost.svg)
-
-The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
-
-![Task 2 wall time per run](figures/task2-time.svg)
 
 Notes:
 

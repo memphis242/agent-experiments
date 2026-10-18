@@ -7,6 +7,16 @@ attempts from the first wave were cut off by the subscription session limit
 (recorded as `cli_error`), dropped and rerun from scratch; they are excluded here.
 The first eight runs were made on six parallel slots, the rest on three.
 
+## Spread across arms
+
+![Task 3 billed cost per run](figures/task3-cost.svg)
+
+The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
+
+![Task 3 wall time per run](figures/task3-time.svg)
+
+## Full results
+
 | Arm | Description | Task | Passes/attempts | Spend per pass USD | Cost per run USD | Cost spread USD | Wall min per run | Turns per run | Spawns | Rounds | Compactions | Main ctx peak (K tokens) | Subagent ctx peak (K tokens) |
 |-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|
 | A1 | solo Opus 5.5 | task3 | 3/3 | 8.83 | 7.53 to 10.53 | 3.00 | 21.4 to 24.8 | 96 to 141 | 0 | 1 | 0 | 275.1 to 330.5 | - |
@@ -20,14 +30,6 @@ The first eight runs were made on six parallel slots, the rest on three.
 | A9 | Sonnet 4.6 subagents, conservative | task3 | 3/3 | 7.58 | 6.60 to 8.81 | 2.21 | 19.1 to 27.4 | 96 to 114 | 0 | 1 | 0 | 250.3 to 318.7 | - |
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A3 0.78, A4 0.78, A9 0.86,
 A7 0.95, A5 0.96, A2 1.35, A6 1.60, A8 1.73.
-
-## Spread across arms
-
-![Task 3 billed cost per run](figures/task3-cost.svg)
-
-The cost chart's right-hand columns give, per arm, the largest value seen in any one run: input, output and cache-read tokens summed over the main agent and all subagents, then the main agent's context peak and the largest subagent context peak (`-` when the arm spawned no subagents). Bars span min to max, dots are single runs, the tick is the median, and a lighter tint marks conservative arms.
-
-![Task 3 wall time per run](figures/task3-time.svg)
 
 Notes:
 
