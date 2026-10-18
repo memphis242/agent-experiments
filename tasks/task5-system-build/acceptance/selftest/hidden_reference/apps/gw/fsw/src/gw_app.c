@@ -13,6 +13,8 @@
 #define NCONN          8
 #define NSUB           16
 #define MAXPKT         1024
+#define ATTEMPT_WAKES  50 /* GW_TCP_ATTEMPT_SEC at 10 Hz */
+#define MAX_ATTEMPTS   4  /* first attempt plus GW_TCP_MAX_RETRIES */
 
 typedef struct
 {
@@ -32,10 +34,10 @@ typedef struct { CMDVAL_Config_t Validation; } GW_Val_t;
 typedef struct
 {
     GW_ConnDef_t def;
-    bool         used, open, egr_rep, ing_rep;
-    uint8        state;
+    bool         used, open, egr_rep, ing_rep, pending;
+    uint8        state, attempts;
     osal_id_t    id;
-    uint32       seq, tx, rx, txerr, rxerr, next_try;
+    uint32       seq, tx, rx, txerr, rxerr, attempt_wake;
     uint8        buf[4400];
     size_t       blen;
 } Conn_t;
@@ -190,25 +192,80 @@ static void conn_close(int i)
 {
     if (G.c[i].open) OS_close(G.c[i].id);
     G.c[i].open = false;
+    G.c[i].pending = false;
 }
 
-static bool tcp_try(int i)
+/* One connect attempt, started now: false only when no socket can be opened. */
+static bool tcp_attempt(int i)
 {
+    Conn_t *c = &G.c[i];
     OS_SockAddr_t a;
-    if (OS_SocketOpen(&G.c[i].id, OS_SocketDomain_INET, OS_SocketType_STREAM) != OS_SUCCESS) return false;
-    G.c[i].open = true;
+    int32 rc;
+    c->attempts++;
+    c->attempt_wake = G.wake;
+    if (OS_SocketOpen(&c->id, OS_SocketDomain_INET, OS_SocketType_STREAM) != OS_SUCCESS) return false;
+    c->open = true;
     OS_SocketAddrInit(&a, OS_SocketDomain_INET);
-    OS_SocketAddrFromString(&a, G.c[i].def.RemoteAddr);
-    OS_SocketAddrSetPort(&a, G.c[i].def.RemotePort);
-    if (OS_SocketConnect(G.c[i].id, &a, 0) == OS_SUCCESS)
+    OS_SocketAddrFromString(&a, c->def.RemoteAddr);
+    OS_SocketAddrSetPort(&a, c->def.RemotePort);
+    rc = OS_SocketConnect(c->id, &a, 0);
+    if (rc == OS_SUCCESS) set_up(i);
+    else if (rc == OS_ERROR_TIMEOUT) c->pending = true;
+    else conn_close(i);
+    return true;
+}
+
+/* A connect cycle with its first attempt at once. */
+static bool tcp_cycle(int i)
+{
+    G.c[i].state = 2;
+    G.c[i].attempts = 0;
+    return tcp_attempt(i);
+}
+
+/* On WAKEUP while CONNECTING: decide an in-progress attempt, then start the next one or enter DOWN. */
+static void tcp_poll(int i)
+{
+    Conn_t *c = &G.c[i];
+    uint32 fl = OS_STREAM_STATE_READABLE | OS_STREAM_STATE_WRITABLE;
+    uint8 tmp[1100];
+    int32 n;
+    if (c->pending)
     {
-        set_up(i);
-        return true;
+        if (OS_SelectSingle(c->id, &fl, 0) == OS_SUCCESS)
+        {
+            if (fl & OS_STREAM_STATE_READABLE)
+            {
+                n = OS_TimedRead(c->id, tmp, sizeof(tmp), 0);
+                if (n > 0)
+                {
+                    c->pending = false;
+                    set_up(i);
+                    memcpy(c->buf, tmp, (size_t)n);
+                    c->blen = (size_t)n;
+                    return;
+                }
+                conn_close(i);
+            }
+            else if (fl & OS_STREAM_STATE_WRITABLE)
+            {
+                c->pending = false;
+                set_up(i);
+                return;
+            }
+        }
+        if (c->pending && G.wake - c->attempt_wake >= ATTEMPT_WAKES) conn_close(i);
+    }
+    if (c->pending || G.wake - c->attempt_wake < ATTEMPT_WAKES) return;
+    if (c->attempts < MAX_ATTEMPTS)
+    {
+        tcp_attempt(i);
+        return;
     }
     conn_close(i);
-    G.c[i].state = 2;
-    G.c[i].next_try = G.wake + 10;
-    return true;
+    c->state = 3;
+    CFE_EVS_SendEvent(28, CFE_EVS_EventType_ERROR, "GW: conn %d to %s:%u timed out", i, c->def.RemoteAddr,
+                      (unsigned)c->def.RemotePort);
 }
 
 static bool conn_open(int i)
@@ -235,7 +292,7 @@ static bool conn_open(int i)
         set_up(i);
         return true;
     }
-    if (c->def.Interface == 2) return tcp_try(i);
+    if (c->def.Interface == 2) return tcp_cycle(i);
     if (strncmp(c->def.DevicePath, "/dev/pts/", 9) == 0)
     {
         if (!G.mapped)
@@ -265,10 +322,7 @@ static void conn_down(int i, bool disable)
         resub();
     }
     else
-    {
-        G.c[i].state = 2;
-        G.c[i].next_try = G.wake + 10;
-    }
+        tcp_cycle(i);
 }
 
 static void apply_table(void)
@@ -497,7 +551,7 @@ static void wakeup(void)
     {
         Conn_t *c = &G.c[i];
         if (!c->used || !c->def.Enabled) continue;
-        if (c->def.Interface == 2 && c->state == 2 && G.wake >= c->next_try) tcp_try(i);
+        if (c->def.Interface == 2 && c->state == 2) tcp_poll(i);
         if (!G.shared || c->state != 1) continue;
         if (c->def.Interface == 1)
         {

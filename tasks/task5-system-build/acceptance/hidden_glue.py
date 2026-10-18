@@ -154,19 +154,27 @@ class HiddenTests:
             self.prep_detail = short(prep.stdout + prep.stderr, 1500)
             return
         bdir = self.tree / "build-native_std" / "native" / "default_cpu1"
+        targets: dict[tuple[str, str], str] = {}
         for comp, unit in self.runners():
             res = RunnerResult()
             self.results[(comp, unit)] = res
             if not self.present.get(comp):
                 res.build_detail = f"{COMPONENT_DIRS[comp]} has no sources"
                 continue
-            target = f"coverage-{comp}-{unit}-testrunner"
-            proc = self.sh(["make", "-C", str(bdir), "-j16", target], 600)
+            targets[(comp, unit)] = f"coverage-{comp}-{unit}-testrunner"
+        if not targets:
+            return
+        # One parallel make for every runner; -k keeps building the others when one component does not compile.
+        proc = self.sh(["make", "-C", str(bdir), "-k", "-j16", *targets.values()], 900)
+        log = (proc.stdout + proc.stderr).splitlines()
+        errs = [ln for ln in log if "error" in ln.lower() or "undefined reference" in ln]
+        for (comp, unit), target in targets.items():
+            res = self.results[(comp, unit)]
             exe = next((p for p in bdir.rglob(target) if p.is_file()), None)
-            if proc.returncode != 0 or exe is None:
-                errs = [ln for ln in (proc.stdout + proc.stderr).splitlines()
-                        if "error" in ln.lower() or "undefined reference" in ln]
-                res.build_detail = "\n".join(errs[-15:]) or short(proc.stdout + proc.stderr, 1200)
+            if exe is None:
+                rel = COMPONENT_DIRS[comp]
+                mine = [ln for ln in errs if rel in ln or f"/{comp}/" in ln or target in ln]
+                res.build_detail = "\n".join((mine or errs)[-15:]) or short(proc.stdout + proc.stderr, 1200)
                 continue
             res.built = True
         threads = []

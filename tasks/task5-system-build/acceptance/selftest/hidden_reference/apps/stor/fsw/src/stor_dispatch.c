@@ -216,6 +216,7 @@ void STOR_TaskPipe(const CFE_SB_Buffer_t *Buf)
         }
         else
         {
+            STOR_Data.CommandErrorCounter++;
             CFE_EVS_SendEvent(STOR_MID_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: invalid packet, MID = 0x%x",
                               (unsigned int)v);
         }

@@ -969,6 +969,8 @@ command path like CMDI, with no exemption.
 #define GW_ADDR_LEN        16
 #define GW_DEV_PATH_LEN    64
 #define GW_MAX_PACKET      1024
+#define GW_TCP_ATTEMPT_SEC 5    /* TCP: seconds between the starts of two connect attempts, and each attempt's bound */
+#define GW_TCP_MAX_RETRIES 3    /* TCP: retries after the first attempt of a cycle */
 
 typedef enum { GW_IfType_NONE = 0, GW_IfType_UDP = 1, GW_IfType_TCP = 2, GW_IfType_SERIAL = 3 } GW_IfType_Enum_t;
 
@@ -998,9 +1000,37 @@ nonzero `LocalPort`. The default table has every slot unused.
 
 - UDP: one CMDI frame per datagram to `RemoteAddr:RemotePort`; with a nonzero
   `LocalPort`, GW binds 0.0.0.0:`LocalPort` and reads inbound datagrams.
-- TCP: GW is the client and connects to `RemoteAddr:RemotePort`; while not
-  connected the connection is CONNECTING and GW retries once per second;
-  peer close or an I/O error returns it to CONNECTING.
+- TCP: GW is the client and connects to `RemoteAddr:RemotePort`. A
+  connect attempt never blocks GW's main loop; with the pinned OSAL, which
+  opens every socket non-blocking, it is done this way: open a stream
+  socket and call `OS_SocketConnect` with a timeout of 0. `OS_SUCCESS`
+  means the connection is UP; `OS_ERROR` means the attempt failed (for
+  example the peer refused); `OS_ERROR_TIMEOUT` means the attempt is in
+  progress, and on each later WAKEUP GW polls it with `OS_SelectSingle`
+  (`OS_STREAM_STATE_READABLE | OS_STREAM_STATE_WRITABLE`, timeout 0):
+  writable and not readable means UP; readable means the attempt has
+  ended, and one `OS_TimedRead` with timeout 0 decides it (an error or end
+  of stream: failed; data: UP, and the bytes go to the stream deframer). Do
+  not call `OS_SocketConnect` again on a socket whose attempt is in
+  progress (OSAL then reports `OS_ERROR`). An attempt still undecided
+  `GW_TCP_ATTEMPT_SEC` (5) seconds after it started fails. A failed
+  attempt's socket is closed.
+- TCP connect cycle: a cycle is a first attempt and at most
+  `GW_TCP_MAX_RETRIES` (3) retries, 4 attempts in all, started
+  `GW_TCP_ATTEMPT_SEC` seconds apart (each attempt starts 5 s after the
+  previous one started, however early that one failed). While a cycle runs
+  the connection is CONNECTING (2). When no attempt of the cycle reaches
+  UP, the connection enters DOWN (3) at the end of the fourth attempt's
+  period, 4 x 5 = 20 s after the cycle began: GW sends one
+  `GW_CONN_TIMEOUT_ERR_EID` naming the connection index, `RemoteAddr` and
+  `RemotePort`, and makes no further attempt; `Enabled` stays 1. A cycle
+  begins, with its first attempt at once, whenever the connection is
+  opened (ADD_CONN or ENABLE_CONN with `Enabled` 1, RELOAD, a table
+  update) and whenever an UP connection drops (peer close or an I/O
+  error). From DOWN, DISABLE_CONN then ENABLE_CONN begins a new cycle. A
+  peer that does not listen or does not answer is not an open failure:
+  ADD_CONN and ENABLE_CONN succeed and the connection is CONNECTING. Failed
+  attempts are counted in none of the connection's counters.
 - SERIAL: GW opens `DevicePath` read-write when enabled and does not change
   terminal attributes (the other side sets raw mode). GW uses OSAL for file
   and socket I/O; mapping `/dev/pts` into the OSAL file system with
@@ -1085,15 +1115,16 @@ nonzero `LocalPort`. The default table has every slot unused.
   `CFE_SB_TransmitMsg(..., false)`, `PacketsIngressed`++.
 - Outbound: each subscribed packet is framed and written to every enabled
   connection listing its MID, `PacketsEgressed`++ per write; a TCP connection that is
-  CONNECTING is skipped and counts an egress error. GW subscribes, message
+  CONNECTING or DOWN is skipped and counts an egress error. GW subscribes, message
   limit 16, to the union of the enabled connections' `Subs` and
   unsubscribes MIDs no longer needed whenever the union changes.
 - An open, bind or I/O failure on a UDP or SERIAL connection disables it
   (`Enabled` 0, `GW_CONN_DOWN_ERR_EID`). `GW_EGRESS_ERR_EID` /
   `GW_INGRESS_ERR_EID` are sent once per connection until its next
   successful write / read; counters always increment.
-- Connection state: DISABLED 0, UP 1, CONNECTING 2; reaching UP sends
-  `GW_CONN_UP_INF_EID`.
+- Connection state: DISABLED 0, UP 1, CONNECTING 2, DOWN 3 (TCP only, see
+  the connect cycle above); reaching UP sends `GW_CONN_UP_INF_EID`,
+  entering DOWN sends `GW_CONN_TIMEOUT_ERR_EID`.
 - Every 10th WAKEUP sends a heartbeat (C.5).
 
 ### S5.3 Commands and telemetry
@@ -1101,9 +1132,9 @@ nonzero `LocalPort`. The default table has every slot unused.
 | Code | Name | Payload | Rules |
 |------|------|---------|-------|
 | 0, 1 | NOOP, RESET_COUNTERS | none | reset: command, HK and per-connection counters |
-| 2 | ADD_CONN | `{ uint8 Index; uint8 Spare[3]; GW_ConnDef_t Conn; }` | `Index` below 8, slot unused, `Conn` valid and not NONE, else `GW_CONN_ADD_ERR_EID`; with `Enabled` 1 opened at once, and an open failure rejects the command leaving the slot unused; success `GW_CONN_ADD_INF_EID` |
+| 2 | ADD_CONN | `{ uint8 Index; uint8 Spare[3]; GW_ConnDef_t Conn; }` | `Index` below 8, slot unused, `Conn` valid and not NONE, else `GW_CONN_ADD_ERR_EID`; with `Enabled` 1 opened at once, and an open failure rejects the command leaving the slot unused (for TCP only a socket that cannot be opened is an open failure; a peer that refuses or does not answer is not); success `GW_CONN_ADD_INF_EID` |
 | 3 | REMOVE_CONN | `GW_ConnIndex_Payload_t { uint8 Index; uint8 Spare[3]; }` | slot used, else `GW_CONN_REMOVE_ERR_EID`; closes and frees it, `GW_CONN_REMOVE_INF_EID` |
-| 4 | ENABLE_CONN | `GW_ConnIndex_Payload_t` | slot used and disabled and opening succeeds, else `GW_CONN_ENABLE_ERR_EID`; success `GW_CONN_ENABLE_INF_EID` |
+| 4 | ENABLE_CONN | `GW_ConnIndex_Payload_t` | slot used and disabled and opening succeeds (as for ADD_CONN), else `GW_CONN_ENABLE_ERR_EID`; success `GW_CONN_ENABLE_INF_EID`; a TCP connection begins a new connect cycle |
 | 5 | DISABLE_CONN | `GW_ConnIndex_Payload_t` | slot used and enabled, else `GW_CONN_DISABLE_ERR_EID`; success `GW_CONN_DISABLE_INF_EID` |
 | 6 | RELOAD | none | close all, re-apply the active table, discarding command changes, `GW_RELOAD_INF_EID`; a table update is applied the same way |
 | 7 | SEND_CONN_STATUS | none | one `GW_ConnTlm_t`, `GW_CONN_STATUS_INF_EID` |
@@ -1133,7 +1164,7 @@ Event IDs: 1 to 10 as in C.4,
 15 CONN_ENABLE_INF, 16 CONN_ENABLE_ERR, 17 CONN_DISABLE_INF,
 18 CONN_DISABLE_ERR, 19 RELOAD_INF, 20 CONN_UP_INF, 21 CONN_DOWN_ERR,
 22 EGRESS_ERR, 23 INGRESS_ERR, 24 CONN_STATUS_INF, 25 FRAME_REJECT_ERR,
-26 VALTBL_ERR, 27 VALTBL_INF.
+26 VALTBL_ERR, 27 VALTBL_INF, 28 CONN_TIMEOUT_ERR.
 
 ### S5 Acceptance
 
@@ -1155,7 +1186,10 @@ not execute; a table update of `CMDI.ValTable` changing the key is
 followed by GW (old-key frames rejected, new-key frames accepted, egress
 frames under the new key); a TCP connection reaches UP once a listener
 opened by the acceptance environment appears and carries marker-framed
-CMDI frames both ways; a SERIAL connection on a PTY pair created by the
+CMDI frames both ways; a TCP connection whose peer never listens makes
+four attempts 5 s apart and enters DOWN with `GW_CONN_TIMEOUT_ERR_EID`
+about 20 s after it was opened, then makes no attempt until DISABLE_CONN
+and ENABLE_CONN begin a new cycle; a SERIAL connection on a PTY pair created by the
 acceptance environment carries marker-framed CMDI frames both ways,
 including a frame split across writes, garbage before a marker and a
 frame with a bad MAC,
@@ -1251,10 +1285,14 @@ typedef struct
     uint8  Correlation;  /* 0 NONE, 1 UNCORRELATED, 2 CLUSTERED */ uint8 Spare[3];
 } SFI_ClusterResult_t;
 
-/* Onsets in any order, Count 0..SFI_HISTORY_LEN; the caller filters recency. */
+/* Onsets in any order, Count 0..SFI_HISTORY_LEN; the caller filters recency. Onsets is not modified. */
 void SFI_ComputeClusters(const CFE_TIME_SysTime_t *Onsets, uint16 Count, uint16 WindowSec,
                          SFI_ClusterResult_t *Result);
 ```
+
+`SFI_ComputeClusters` must not modify the caller's `Onsets` array: it is
+`const`, and casting the qualifier away is not allowed. It sorts a local
+copy of at most `SFI_HISTORY_LEN` entries, with no dynamic allocation.
 
 ### S6.4 Counter watches
 
@@ -1483,7 +1521,9 @@ server.
 - `OpenUdpLink`: `name`, `local_port`, `remote_port`; a UDP socket bound to
   127.0.0.1:`local_port` that sends to 127.0.0.1:`remote_port`.
 - `OpenTcpServer`: `name`, `port`; listens on 127.0.0.1:`port` and accepts
-  GW's connection in the background (again after GW reconnects).
+  GW's connection in the background (again after GW reconnects). GW starts
+  a connect attempt every 5 s while CONNECTING (S5.2), so a test that
+  opens the server after adding the connection waits at least 6 s.
 - `WaitLinkConnected`: `name`, `timeout`; passes once a client is
   connected.
 - `OpenPtyPair`: `name`, `variable`; opens a PTY pair, sets the slave to
@@ -1579,7 +1619,7 @@ nonzero if any fails.
 | 2 | `st_cmdval_hmac.json` | a CMDI frame wrapping a SAMPLE_APP NOOP with a valid MAC executes; the same command in a frame with one MAC byte changed (CRC recomputed) is rejected, `HmacErrors` rises by 1, the REJECT event names HMAC, and SAMPLE_APP `CommandCounter` does not change |
 | 3 | `st_tlmo_priority.json` | with budget 0, class 0 and class 3 verification streams are injected past capacity; only class 3 drops; after raising the budget every class 0 packet reaches UDP 2234 before any class 3 packet (`tlm_order_plugin`) |
 | 4 | `st_gw_udp.json` | a GW UDP connection added by command egresses a verification packet injected on a subscribed reserved MID to the test's UDP link as a valid CMDI frame (`CheckLinkPacket`); a SAMPLE_APP NOOP sent over the link with `SendLinkCmdiCommand` executes; the same command with `corrupt` `mac` does not execute, and GW `HmacErrors` rises by 1 with `GW_FRAME_REJECT_ERR_EID` naming HMAC |
-| 5 | `st_gw_tcp.json` | a GW TCP connection to the test's TCP server reaches UP (`GW_CONN_UP_INF_EID`, `ConnectionsUp`), egresses a verification packet on a subscribed reserved MID as a marker-framed CMDI frame, and ingests a SAMPLE_APP NOOP sent with `SendLinkCmdiCommand`, which executes |
+| 5 | `st_gw_tcp.json` | a GW TCP connection to the test's TCP server reaches UP (`GW_CONN_UP_INF_EID`, `ConnectionsUp`) within one 5 s attempt period, egresses a verification packet on a subscribed reserved MID as a marker-framed CMDI frame, and ingests a SAMPLE_APP NOOP sent with `SendLinkCmdiCommand`, which executes |
 | 6 | `st_gw_serial.json` | a GW SERIAL connection on a PTY pair opened by the test egresses a verification packet as a marker-framed CMDI frame and ingests a SAMPLE_APP NOOP sent with `SendLinkCmdiCommand` split across writes after garbage bytes, which executes |
 | 7 | `st_sfi_heartbeat.json` | stopping GW with ES STOP_APP makes SFI report GW missing (event and `AppsMissing` 1); starting it again with ES START_APP (`/cf/gw.so`, `GW_AppMain`, priority 70, stack 131072) restores it |
 | 8 | `st_stor_transfer.json` | with cpu1 and cpu2 running, GW UDP connections on both nodes carry `STOR_XFER_SEG_MID` from cpu1 to cpu2 and `STOR_XFER_ACK_MID` back, as CMDI frames each GW validates; a file added on cpu1 is transferred to node 2 with DELETE; it is byte-identical on cpu2, gone on cpu1, and `XfersCompleted` is 1 |

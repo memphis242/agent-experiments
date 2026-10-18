@@ -824,10 +824,14 @@ static void Test_ClassMap(void)
 {
     ptbl_t t;
     cmap_t m;
+    hk_t h0, h1;
     char why[160];
     int s;
     ptbl_default(&t);
-    if (!boot(&t)) return;
+    if (!boot(&t) || !get_hk(&h0)) return;
+    if (get_map(&m) && get_hk(&h1))
+        UtAssert_True(h1.cc == (uint8)(h0.cc + 1) && h1.cec == h0.cec,
+                      "SEND_CLASS_MAP is an accepted command and increments CommandCounter (%u -> %u)", h0.cc, h1.cc);
     if (get_map(&m))
     {
         UtAssert_True(m.budget == 16 && m.count == 48, "class map BudgetPacketsPerCycle %u, StreamCount %u (expected 16, 48)",
@@ -1189,6 +1193,10 @@ static void Test_CommandErrors(void)
     ev0 = t5_nev;
     deliver_to_pipe_of(MID_CMD, m, n);
     UtAssert_True(t5_count_ev(EID_MID_ERR, ev0) == 1, "an unexpected message ID on the command pipe emits TLMO_MID_ERR_EID (5)");
+    if (get_hk(&h0))
+        UtAssert_True(h0.cec == (uint8)(h.cec + 1) && h0.cc == h.cc,
+                      "the unexpected message ID counts as one rejected command (CommandErrorCounter %u -> %u, CommandCounter "
+                      "%u -> %u)", h.cec, h0.cec, h.cc, h0.cc);
 }
 
 static void Test_StartupErrors(void)

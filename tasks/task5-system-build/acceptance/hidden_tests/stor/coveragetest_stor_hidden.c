@@ -1142,11 +1142,16 @@ static void Test_CommandErrors(void)
     UtAssert_True(count_ev(EID_LEN_ERR, 0) == 11, "event 6 emitted %d times for 11 wrongly sized commands", count_ev(EID_LEN_ERR, 0));
     UtAssert_True(last_ev_type(EID_LEN_ERR) == CFE_EVS_EventType_ERROR, "event 6 is ERROR");
     UtAssert_True(count_ev(EID_NOOP, 0) == 0 && count_ev(EID_RESET, 0) == 0, "wrongly sized commands do nothing");
-    if (get_hk(&b)) UtAssert_True(b.cec >= a.cec + 12, "error counter %u -> %u (at least +12)", a.cec, b.cec);
+    if (get_hk(&b))
+        UtAssert_True(b.cec == (uint8)(a.cec + 12) && b.cc == a.cc,
+                      "twelve rejected commands: CommandErrorCounter %u -> %u, CommandCounter %u -> %u", a.cec, b.cec, a.cc, b.cc);
     fill_pkt(unknown, T_MID_UNKNOWN, sizeof(unknown), 0);
     deliver_unsubscribed(unknown, sizeof(unknown));
     UtAssert_True(count_ev(EID_MID_ERR, 0) == 1, "a packet with an unknown message ID emits event 5 (%d)", count_ev(EID_MID_ERR, 0));
     UtAssert_True(last_ev_type(EID_MID_ERR) == CFE_EVS_EventType_ERROR, "event 5 is ERROR");
+    if (get_hk(&a))
+        UtAssert_True(a.cec == (uint8)(b.cec + 1) && a.cc == b.cc,
+                      "the unknown message ID counts as one rejected command (CommandErrorCounter %u -> %u)", b.cec, a.cec);
 }
 
 static void Test_CommandCounters(void)

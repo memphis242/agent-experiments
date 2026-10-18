@@ -300,7 +300,11 @@ void SFI_AppMain(void)
                 int i, hit = 0;
                 for (i = 0; i < G.nsubs; i++) if (G.subs[i] == CFE_SB_MsgIdToValue(id)) hit = 1;
                 if (hit) Watch(CFE_SB_MsgIdToValue(id), (const uint8 *)b, sz);
-                else CFE_EVS_SendEvent(5, CFE_EVS_EventType_ERROR, "SFI: bad MID 0x%04X", (unsigned)CFE_SB_MsgIdToValue(id));
+                else
+                {
+                    G.hk.P.cec++;
+                    CFE_EVS_SendEvent(5, CFE_EVS_EventType_ERROR, "SFI: bad MID 0x%04X", (unsigned)CFE_SB_MsgIdToValue(id));
+                }
             }
         }
     }

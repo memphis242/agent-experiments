@@ -238,6 +238,7 @@ void CMDI_AppMain(void)
                 CFE_SB_TransmitMsg(CFE_MSG_PTR(G.Hk.TelemetryHeader), true);
                 break;
             default:
+                G.Hk.Payload.CommandErrorCounter++;
                 CFE_EVS_SendEvent(5, CFE_EVS_EventType_ERROR, "CMDI: bad MID 0x%04X", (unsigned)CFE_SB_MsgIdToValue(mid));
                 break;
         }

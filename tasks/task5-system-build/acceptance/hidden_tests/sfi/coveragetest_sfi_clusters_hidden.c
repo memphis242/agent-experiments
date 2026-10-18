@@ -219,6 +219,16 @@ static void Test_LargeTimes(void)
     expect("onsets near the end of the seconds range, exactly W seconds apart", on, 2, 5, 1, 2, CLUSTERED);
 }
 
+/* Onsets in read-only storage: an implementation that casts the qualifier away and sorts the caller's array
+ * in place faults here instead of returning. */
+static const CFE_TIME_SysTime_t ReadOnlyOnsets[5] = {{40, 0}, {10, 0}, {30, 0}, {12, HALF}, {20, 0}};
+
+static void Test_ReadOnly(void)
+{
+    expect("unsorted onsets in read-only storage", ReadOnlyOnsets, 5, 3, 4, 2, CLUSTERED);
+    expect("the same onsets with a window of 10 s", ReadOnlyOnsets, 5, 10, 1, 5, CLUSTERED);
+}
+
 void UtTest_Setup(void)
 {
     UtTest_Add(Test_Empty, Setup, Teardown, "No recent misses");
@@ -232,4 +242,5 @@ void UtTest_Setup(void)
     UtTest_Add(Test_Largest, Setup, Teardown, "Largest cluster");
     UtTest_Add(Test_Sixteen, Setup, Teardown, "Sixteen onsets");
     UtTest_Add(Test_LargeTimes, Setup, Teardown, "Large onset times");
+    UtTest_Add(Test_ReadOnly, Setup, Teardown, "Onsets in read-only storage");
 }

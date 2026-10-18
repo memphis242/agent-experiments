@@ -82,8 +82,14 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   ingress of a framed SAMPLE_APP NOOP; a NOOP must arrive as a valid frame to
   execute; one live check per rejection reason with GW counters and event 25; a bad
   MAC raises HmacErrors by 1; loop drop on the embedded command.
-- Live TCP: listener appears late, connection reaches UP, marker-framed traffic both
-  ways, split frame, garbage before a marker, bad MAC.
+- Live TCP: listener appears late, connection reaches UP within one 5 s attempt period,
+  marker-framed traffic both ways, split frame, garbage before a marker, bad MAC; after
+  the peer closes, a new connect cycle with an attempt at once.
+- Live TCP connect cycle (s5-tcp-down): against a peer that never listens, DOWN (3) with
+  one GW_CONN_TIMEOUT_ERR_EID about 20 s after ADD_CONN (accepted window 18-26 s),
+  Enabled stays 1, egress while DOWN counts EgressErrors, no attempt once DOWN even when a
+  listener appears, and DISABLE_CONN then ENABLE_CONN starts a fresh cycle with an
+  attempt at once.
 - Live PTY (raw mode): same as TCP over a PTY pair; GW keeps its heartbeat and
   answers HK with an idle PTY.
 - Restart: GW STOP_APP then START_APP (/cf/gw.so, GW_AppMain, priority 70, stack
@@ -139,10 +145,22 @@ Deviations from the plan above, and why:
 - Result file: the contract (enforced by harness/acceptance.py) allows exactly `passed` and `checks` at the
   top level, so the per-subsystem summary (checks, run, passed, failed, fraction, passed_all, overall,
   `preliminary: true`) is written next to it as `<out-stem>.subsystems.json` and printed to stdout.
-- Parallelism: under `ACCEPT_NO_NAMESPACE` the pack may not create namespaces, and the node ports are fixed,
-  so every check that binds them runs in one ordered "ports" lane; the build, a "cpu" lane (unit tests,
-  coverage, behaviour tests) and a "misc" lane (static checks, fresh CTF set-up, plugin listing, CCDD probe)
-  run alongside it.
+- Parallelism: the node ports are fixed, so every check that binds them (live checks, the harness CLI, CTF
+  scripts) runs in the "isolated" lane, in groups that each get their own nested unprivileged user, network
+  (own loopback), mount (private /dev/shm, the OSAL RAM disk), IPC (POSIX queues, named after PIDs) and PID
+  namespaces (`isolation.py`; `unshare --kill-child` under `setpriv --pdeathsig`, so a group's processes die
+  with it, and pgrep/pkill in a group see only that group). The group's code runs in a further user
+  namespace mapping the caller's uid back, so cFS never runs as uid 0. `live_worker.py` runs a group's
+  checks in order in a reconstructed context and writes their results after each check. Groups: checks that
+  share nodes (TLMO hold, GW UDP, GW SERIAL, STOR peer transfer, two-node probes) and the CTF scripts (they
+  share the one set-up ctf/ tree, and wait until s7-setup-fresh, including its idempotence re-run, is over)
+  are one group each; every other check is its own group. `T5_PACK_JOBS` groups run at once (default 8,
+  1..64; up to 7 reviews may run at once on the 32-thread host). Node start-up failures are shared through a
+  locked file, so after two failed starts of a node the remaining groups report it at once. Without nested
+  namespaces (or when the build failed) the lane runs in-process one check at a time. The contract permits
+  this nesting under `ACCEPT_NO_NAMESPACE` (harness/ACCEPTANCE_CONTRACT.md). The build, a "cpu" lane (unit
+  tests, coverage, then the behaviour tests, whose runners build in one `make -k -j16`) and a "misc" lane
+  (static checks, fresh CTF set-up, plugin listing, CCDD probe) run alongside it.
 - S1 tables: nodes boot STOR with an entry-less StorageTable and each scenario table is then loaded through
   cFE Table Services, so no default-entry packet files distort the arithmetic Task 4 relied on.
 - Events are read from TLMO's event telemetry; only the start-up INIT events are read from the node's console
@@ -159,3 +177,20 @@ Deviations from the plan above, and why:
   need `harness/run.py --acceptance-timeout 2760` (the default is 2400).
 - Checks that pass on the unmodified template by design: `n-build-werror`, `n-unit-tests` (the template has
   no CI_LAB/TO_LAB unit tests), `n-change-scope` and `s7-setup-fresh`.
+- Command counters (owner decision on C.4): in every app, every rejected command (unknown function code, wrong
+  length, and a message with an unexpected MID) increments `CommandErrorCounter` once and nothing else, and every
+  accepted command, including request commands such as SEND_STATS, SEND_CLASS_MAP, SEND_CONN_STATUS, SEND_STATUS
+  and CLEAR_HISTORY, increments `CommandCounter`. SEND_HK and WAKEUP messages are not commands; RESET_COUNTERS
+  leaves both counters at 0. The behaviour tests of all five apps and the live command checks assert this.
+- TCP connect cycle (owner decision on S5.2, pinned in the spec): OSAL only, with `OS_SocketConnect(..., 0)`
+  and an in-progress attempt polled each WAKEUP with `OS_SelectSingle(READABLE|WRITABLE, 0)` (the pinned OSAL
+  has no asynchronous connect completion, and a second `OS_SocketConnect` on the same socket fails). Four
+  attempts start 5 s apart (`GW_TCP_ATTEMPT_SEC`, 1 + `GW_TCP_MAX_RETRIES`); an attempt undecided after 5 s
+  fails; DOWN (3) follows at the end of the fourth period (20 s) with one `GW_CONN_TIMEOUT_ERR_EID` (28). A
+  refused attempt on loopback fails at once, so the attempts are spaced by start time; otherwise DOWN would
+  come in milliseconds and the 18-26 s window would not hold. Failed attempts are counted in no connection
+  counter. A cycle begins on ADD_CONN, ENABLE_CONN, RELOAD, a table update and a drop from UP; from DOWN only
+  DISABLE_CONN then ENABLE_CONN (ENABLE_CONN of an enabled connection stays rejected).
+- S6.3 `SFI_ComputeClusters` takes `const` onsets and sorts a local copy of at most `SFI_HISTORY_LEN` entries
+  with no dynamic allocation; the clusters behaviour test checks the caller's array is unchanged and its
+  feedback quotes that sentence.

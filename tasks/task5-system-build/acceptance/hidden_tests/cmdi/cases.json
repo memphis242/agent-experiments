@@ -18,7 +18,7 @@
       "Framed parameter commands": "SET_ENABLE_MASK and SET_MAX_AGE arriving in valid frames take effect from the next frame, while the same commands sent unframed or in a frame with a bad MAC are rejected and change nothing",
       "Table load overrides": "an update of ValTable replaces the key, the allowed sources, MaxAgeSeconds and EnableMask, overriding values set by SET_MAX_AGE and SET_ENABLE_MASK, and later frames are validated against the new table",
       "Table validation": "ValTable validation rejects an all-zero key, MaxAgeSeconds 0 or above 86400, EnableMask bits above 0x0F, the SOURCE bit with no nonzero source and duplicate nonzero sources, each with CMDI_TBL_VAL_ERR_EID, and accepts the boundary values",
-      "Commands and counters": "an unknown function code (CMDI_CC_ERR_EID) and a wrong command length (CMDI_CMD_LEN_ERR_EID) are counted in CommandErrorCounter and change nothing else, a message with an unexpected MID emits CMDI_MID_ERR_EID, and RESET_COUNTERS (CMDI_RESET_INF_EID) zeroes the command counters, FramesReceived, FramesAccepted and the five reason counters but not MaxAgeSeconds or EnableMask"
+      "Commands and counters": "an unknown function code (CMDI_CC_ERR_EID), a wrong command length (CMDI_CMD_LEN_ERR_EID) and a message with an unexpected MID (CMDI_MID_ERR_EID) are each counted once in CommandErrorCounter and change nothing else, every accepted command increments CommandCounter, and RESET_COUNTERS (CMDI_RESET_INF_EID) zeroes the command counters, FramesReceived, FramesAccepted and the five reason counters but not MaxAgeSeconds or EnableMask"
     }
   }
 }

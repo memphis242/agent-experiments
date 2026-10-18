@@ -70,7 +70,7 @@ class Contract(unittest.TestCase):
         self.assertEqual(sorted(sum(check.RUN_ORDER.values(), [])), sorted(check.BY_ID))
         for c in check.CHECKS:
             self.assertEqual(c.check_id.split("-", 1)[0].upper(), c.sub)
-        self.assertTrue(all(c.lane == "ports" for c in check.CHECKS if c.live))
+        self.assertTrue(all(c.lane == "isolated" for c in check.CHECKS if c.live))
 
 
 class Scoring(unittest.TestCase):
@@ -160,6 +160,49 @@ class SidecarName(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             out = Path(d) / "acceptance-result-round1.json"
             self.assertEqual(out.with_name(out.stem + ".subsystems.json").name, "acceptance-result-round1.subsystems.json")
+
+
+class IsolatedLane(unittest.TestCase):
+    def test_groups_cover_the_lane_once(self) -> None:
+        ids = [c for _name, group in check._GROUPS for c in group]
+        self.assertEqual(sorted(ids), sorted(check.RUN_ORDER["isolated"]))
+        self.assertEqual(len(ids), len(set(ids)))
+        ctf = dict(check._GROUPS)["ctf"]
+        self.assertTrue(all(check.BY_ID[c].sub == "S7" for c in ctf))
+
+    def test_group_jobs(self) -> None:
+        import os
+        old = os.environ.pop("T5_PACK_JOBS", None)
+        try:
+            self.assertEqual(check.group_jobs(), check.DEFAULT_GROUP_JOBS)
+            for good, want in (("1", 1), ("32", 32)):
+                os.environ["T5_PACK_JOBS"] = good
+                self.assertEqual(check.group_jobs(), want)
+            for bad in ("0", "-2", "eight", "", "65", "4.5"):
+                os.environ["T5_PACK_JOBS"] = bad
+                with self.assertRaises(ValueError) as cm:
+                    check.group_jobs()
+                self.assertIn("T5_PACK_JOBS", str(cm.exception))
+        finally:
+            os.environ.pop("T5_PACK_JOBS", None)
+            if old is not None:
+                os.environ["T5_PACK_JOBS"] = old
+
+    def test_boot_record_is_shared_between_groups(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            a = check.Ctx(Path(d), Path(d) / "a", 0.0)
+            b = check.Ctx(Path(d), Path(d) / "b", 0.0)
+            a.boot_fail_dir = b.boot_fail_dir = Path(d) / "boot"
+            with a.boot_record() as rec:
+                rec[1].append("first")
+            with b.boot_record() as rec:
+                self.assertEqual(rec[1], ["first"])
+                rec[1].append("second")
+            with a.boot_record() as rec:
+                self.assertEqual((rec[1], rec[2]), (["first", "second"], []))
+                rec[1] = []
+            with b.boot_record() as rec:
+                self.assertEqual(rec[1], [])
 
 
 if __name__ == "__main__":

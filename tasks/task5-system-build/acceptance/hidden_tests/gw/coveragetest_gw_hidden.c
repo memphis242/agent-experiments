@@ -61,6 +61,7 @@ extern void GW_AppMain(void);
 #define EID_REJECT      25
 #define EID_VALTBL_ERR  26
 #define EID_VALTBL_INF  27
+#define EID_TIMEOUT_ERR 28
 
 #define IF_UDP        1
 #define IF_TCP        2
@@ -68,6 +69,7 @@ extern void GW_AppMain(void);
 #define ST_DISABLED   0
 #define ST_UP         1
 #define ST_CONNECTING 2
+#define ST_DOWN       3
 
 #define CONN_SIZE     152
 #define TBL_SIZE      (8 * CONN_SIZE)
@@ -1047,47 +1049,377 @@ static void Test_LoopRule(void)
     UtAssert_True(t5_tx_count(V_E5, from) == 1, "once no enabled connection lists the MID the command is published");
 }
 
-static void Test_Tcp(void)
+/* ------------------------------------------------------------------ TCP connect cycle (S5.2) */
+
+#define ATTEMPT_WAKES 50 /* GW_TCP_ATTEMPT_SEC at 10 WAKEUPs per second */
+#define CYCLE_WAKES   200 /* 4 attempts x GW_TCP_ATTEMPT_SEC */
+
+/* Stream sockets GW holds open. */
+static int stream_socks(void)
+{
+    int k, n = 0;
+    for (k = 0; k < T5_SOCK_MAX; k++) n += t5_sock[k].used && t5_sock[k].stream;
+    return n;
+}
+
+/* Run WAKEUPs until the onboard clock sits on a whole second, so that a cycle begun now has its attempt
+ * starts on whole seconds whatever clock resolution GW uses. */
+static void align_second(void)
+{
+    int guard = 0;
+    while (t5_now_sub > 0x00100000u && guard++ < 20) wakeup();
+}
+
+/* WAKEUPs since the trace began, the wakeup at which each new connect call came, when GW_CONN_TIMEOUT_ERR_EID
+ * and GW_CONN_UP_INF_EID first appeared. */
+typedef struct
+{
+    int w, n, last, ev0, down_at, up_at;
+    int at[16];
+} trace_t;
+
+static void trace_reset(trace_t *tr)
+{
+    memset(tr, 0, sizeof(*tr));
+    tr->last = t5_n_connect;
+    tr->ev0 = t5_nev;
+    tr->down_at = tr->up_at = -1;
+}
+
+static void trace_run(trace_t *tr, int n)
+{
+    int i;
+    for (i = 0; i < n; i++)
+    {
+        if (!wakeup()) return;
+        tr->w++;
+        while (tr->last < t5_n_connect)
+        {
+            if (tr->n < 16) tr->at[tr->n++] = tr->w;
+            tr->last++;
+        }
+        if (tr->down_at < 0 && t5_count_ev(EID_TIMEOUT_ERR, tr->ev0) > 0) tr->down_at = tr->w;
+        if (tr->up_at < 0 && t5_count_ev(EID_UP_INF, tr->ev0) > 0) tr->up_at = tr->w;
+    }
+}
+
+static bool near(int got, int want) { return got >= want - 1 && got <= want + 1; }
+
+/* The event GW_CONN_TIMEOUT_ERR_EID since `from` names the index, RemoteAddr and RemotePort. */
+static bool timeout_ev(int from, unsigned idx, const char *addr, unsigned port)
+{
+    int i;
+    for (i = from; i < t5_nev; i++)
+        if (t5_ev[i].id == EID_TIMEOUT_ERR && has_num(t5_ev[i].text, idx) && strstr(t5_ev[i].text, addr) != NULL &&
+            has_num(t5_ev[i].text, port))
+            return true;
+    return false;
+}
+
+static void Test_TcpNotListening(void)
 {
     conn_t c;
     hk_t a, h;
     cs_t cs[8];
-    uint8 f[256], pkt[64], buf[4096], wr[512];
-    size_t n, pn, sn, off[8], len[8], before, wn;
-    int from, ev0, cnt;
-    unsigned connects;
-    bool clean;
+    int ev0;
     if (!boot(true)) return;
-    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7001, NULL);
+    if (!get_hk(&a)) return;
+    ev0 = t5_nev;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7015, NULL);
+    add_conn(6, &c);
+    UtAssert_True(t5_count_ev(EID_ADD_INF, ev0) == 1 && t5_count_ev(EID_ADD_ERR, ev0) == 0,
+                  "ADD_CONN of an enabled TCP connection whose peer does not listen succeeds with GW_CONN_ADD_INF_EID (a "
+                  "refusing peer is not an open failure)");
+    conn_set(&c, IF_TCP, 0, 0, "127.0.0.1", 7016, NULL);
+    add_conn(7, &c);
+    idx_cmd(CC_ENABLE, 7);
+    UtAssert_True(t5_count_ev(EID_ENABLE_INF, ev0) == 1 && t5_count_ev(EID_ENABLE_ERR, ev0) == 0,
+                  "ENABLE_CONN of a TCP connection whose peer does not listen succeeds with GW_CONN_ENABLE_INF_EID");
+    if (get_cs(cs))
+        UtAssert_True(cs[6].state == ST_CONNECTING && cs[6].en == 1 && cs[7].state == ST_CONNECTING && cs[7].en == 1,
+                      "both connections are CONNECTING while their connect cycle runs (States %u, %u)", cs[6].state,
+                      cs[7].state);
+    if (get_hk(&h))
+        UtAssert_True(h.cfg == a.cfg + 2 && h.cec == a.cec && h.up == 0, "both slots are configured, no command error, "
+                      "ConnectionsUp 0 (%u, %u, %u)", h.cfg, h.cec, h.up);
+    /* Only a socket that cannot be opened is an open failure. */
+    t5_sock_open_rc = OS_ERROR;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7017, NULL);
+    add_rejected(5, &c, "of a TCP connection whose socket cannot be opened");
+    t5_sock_open_rc = OS_SUCCESS;
+    UtAssert_True(t5_connect_waiting == 0, "connect attempts never wait (OS_SocketConnect with a timeout of 0; %d waited)",
+                  t5_connect_waiting);
+}
+
+static void Test_TcpCycleDown(void)
+{
+    conn_t c;
+    hk_t a, h;
+    cs_t cs[8];
+    trace_t tr;
+    uint8 pkt[64];
+    size_t pn;
+    int ev0, n0, from, hb_from, hk_ok, i;
+    if (!boot(true)) return;
+    align_second();
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7009, NULL);
     conn_sub(&c, 0, V_E5);
     ev0 = t5_nev;
-    add_conn(2, &c);
-    UtAssert_True(t5_count_ev(EID_ADD_INF, ev0) == 1, "a TCP connection is added while no listener exists");
-    if (get_cs(cs)) UtAssert_True(cs[2].state == ST_CONNECTING && cs[2].en == 1, "without a listener the TCP connection is "
-                                  "CONNECTING (State %u)", cs[2].state);
+    n0 = t5_n_connect;
+    add_conn(4, &c);
+    UtAssert_True(t5_count_ev(EID_ADD_INF, ev0) == 1, "ADD_CONN to a refusing peer succeeds and begins the connect cycle");
+    UtAssert_True(t5_n_connect - n0 == 1, "the cycle's first attempt starts at once (%d connect calls)", t5_n_connect - n0);
+    UtAssert_True(stream_socks() == 0, "a refused attempt's socket is closed (%d stream sockets open)", stream_socks());
+    trace_reset(&tr);
+    trace_run(&tr, 25);
+    if (get_cs(cs))
+    {
+        UtAssert_True(cs[4].state == ST_CONNECTING && cs[4].en == 1, "the connection is CONNECTING while the cycle runs "
+                      "(State %u)", cs[4].state);
+        UtAssert_True(cs[4].tx == 0 && cs[4].rx == 0 && cs[4].txerr == 0 && cs[4].rxerr == 0, "failed attempts are counted "
+                      "in none of the connection's counters (%u, %u, %u, %u)", (unsigned)cs[4].tx, (unsigned)cs[4].rx,
+                      (unsigned)cs[4].txerr, (unsigned)cs[4].rxerr);
+    }
     if (!get_hk(&a)) return;
-    UtAssert_True(a.up == 0, "ConnectionsUp is 0 while CONNECTING (%u)", a.up);
-    connects = (unsigned)t5_n_connect;
-    wakeups(20);
-    connects = (unsigned)t5_n_connect - connects;
-    UtAssert_True(connects >= 1 && connects <= 4, "while CONNECTING GW retries once per second (%u attempts in 2 s)",
-                  connects);
-    /* Egress to a CONNECTING connection is skipped and counted. */
+    UtAssert_True(a.ingerr == 0, "failed attempts are not ingress errors (%u)", (unsigned)a.ingerr);
     ev0 = t5_nev;
     pn = t5_build_verif(pkt, V_E5, 40, 1, 4);
     t5_deliver(pkt, pn);
     t5_deliver(pkt, pn);
-    t5_deliver(pkt, pn);
-    if (get_hk(&h)) UtAssert_True(h.egerr == a.egerr + 3, "each write skipped while CONNECTING counts an egress error "
-                                  "(%u of 3)", (unsigned)(h.egerr - a.egerr));
+    if (get_hk(&h)) UtAssert_True(h.egerr == a.egerr + 2, "each write to a CONNECTING connection is skipped and counts an "
+                                  "egress error (%u of 2)", (unsigned)(h.egerr - a.egerr));
     UtAssert_True(t5_count_ev(EID_EGRESS_ERR, ev0) == 1, "GW_EGRESS_ERR_EID is sent once for the skipped writes (%d)",
                   t5_count_ev(EID_EGRESS_ERR, ev0));
-    /* The listener appears. */
+    trace_run(&tr, CYCLE_WAKES + 5 - 25);
+    UtAssert_True(tr.n == 3, "a cycle is the first attempt and GW_TCP_MAX_RETRIES (3) retries (%d retries)", tr.n);
+    if (tr.n >= 3)
+        UtAssert_True(near(tr.at[0], 50) && near(tr.at[1], 100) && near(tr.at[2], 150), "attempts start "
+                      "GW_TCP_ATTEMPT_SEC (5) seconds apart, however early the previous one failed (retries at %d, %d and %d "
+                      "wakeups after the first, expected 50, 100 and 150)", tr.at[0], tr.at[1], tr.at[2]);
+    UtAssert_True(near(tr.down_at, CYCLE_WAKES), "the connection enters DOWN at the end of the fourth attempt's period, 20 s "
+                  "after the cycle began (GW_CONN_TIMEOUT_ERR_EID at wakeup %d, expected 200)", tr.down_at);
+    UtAssert_True(t5_count_ev(EID_TIMEOUT_ERR, tr.ev0) == 1, "entering DOWN sends one GW_CONN_TIMEOUT_ERR_EID (28) (%d)",
+                  t5_count_ev(EID_TIMEOUT_ERR, tr.ev0));
+    UtAssert_True(t5_last_ev_type(EID_TIMEOUT_ERR) == CFE_EVS_EventType_ERROR, "event 28 is ERROR type");
+    UtAssert_True(timeout_ev(tr.ev0, 4, "127.0.0.1", 7009), "GW_CONN_TIMEOUT_ERR_EID names the connection index 4, "
+                  "RemoteAddr 127.0.0.1 and RemotePort 7009 (%s)", t5_last_ev_text(EID_TIMEOUT_ERR, tr.ev0) ?
+                  t5_last_ev_text(EID_TIMEOUT_ERR, tr.ev0) : "no event");
+    if (get_cs(cs)) UtAssert_True(cs[4].state == ST_DOWN && cs[4].en == 1, "after the cycle the connection is DOWN (3) and "
+                                  "Enabled stays 1 (State %u, Enabled %u)", cs[4].state, cs[4].en);
+    /* DOWN: no further attempt; the rest of GW keeps running. */
+    hb_from = t5_ntx;
+    hk_ok = 0;
+    for (i = 0; i < 6; i++)
+    {
+        trace_run(&tr, 50);
+        hk_ok += get_hk(&h) ? 1 : 0;
+    }
+    UtAssert_True(tr.n == 3, "a DOWN connection makes no further attempt (%d retries after 30 s more)", tr.n);
+    UtAssert_True(t5_count_ev(EID_TIMEOUT_ERR, tr.ev0) == 1, "GW_CONN_TIMEOUT_ERR_EID is not repeated while DOWN (%d)",
+                  t5_count_ev(EID_TIMEOUT_ERR, tr.ev0));
+    UtAssert_True(t5_tx_count(SFI_HB_MID, hb_from) == 30 && hk_ok == 6, "housekeeping and heartbeats keep flowing while a "
+                  "connection is DOWN (%d heartbeats in 30 s, %d of 6 housekeeping replies)", t5_tx_count(SFI_HB_MID, hb_from),
+                  hk_ok);
+    if (h.up != 0) UtAssert_Failed("ConnectionsUp is %u with the only connection DOWN", h.up);
+    from = (int)h.egerr;
+    t5_deliver(pkt, pn);
+    if (get_hk(&h)) UtAssert_True(h.egerr == (uint32)from + 1, "a write to a DOWN connection is skipped and counts an egress "
+                                  "error (%u -> %u)", (unsigned)from, (unsigned)h.egerr);
+    UtAssert_True(stream_socks() == 0, "no socket is left open after the cycle (%d)", stream_socks());
+    UtAssert_True(t5_connect_waiting == 0 && t5_connect_again == 0, "connect calls never wait and never repeat on an "
+                  "attempt in progress (%d, %d)", t5_connect_waiting, t5_connect_again);
+}
+
+static void Test_TcpCycleRestart(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    hk_t h;
+    trace_t tr;
+    int ev0, n;
+    if (!boot(true)) return;
+    align_second();
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7010, NULL);
+    add_conn(4, &c);
+    trace_reset(&tr);
+    trace_run(&tr, CYCLE_WAKES + 5);
+    if (!(get_cs(cs) && UtAssert_True(cs[4].state == ST_DOWN, "set-up: the connection is DOWN after a refused cycle (%u)",
+                                      cs[4].state)))
+        return;
     ev0 = t5_nev;
+    n = t5_n_connect;
+    idx_cmd(CC_DISABLE, 4);
+    UtAssert_True(t5_count_ev(EID_DISABLE_INF, ev0) == 1, "DISABLE_CONN of a DOWN connection succeeds");
+    if (get_cs(cs)) UtAssert_True(cs[4].state == ST_DISABLED && cs[4].en == 0, "after DISABLE_CONN the connection is "
+                                  "DISABLED (State %u)", cs[4].state);
+    align_second();
+    UtAssert_True(t5_n_connect == n, "a disabled connection makes no attempt");
+    idx_cmd(CC_ENABLE, 4);
+    UtAssert_True(t5_count_ev(EID_ENABLE_INF, ev0) == 1, "ENABLE_CONN from DOWN succeeds with GW_CONN_ENABLE_INF_EID");
+    UtAssert_True(t5_n_connect == n + 1, "ENABLE_CONN begins a new connect cycle with its first attempt at once (%d "
+                  "connect calls)", t5_n_connect - n);
+    if (get_cs(cs)) UtAssert_True(cs[4].state == ST_CONNECTING && cs[4].en == 1, "the new cycle is CONNECTING (State %u)",
+                                  cs[4].state);
+    trace_reset(&tr);
+    trace_run(&tr, 10);
+    t5_listen[0] = 7010;
+    trace_run(&tr, 50);
+    UtAssert_True(near(tr.up_at, 50), "the new cycle's next attempt, 5 s after its first, reaches UP once the peer listens "
+                  "(GW_CONN_UP_INF_EID at wakeup %d, expected 50)", tr.up_at);
+    if (get_cs(cs)) UtAssert_True(cs[4].state == ST_UP, "the connection is UP (State %u)", cs[4].state);
+    if (get_hk(&h)) UtAssert_True(h.up == 1, "ConnectionsUp is 1 (%u)", h.up);
+}
+
+static void Test_TcpPeerDrop(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    trace_t tr;
+    uint8 f[256], wr[512];
+    size_t n;
+    int from;
+    if (!boot(true)) return;
+    t5_listen[0] = 7011;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7011, NULL);
+    add_conn(3, &c);
+    if (!(get_cs(cs) && UtAssert_True(cs[3].state == ST_UP, "a TCP connection to a listening peer is UP at once (State %u)",
+                                      cs[3].state)))
+        return;
+    align_second();
+    t5_listen[0] = 0;
+    t5_tcp_close_peer(7011);
+    trace_reset(&tr);
+    trace_run(&tr, 3);
+    UtAssert_True(tr.n >= 1 && tr.at[0] <= 2, "when an UP connection drops, a new connect cycle begins with an attempt at once "
+                  "(first attempt at wakeup %d after the peer closed)", tr.n >= 1 ? tr.at[0] : -1);
+    if (get_cs(cs)) UtAssert_True(cs[3].state == ST_CONNECTING, "the dropped connection is CONNECTING (State %u)", cs[3].state);
+    t5_listen[0] = 7011;
+    trace_run(&tr, 55);
+    UtAssert_True(tr.n >= 2 && near(tr.at[1] - tr.at[0], 50), "the next attempt starts 5 s after the first (%d wakeups)",
+                  tr.n >= 2 ? tr.at[1] - tr.at[0] : -1);
+    UtAssert_True(tr.up_at > 0 && tr.n >= 2 && tr.up_at == tr.at[1], "that attempt reaches UP with GW_CONN_UP_INF_EID");
+    from = t5_ntx;
+    n = noop_frame(f, KEY0, 1, 0);
+    t5_tcp_write(7011, wr, framed(wr, NULL, 0, f, n));
+    wakeup();
+    UtAssert_True(noops_since(from) == 1, "traffic flows after the new cycle reached UP");
+}
+
+static void Test_TcpCompletedLater(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    trace_t tr;
+    uint8 f[256], wr[512], pkt[64], buf[4096];
+    size_t n, pn, sn, off[4], len[4];
+    int from, n0, cnt;
+    bool clean;
+    if (!boot(true)) return;
+    align_second();
+    t5_listen_pending[0] = 7012;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7012, NULL);
+    conn_sub(&c, 0, V_E5);
+    n0 = t5_n_connect;
+    add_conn(2, &c);
+    UtAssert_True(t5_n_connect - n0 == 1 && stream_socks() == 1, "an attempt in progress keeps its socket (%d connect calls, "
+                  "%d sockets)", t5_n_connect - n0, stream_socks());
+    trace_reset(&tr);
+    trace_run(&tr, 20);
+    UtAssert_True(tr.n == 0 && t5_connect_again == 0, "GW polls an attempt in progress without calling OS_SocketConnect "
+                  "again (%d more connect calls, %d on the in-progress socket)", tr.n, t5_connect_again);
+    if (get_cs(cs)) UtAssert_True(cs[2].state == ST_CONNECTING, "the connection is CONNECTING while the attempt is in "
+                                  "progress (State %u)", cs[2].state);
+    t5_tcp_complete(7012, true);
+    trace_run(&tr, 2);
+    UtAssert_True(tr.up_at == 21, "a socket that becomes writable is UP on the next WAKEUP (GW_CONN_UP_INF_EID at wakeup %d "
+                  "after the peer accepted)", tr.up_at < 0 ? -1 : tr.up_at - 20);
+    UtAssert_True(tr.n == 0 && t5_connect_again == 0 && t5_connect_waiting == 0, "the completed attempt is not connected "
+                  "again (%d connect calls, %d repeated, %d waiting)", tr.n, t5_connect_again, t5_connect_waiting);
+    if (get_cs(cs)) UtAssert_True(cs[2].state == ST_UP, "the connection is UP (State %u)", cs[2].state);
+    pn = t5_build_verif(pkt, V_E5, 40, 5, 4);
+    t5_deliver(pkt, pn);
+    sn = t5_stream_out(7012, -1, buf, sizeof(buf));
+    cnt = stream_frames(buf, sn, off, len, 4, &clean);
+    UtAssert_True(cnt == 1 && clean, "egress flows on the completed connection (%d frames)", cnt);
+    from = t5_ntx;
+    n = noop_frame(f, KEY0, 1, 0);
+    t5_tcp_write(7012, wr, framed(wr, NULL, 0, f, n));
+    wakeup();
+    UtAssert_True(noops_since(from) == 1, "ingress flows on the completed connection");
+    /* Readable at completion: the data decides the attempt and goes to the deframer. */
+    t5_listen_pending[1] = 7013;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7013, NULL);
+    add_conn(1, &c);
+    wakeup();
+    t5_tcp_complete(7013, true);
+    from = t5_ntx;
+    n = noop_frame(f, KEY0, 1, 0);
+    t5_tcp_write(7013, wr, framed(wr, NULL, 0, f, n));
+    trace_reset(&tr);
+    trace_run(&tr, 2);
+    if (get_cs(cs)) UtAssert_True(cs[1].state == ST_UP, "an attempt whose socket is readable with data is UP (State %u)",
+                                  cs[1].state);
+    UtAssert_True(noops_since(from) == 1, "the data that decided the attempt goes to the stream deframer (%d published)",
+                  noops_since(from));
+    UtAssert_True(t5_connect_again == 0, "no connect call is repeated (%d)", t5_connect_again);
+}
+
+static void Test_TcpAttemptTimeout(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    trace_t tr;
+    if (!boot(true)) return;
+    align_second();
+    t5_listen_pending[0] = 7014;
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7014, NULL);
+    add_conn(2, &c);
+    trace_reset(&tr);
+    trace_run(&tr, 45);
+    UtAssert_True(tr.n == 0 && stream_socks() == 1, "an undecided attempt stays in progress before 5 s (%d new attempts, %d "
+                  "sockets)", tr.n, stream_socks());
+    trace_run(&tr, 10);
+    UtAssert_True(tr.n == 1 && near(tr.at[0], 50), "an attempt still undecided GW_TCP_ATTEMPT_SEC (5) seconds after it "
+                  "started fails and the next attempt starts (at wakeup %d, expected 50)", tr.n >= 1 ? tr.at[0] : -1);
+    UtAssert_True(stream_socks() == 1, "the failed attempt's socket is closed (%d stream sockets open, expected the new "
+                  "attempt's only)", stream_socks());
+    trace_run(&tr, 15);
+    t5_tcp_complete(7014, false);
+    trace_run(&tr, 2);
+    UtAssert_True(stream_socks() == 0, "an attempt that ends in failure (readable, the read reports an error) closes its "
+                  "socket (%d open)", stream_socks());
+    if (get_cs(cs)) UtAssert_True(cs[2].state == ST_CONNECTING, "the cycle goes on CONNECTING (State %u)", cs[2].state);
+    trace_run(&tr, CYCLE_WAKES + 5 - tr.w);
+    UtAssert_True(tr.n == 3 && near(tr.at[1], 100) && near(tr.at[2], 150), "the next attempts still start 5 s apart from "
+                  "the previous start, not earlier after an early failure (at %d and %d, expected 100 and 150)",
+                  tr.n >= 2 ? tr.at[1] : -1, tr.n >= 3 ? tr.at[2] : -1);
+    UtAssert_True(near(tr.down_at, CYCLE_WAKES), "a cycle of undecided attempts ends in DOWN at 20 s (wakeup %d)",
+                  tr.down_at);
+    UtAssert_True(stream_socks() == 0 && t5_connect_again == 0, "no socket is left open and no connect call is repeated "
+                  "(%d, %d)", stream_socks(), t5_connect_again);
+    if (get_cs(cs)) UtAssert_True(cs[2].state == ST_DOWN, "the connection is DOWN (State %u)", cs[2].state);
+}
+
+static void Test_Tcp(void)
+{
+    conn_t c;
+    hk_t a, h;
+    trace_t tr;
+    uint8 f[256], pkt[64], buf[4096], wr[512];
+    size_t n, pn, sn, off[8], len[8], before, wn;
+    int from, ev0, cnt;
+    bool clean;
+    if (!boot(true)) return;
+    align_second();
+    conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7001, NULL);
+    conn_sub(&c, 0, V_E5);
+    add_conn(2, &c);
+    trace_reset(&tr);
+    trace_run(&tr, 10);
     t5_listen[0] = 7001;
-    UtAssert_True(wait_state(2, ST_UP, 15), "the TCP connection reaches UP once a listener appears");
-    UtAssert_True(t5_count_ev(EID_UP_INF, ev0) == 1, "reaching UP sends GW_CONN_UP_INF_EID (20) (%d)",
-                  t5_count_ev(EID_UP_INF, ev0));
+    trace_run(&tr, 45);
+    UtAssert_True(near(tr.up_at, 50), "a TCP connection reaches UP at its next attempt once the listener appears "
+                  "(GW_CONN_UP_INF_EID at wakeup %d, expected 50)", tr.up_at);
     if (get_hk(&h)) UtAssert_True(h.up == 1, "ConnectionsUp is 1 (%u)", h.up);
     /* Egress: marker then frame. */
     before = t5_stream_out(7001, -1, buf, sizeof(buf));
@@ -1142,36 +1474,25 @@ static void Test_Tcp(void)
     wakeup();
     UtAssert_True(noops_since(from) == 4, "a frame with a bad MAC on TCP is not published");
     if (get_hk(&h)) UtAssert_True(h.hmac == a.hmac + 1, "it counts under HmacErrors (%u of 1)", (unsigned)(h.hmac - a.hmac));
-    /* Peer close with the listener gone: back to CONNECTING; then reconnect. */
-    t5_listen[0] = 0;
-    t5_tcp_close_peer(7001);
-    UtAssert_True(wait_state(2, ST_CONNECTING, 5), "a peer close returns the connection to CONNECTING");
-    ev0 = t5_nev;
-    t5_listen[0] = 7001;
-    UtAssert_True(wait_state(2, ST_UP, 15), "GW reconnects when the listener is back");
-    UtAssert_True(t5_count_ev(EID_UP_INF, ev0) == 1, "reaching UP again sends GW_CONN_UP_INF_EID");
-    n = noop_frame(f, KEY0, 1, 0);
-    t5_tcp_write(7001, wr, framed(wr, NULL, 0, f, n));
-    wakeup();
-    UtAssert_True(noops_since(from) == 5, "traffic flows after the reconnect");
 }
 
 static void Test_TcpReadFailure(void)
 {
     conn_t c;
     hk_t a, h;
-    int ev0;
+    int ev0, n;
     if (!boot(true)) return;
     t5_listen[0] = 7002;
     conn_set(&c, IF_TCP, 1, 0, "127.0.0.1", 7002, NULL);
     add_conn(3, &c);
-    if (!wait_state(3, ST_UP, 15))
+    if (!wait_state(3, ST_UP, 3))
     {
-        UtAssert_Failed("the TCP connection to a listener does not reach UP");
+        UtAssert_Failed("the TCP connection to a listening peer does not reach UP");
         return;
     }
     if (!get_hk(&a)) return;
     ev0 = t5_nev;
+    n = t5_n_connect;
     fail_stream_read = true;
     t5_tcp_write(7002, "\x01", 1);
     wakeup();
@@ -1180,7 +1501,10 @@ static void Test_TcpReadFailure(void)
                                   (unsigned)a.ingerr, (unsigned)h.ingerr);
     UtAssert_True(t5_count_ev(EID_INGRESS_ERR, ev0) == 1, "a read failure sends GW_INGRESS_ERR_EID (23) (%d)",
                   t5_count_ev(EID_INGRESS_ERR, ev0));
-    UtAssert_True(wait_state(3, ST_UP, 15), "after an I/O error the TCP connection reconnects (CONNECTING, then UP)");
+    wakeup();
+    UtAssert_True(t5_n_connect > n, "the I/O error begins a new connect cycle with an attempt at once (%d connect calls "
+                  "within 2 wakeups)", t5_n_connect - n);
+    UtAssert_True(wait_state(3, ST_UP, 3), "with the peer still listening that attempt reaches UP");
 }
 
 static void Test_Serial(void)
@@ -1568,6 +1892,12 @@ void UtTest_Setup(void)
     UtTest_Add(Test_LoopRule, Setup, Teardown, "Loop rule");
     UtTest_Add(Test_Tcp, Setup, Teardown, "TCP connection and stream framing");
     UtTest_Add(Test_TcpReadFailure, Setup, Teardown, "TCP read failure");
+    UtTest_Add(Test_TcpNotListening, Setup, Teardown, "TCP peer not listening is no failure");
+    UtTest_Add(Test_TcpCycleDown, Setup, Teardown, "TCP connect cycle ends in DOWN");
+    UtTest_Add(Test_TcpCycleRestart, Setup, Teardown, "TCP cycle restarted from DOWN");
+    UtTest_Add(Test_TcpPeerDrop, Setup, Teardown, "TCP peer drop begins a new cycle");
+    UtTest_Add(Test_TcpCompletedLater, Setup, Teardown, "TCP attempt completed later");
+    UtTest_Add(Test_TcpAttemptTimeout, Setup, Teardown, "TCP attempt undecided after 5 s");
     UtTest_Add(Test_Serial, Setup, Teardown, "Serial connection and stream framing");
     UtTest_Add(Test_SerialIdle, Setup, Teardown, "Serial reads never block");
     UtTest_Add(Test_Restart, Setup, Teardown, "Restart with an existing serial mapping");

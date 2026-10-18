@@ -2,7 +2,7 @@
   "s6-hidden-sfi-clusters": {
     "runner": "hidden_clusters",
     "prefix": "",
-    "base": "SFI_ComputeClusters in fsw/src/sfi_cluster.c (declared in fsw/src/sfi_cluster.h with the pinned signature and SFI_ClusterResult_t) must, for onsets in any order, sort them by full time (subseconds included) and report ClusterCount, LargestClusterSize and Correlation, where a cluster is a maximal run in which each consecutive pair is at most WindowSec apart, without modifying the onsets passed in.",
+    "base": "SFI_ComputeClusters in fsw/src/sfi_cluster.c (declared in fsw/src/sfi_cluster.h with the pinned signature and SFI_ClusterResult_t) must, for onsets in any order, sort them by full time (subseconds included) and report ClusterCount, LargestClusterSize and Correlation, where a cluster is a maximal run in which each consecutive pair is at most WindowSec apart. SFI_ComputeClusters must not modify the caller's Onsets array: it is const, and casting the qualifier away is not allowed. It sorts a local copy of at most SFI_HISTORY_LEN entries, with no dynamic allocation.",
     "cases": {
       "No recent misses": "with no onsets the result is ClusterCount 0, LargestClusterSize 0 and Correlation NONE (0)",
       "A single miss": "a single onset is one cluster of size 1 with Correlation UNCORRELATED (1)",
@@ -14,7 +14,8 @@
       "Chained onsets": "a cluster is a chain: consecutive gaps of at most W join onsets even when the first and last are further apart",
       "Largest cluster": "LargestClusterSize is the size of the largest cluster wherever it lies",
       "Sixteen onsets": "a full history of 16 onsets is evaluated",
-      "Large onset times": "onset seconds anywhere in the 32-bit range are compared without overflow or wrap-around"
+      "Large onset times": "onset seconds anywhere in the 32-bit range are compared without overflow or wrap-around",
+      "Onsets in read-only storage": "onsets the caller passes in read-only storage are evaluated without being written to (the const array is never modified, sorted in place or cast to a writable pointer)"
     }
   }
 }

@@ -737,6 +737,10 @@ static void Test_CommandsAndCounters(void)
     deliver_unknown_mid();
     UtAssert_True(t5_count_ev(EID_MID_ERR, 0) == 1, "a message with an unexpected MID emits CMDI_MID_ERR_EID (5)");
     UtAssert_True(t5_last_ev_type(EID_MID_ERR) == CFE_EVS_EventType_ERROR, "event 5 is ERROR");
+    if (get_hk(&h))
+        UtAssert_True(h.cec == (uint8)(a.cec + 1) && h.cc == a.cc,
+                      "the unexpected MID counts as one rejected command (CommandErrorCounter %u -> %u, CommandCounter %u -> %u)",
+                      a.cec, h.cec, a.cc, h.cc);
     cmd_max_age(77);
     cmd_mask(0x0B);
     cmd(CC_RESET, NULL, 0);

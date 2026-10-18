@@ -16,7 +16,7 @@
       "S1 Purge after priority change": "run-time SET_PRIORITY and SET_PURGE_THRESHOLD change which files are purged first",
       "S1 Telemetry quota drops": "a packet that would take TelemetryBytesUsed over TelemetryQuotaBytes is dropped (Dropped, PacketsDropped) with event 13 once per entry until it stores again, and SET_PURGE_THRESHOLD frees space",
       "S1 Parameter commands": "SET_PRIORITY, SET_DECIMATION (value 0 or unknown MsgId) and SET_PURGE_THRESHOLD (outside 1..100) are rejected with event 17 and a command error; valid values are accepted with event 16",
-      "S1 Command errors": "an invalid function code gives event 2, a wrong command length event 6, an unknown message ID event 5, each counted as a command error",
+      "S1 Command errors": "an invalid function code gives event 2, a wrong command length event 6 and an unknown message ID event 5, each counted once in CommandErrorCounter and not in CommandCounter",
       "S1 Command counters": "every accepted command (including SEND_STATS, LIST_DIR, LIST_ALL, CLOSE_FILES and the file commands) increments CommandCounter, and every rejected one increments CommandErrorCounter and nothing else",
       "S1 Reset counters": "RESET_COUNTERS zeroes the command, packet, purge and file-add counters and all per-entry counters without touching byte accounting, FileCount, open files or run-time parameters",
       "S1 File add and delete": "ADD_FILE copies the source into the file area creating directories (event 22) and rejects an existing destination (20), an unreadable source (19) and a quota overrun (21, FileAddsRejected, no partial file); DELETE_FILE removes a regular file (24) and reports a missing file or directory (23)",

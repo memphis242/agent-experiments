@@ -321,9 +321,11 @@ def c_table_update(ctx: "Ctx") -> None:
 def c_class_map(ctx: "Ctx") -> None:
     n = boot(ctx, (1,))[1]
     p = Problems()
+    before = n.hk("TLMO")["CommandCounter"]
     mark = n.g.mark()
     cm = class_map(n)
     p.check(bool(n.wait_event(mark, "TLMO", EID["CLASS_MAP_INF"])), "SEND_CLASS_MAP produced no TLMO_CLASS_MAP_INF_EID")
+    p.check(n.hk("TLMO")["CommandCounter"] == (before + 1) % 256, "SEND_CLASS_MAP did not increment CommandCounter")
     image = tb.TlmoTable.unpack(tb.split_image(n.table_image("TLMO"), "TLMO")[1])
     p.check(cm.budget == 16 and cm.count == 48, f"class map budget/StreamCount {cm.budget}/{cm.count} != 16/48")
     p.check(tuple(cm.streams) == tuple(image.streams), "the class map slots differ from the runtime list loaded from the table")
@@ -340,6 +342,7 @@ def c_tlmo_commands(ctx: "Ctx") -> None:
     mark = n.g.mark()
     n.cmd("TLMO", "NOOP")
     p.check(bool(n.wait_event(mark, "TLMO", EID["NOOP_INF"])), "NOOP produced no event 3")
+    p.check(n.hk("TLMO")["CommandCounter"] == (hk["CommandCounter"] + 1) % 256, "NOOP did not increment CommandCounter")
     n.cmd("TLMO", "SET_BUDGET", budget_payload(999))
     mark = n.g.mark()
     n.cmd("TLMO", "RESET_COUNTERS")
@@ -353,6 +356,10 @@ def c_tlmo_commands(ctx: "Ctx") -> None:
     time.sleep(0.5)
     p.check(bool(n.events(mark, "TLMO", EID["CC_ERR"])) and bool(n.events(mark, "TLMO", EID["CMD_LEN_ERR"])),
             "an unknown function code and a wrong length did not produce events 2 and 6")
+    h3 = n.hk("TLMO")
+    p.check(h3["CommandErrorCounter"] == h2["CommandErrorCounter"] + 2 and h3["CommandCounter"] == h2["CommandCounter"],
+            f"two rejected commands moved CommandErrorCounter/CommandCounter {h2['CommandErrorCounter']}/{h2['CommandCounter']} -> "
+            f"{h3['CommandErrorCounter']}/{h3['CommandCounter']} (expected +2/+0)")
     p.raise_if()
 
 

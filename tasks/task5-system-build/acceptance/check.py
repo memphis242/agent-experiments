@@ -5,15 +5,20 @@ Usage: check.py <repo-path> <out.json>
 
 The repository is copied to scratch space and built there; the original is never modified. Checks are
 graded per subsystem (S1..S7, N) and overall. Three lanes run in parallel after the build:
-  ports  every check that binds the fixed node ports (live checks, the harness CLI, CTF scripts), in order;
-  cpu    unit tests, coverage, then the black-box component tests;
-  misc   static checks, the fresh CTF set-up, plugin listing and the CCDD layout probe.
+  isolated  every check that binds the fixed node ports (live checks, the harness CLI, CTF scripts), in groups
+            that each run in their own nested user, network, mount, IPC and PID namespaces (isolation.py,
+            live_worker.py), T5_PACK_JOBS groups at a time (default 8); checks of one group share nodes and run
+            in order;
+  cpu       unit tests, coverage, then the black-box component tests;
+  misc      static checks, the fresh CTF set-up, plugin listing and the CCDD layout probe.
 The result file has exactly the contract's keys; the per-subsystem summary is written next to it as
 <out-stem>.subsystems.json and printed. Exit status: 0 every check passed, 1 at least one failed,
 2 an infrastructure fault before the agent's code was used.
 """
 from __future__ import annotations
 
+import contextlib
+import fcntl
 import json
 import os
 import re
@@ -25,7 +30,8 @@ import tempfile
 import threading
 import time
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -34,6 +40,7 @@ sys.path.insert(0, str(PACK))
 
 import ctf_checks as cc  # noqa: E402
 import harness_checks as hc  # noqa: E402
+import isolation  # noqa: E402
 import live_cmdi as l3  # noqa: E402
 import live_gw as l5  # noqa: E402
 import live_nodes as ln  # noqa: E402
@@ -48,6 +55,7 @@ from node import Node  # noqa: E402
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TOTAL_BUDGET_S = 44 * 60
 JOBS = "-j16"
+DEFAULT_GROUP_JOBS = 8
 SUBSYSTEMS = {
     "S1": "S1 STOR base", "S2": "S2 STOR transfer", "S3": "S3 CMDVAL and CMDI", "S4": "S4 TLMO", "S5": "S5 GW",
     "S6": "S6 SFI", "S7": "S7 CTF system tests", "N": "N Non-functional and common conventions",
@@ -97,6 +105,7 @@ class Ctx:
         self.cache: dict[str, object] = {}
         self.end_callbacks: list[Callable[[], None]] = []
         self.boot_failures: dict[int, list[str]] = {1: [], 2: []}
+        self.boot_fail_dir: Path | None = None  # set when several isolated groups share the start-up record
         self.pristine_cache: dict[int, dict[str, bytes]] = {}
         self.hidden: HiddenTests | None = None
         self.ctf: cc.CtfEnv | None = None
@@ -169,6 +178,25 @@ class Ctx:
         return self.pristine_cache[node]
 
     # -- sessions -------------------------------------------------------------------
+    @contextlib.contextmanager
+    def boot_record(self) -> Iterator[dict[int, list[str]]]:
+        """Node start-up failures since each node's last successful start, shared by every isolated group when
+        boot_fail_dir is set (a file under an exclusive lock), else this process's own record."""
+        if self.boot_fail_dir is None:
+            yield self.boot_failures
+            return
+        self.boot_fail_dir.mkdir(parents=True, exist_ok=True)
+        state = self.boot_fail_dir / "boot-failures.json"
+        with open(self.boot_fail_dir / "lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            record = {1: [], 2: []}
+            if state.is_file():
+                record.update({int(k): v for k, v in json.loads(state.read_text()).items()})
+            yield record
+            tmp = state.with_suffix(".tmp")
+            tmp.write_text(json.dumps(record))
+            tmp.replace(state)
+
     def on_session_end(self, fn: Callable[[], None]) -> None:
         self.end_callbacks.append(fn)
 
@@ -188,9 +216,10 @@ class Ctx:
                 startup_edit: Callable[[str], str] | None = None) -> dict[int, Node]:
         self.build()
         self.shutdown_session()
-        for nid in nodes:
-            if len(self.boot_failures[nid]) >= 2:
-                raise PrereqFail(f"cpu{nid} could not be started earlier in this review: {self.boot_failures[nid][-1]}")
+        with self.boot_record() as record:
+            for nid in nodes:
+                if len(record[nid]) >= 2:
+                    raise PrereqFail(f"cpu{nid} could not be started earlier in this review: {record[nid][-1]}")
         self.timeout_for(90)
         self.session_no += 1
         started: dict[int, Node] = {}
@@ -201,9 +230,11 @@ class Ctx:
                 try:
                     n.start()
                 except PrereqFail as exc:
-                    self.boot_failures[nid].append(str(exc))
+                    with self.boot_record() as record:
+                        record[nid].append(str(exc))
                     raise
-                self.boot_failures[nid] = []
+                with self.boot_record() as record:
+                    record[nid] = []
                 started[nid] = n
                 self.nodes[nid] = n
         except BaseException:
@@ -297,96 +328,96 @@ CHECKS: list[CheckSpec] = [
       "within the age window.", st.c_system_report, "misc"),
     C("n-run-scripts", "N", "C.1 Nodes (run scripts)", "CFS_CPU=cpu2 tools/run_cfs.sh must start core-cpu2 from exe/cpu2 with "
       "its log and PID in build-native_std/run/cpu2/, cpu1 must keep build-native_std/run/cfs.log, and tools/stop_cfs.sh "
-      "with the same CFS_CPU must stop the node.", ln.c_run_scripts, "ports", live=True),
+      "with the same CFS_CPU must stop the node.", ln.c_run_scripts, "isolated", live=True),
     C("n-nodes-operational", "N", "C.1 Nodes and C.6 Mission integration", "cpu1 and cpu2 started with tools/run_cfs.sh "
       "(CFS_CPU=cpu2) must run at the same time and reach OPERATIONAL with the initialization events of STOR, CMDI, TLMO, GW "
-      "and SFI and without CI_LAB or TO_LAB.", ln.c_nodes_operational, "ports", live=True),
+      "and SFI and without CI_LAB or TO_LAB.", ln.c_nodes_operational, "isolated", live=True),
     C("n-ram-disks-distinct", "N", "C.1 Nodes (RAM disks)", "cpu1 and cpu2 must not share one OSAL RAM disk directory while "
       "both run (on this host both default to /dev/shm/osal:RAM); make each node's RAM disk distinct.",
-      ln.c_ram_disks_distinct, "ports", live=True),
+      ln.c_ram_disks_distinct, "isolated", live=True),
     C("n-node-clocks", "N", "S5.2 Egress framing (node clocks)", "The onboard clocks of cpu1 and cpu2 started with "
       "tools/run_cfs.sh must agree within the table's MaxAgeSeconds (30 s) so that the two gateways accept each other's frames.",
-      ln.c_node_clocks, "ports", live=True),
+      ln.c_node_clocks, "isolated", live=True),
     # ---------------------------------------------------------------- S1
     C("s1-default-table", "S1", "S1.1 Table", "The installed StorageTable (/cf/stor_tbl.tbl, 400 bytes) of each node must default "
       "to roots /cf/stor/tlm and /cf/stor/files, quotas 262144 and 1048576, MaxPacketFileBytes 16384, threshold 80 and the "
       "entries CFE_EVS_HK_TLM_MID (10, 1), CFE_ES_HK_TLM_MID (20, 1), SAMPLE_APP_HK_TLM_MID (30, 2), CFE_TIME_HK_TLM_MID (40, 1) "
       "with that node's MIDs.", table("STOR"), "misc"),
     C("s1-scheduled-housekeeping", "S1", "S1.5 Housekeeping", "STOR housekeeping (0x08C4) must reach UDP 2234 through TLMO "
-      "without any request, scheduled every 4.9 s.", l12.c_scheduled_housekeeping, "ports", live=True),
+      "without any request, scheduled every 4.9 s.", l12.c_scheduled_housekeeping, "isolated", live=True),
     C("s1-startup-and-hk", "S1", "S1.5 Housekeeping and events", "STOR must emit its initialization event (1) once and answer a "
       "framed SEND_HK with STOR_HkTlm_t in the specified field order (72-byte payload) reporting the default quotas, threshold 80, "
       "ActiveEntries 4 and idle transfer fields; NOOP increments CommandCounter with event 3; the default entries are stored.",
-      l12.c_startup_and_hk, "ports", live=True),
+      l12.c_startup_and_hk, "isolated", live=True),
     C("s1-decimation-and-stats", "S1", "S1.2 Telemetry storage (decimation) and S1.4 SEND_STATS", "STOR must store a packet only "
       "when (Received - 1) % Decimation == 0, count the others as Decimated, report per entry MsgId, Priority, Decimation, "
       "Received, Stored, Decimated and Dropped in STOR_StatsTlm_t, and apply SET_DECIMATION and SET_PRIORITY at run time; tables "
-      "naming reserved MIDs are loaded through cFE Table Services.", l12.c_decimation_and_stats, "ports", live=True),
+      "naming reserved MIDs are loaded through cFE Table Services.", l12.c_decimation_and_stats, "isolated", live=True),
     C("s1-packet-file-naming", "S1", "S1.2 Telemetry storage (packet files)", "Stored packets must be appended unchanged to "
       "<TelemetryRoot>/tlm_<MMMM>_<NNNNNNNN>.bin starting with a CFE_FS_Header_t of sub type 0x5354 and description "
       "\"STOR packet file\"; CLOSE_FILES closes them with event 27 and TelemetryBytesUsed equals the bytes on disk.",
-      l12.c_packet_file_naming, "ports", live=True),
+      l12.c_packet_file_naming, "isolated", live=True),
     C("s1-rollover", "S1", "S1.2 Telemetry storage (roll-over)", "STOR must close a packet file and open the next sequence before "
       "a packet would make it exceed MaxPacketFileBytes (exactly filling it is allowed), with sequences per MID from 0.",
-      l12.c_rollover, "ports", live=True),
+      l12.c_rollover, "isolated", live=True),
     C("s1-idle-file-close", "S1", "S1.2 WAKEUP (idle close)", "On every 1 Hz WAKEUP STOR must close packet files not written for "
-      "10 s or more, and not earlier.", l12.c_idle_file_close, "ports", live=True),
+      "10 s or more, and not earlier.", l12.c_idle_file_close, "isolated", live=True),
     C("s1-purge-order", "S1", "S1.2 Purge", "While TelemetryBytesUsed exceeds PurgeThresholdPercent of TelemetryQuotaBytes, after "
       "every store and on every WAKEUP, STOR must delete one closed packet file at a time, lowest current priority first and "
       "lowest sequence first, counting FilesPurged and PurgeCycles; run-time SET_PRIORITY changes the order.",
-      l12.c_purge_order, "ports", live=True),
+      l12.c_purge_order, "isolated", live=True),
     C("s1-purge-archived-first", "S1", "S1.2 Purge (archived files)", "Archived (.arc) packet files count as packet files and must "
-      "be purged before any .bin file, whatever their MID's priority.", l12.c_purge_archived_first, "ports", live=True),
+      "be purged before any .bin file, whatever their MID's priority.", l12.c_purge_archived_first, "isolated", live=True),
     C("s1-quota-drop", "S1", "S1.2 Quota", "A packet that would take TelemetryBytesUsed over TelemetryQuotaBytes (a new file's "
       "header included) must be dropped (Dropped, PacketsDropped) with STOR_TLM_QUOTA_ERR_EID once per entry until it stores "
-      "again; SET_PURGE_THRESHOLD triggers a purge check.", l12.c_quota_drop, "ports", live=True),
+      "again; SET_PURGE_THRESHOLD triggers a purge check.", l12.c_quota_drop, "isolated", live=True),
     C("s1-restart-scan", "S1", "S1.2 Startup", "At start-up STOR must delete *.part files in the file area, initialize "
       "TelemetryBytesUsed from the packet files (.bin and .arc) and FileBytesUsed and FileCount from the file area, and continue "
-      "each MID's sequence after the highest existing one.", l12.c_restart_scan, "ports", live=True),
+      "each MID's sequence after the highest existing one.", l12.c_restart_scan, "isolated", live=True),
     C("s1-set-param-errors", "S1", "S1.4 Commands (SET_*)", "SET_PRIORITY and SET_DECIMATION must reject value 0 or an unknown "
       "MsgId and SET_PURGE_THRESHOLD values outside 1..100 with STOR_SET_PARAM_ERR_EID and a command error; valid values give "
       "STOR_SET_PARAM_INF_EID; an unknown function code and a wrong length give events 2 and 6.",
-      l12.c_set_param_errors, "ports", live=True),
+      l12.c_set_param_errors, "isolated", live=True),
     C("s1-file-add-list-delete", "S1", "S1.3 File area", "ADD_FILE, DELETE_FILE, LIST_DIR and LIST_ALL must behave as specified "
       "(events 22, 24, 25, 26, 23; FileCount and FileBytesUsed; listings of at most four entries, directories with a trailing / "
       "and size 0, LIST_ALL depth-first relative to FileRoot, an empty listing as one packet).",
-      l12.c_file_add_list_delete, "ports", live=True),
+      l12.c_file_add_list_delete, "isolated", live=True),
     C("s1-file-path-rejection", "S1", "S1.3 File area (paths)", "A path containing .. or starting with / must be rejected with "
       "STOR_PATH_ERR_EID for ADD_FILE, DELETE_FILE and LIST_DIR without touching anything outside FileRoot.",
-      l12.c_file_path_rejection, "ports", live=True),
+      l12.c_file_path_rejection, "isolated", live=True),
     C("s1-file-exists-rejection", "S1", "S1.3 ADD_FILE", "ADD_FILE must reject an existing destination with "
-      "STOR_FILE_EXISTS_ERR_EID and an unopenable source with STOR_FILE_SRC_ERR_EID.", l12.c_file_exists_rejection, "ports",
+      "STOR_FILE_EXISTS_ERR_EID and an unopenable source with STOR_FILE_SRC_ERR_EID.", l12.c_file_exists_rejection, "isolated",
       live=True),
     C("s1-file-quota-rejection", "S1", "S1.3 ADD_FILE (quota)", "ADD_FILE must reject a file that would take FileBytesUsed over "
       "FileQuotaBytes with STOR_FILE_QUOTA_ERR_EID, FileAddsRejected and no partial file, and accept one that exactly fills it.",
-      l12.c_file_quota_rejection, "ports", live=True),
+      l12.c_file_quota_rejection, "isolated", live=True),
     C("s1-reset-counters", "S1", "S1.4 RESET_COUNTERS", "RESET_COUNTERS must zero the command, per-entry, packet, purge, file-add "
       "and transfer counters without changing byte accounting, file counts, open files or run-time parameters.",
-      l12.c_reset_counters, "ports", live=True),
+      l12.c_reset_counters, "isolated", live=True),
     C("s1-table-validation-live", "S1", "C.4 Tables (StorageTable)", "A StorageTable that fails validation (for example threshold "
       "0 or duplicate MsgIds) loaded through cFE Table Services must be rejected and leave the previous table active.",
-      l12.c_table_validation_live, "ports", live=True),
+      l12.c_table_validation_live, "isolated", live=True),
     C("s1-hidden-stor", "S1", "S1 Acceptance (coverage tests)", hidden_text("s1-hidden-stor"), hidden("s1-hidden-stor"), "cpu"),
     # ---------------------------------------------------------------- S2
     C("s2-ground-transfer", "S2", "S2.3 Sending (ground) and S2.4 DELETE", "A TRANSFER of a file-area file to the ground must "
       "send STOR_XferTlm_t segments on STOR_XFER_TLM_MID (forwarded by TLMO) with the S2.1 fields (TransferId, nodes, Area, "
       "SegmentIndex, SegmentCount, FileSize, FileCrc as CRC-32/ISO-HDLC, Offset, DataLength, DestPath, zeroed unused bytes), "
       "complete with STOR_XFER_DONE_INF_EID and apply DELETE with the accounting of DELETE_FILE.", l12.c_ground_transfer,
-      "ports", live=True),
+      "isolated", live=True),
     C("s2-tlm-transfer-archive", "S2", "S2.4 MARK_ARCHIVED", "A TRANSFER of a closed packet file to the ground with MARK_ARCHIVED "
       "must send its exact contents and rename tlm_MMMM_NNNNNNNN.bin to .arc without changing byte accounting.",
-      l12.c_tlm_transfer_archive, "ports", live=True),
+      l12.c_tlm_transfer_archive, "isolated", live=True),
     C("s2-peer-transfer", "S2", "S2.3 Sending (peer) and S2.5 Receiving", "A TRANSFER from cpu1 to node 2, with segments and "
       "acknowledgements carried as CMDI frames, must complete on cpu1 (XfersCompleted, DELETE applied) and leave a "
       "byte-identical file under cf/stor/files/<DestPath> on cpu2 (FilesReceived, FileCount, no .part).", l12.c_peer_transfer,
-      "ports", live=True),
+      "isolated", live=True),
     C("s2-peer-exists-nak", "S2", "S2.5 Receiving (EXISTS)", "A transfer to a destination that already exists on the receiver must "
       "fail on the sender with status EXISTS (XfersFailed, XferLastStatus 1, STOR_XFER_FAIL_ERR_EID), leave the source unchanged "
-      "and count RxErrors with STOR_XFER_RX_ERR_EID on the receiver.", l12.c_peer_exists_nak, "ports", live=True),
+      "and count RxErrors with STOR_XFER_RX_ERR_EID on the receiver.", l12.c_peer_exists_nak, "isolated", live=True),
     C("s2-abort-and-rejections", "S2", "S2.2 TRANSFER and S2.3 ABORT_TRANSFER", "TRANSFER must be rejected with "
       "STOR_XFER_ERR_EID for every S2.2 reason (active transfer, Area or SuccessAction out of range, own node, path rules, TLM "
       "names, missing or directory source, open packet file, empty peer DestPath); ABORT_TRANSFER fails an active transfer with "
-      "ABORTED and STOR_XFER_ABORT_INF_EID and is rejected with none active.", l12.c_transfer_abort_and_rejections, "ports",
+      "ABORTED and STOR_XFER_ABORT_INF_EID and is rejected with none active.", l12.c_transfer_abort_and_rejections, "isolated",
       live=True),
     C("s2-hidden-stor-transfer", "S2", "S2 Acceptance (coverage tests)", hidden_text("s2-hidden-stor-transfer"), hidden("s2-hidden-stor-transfer"), "cpu"),
     # ---------------------------------------------------------------- S3
@@ -398,22 +429,22 @@ CHECKS: list[CheckSpec] = [
     C("s3-hidden-cmdval-lib", "S3", "S3 Acceptance (cmdval_lib unit test)", hidden_text("s3-hidden-cmdval-lib"), hidden("s3-hidden-cmdval-lib"), "cpu"),
     C("s3-hidden-cmdi", "S3", "S3 Acceptance (coverage tests)", hidden_text("s3-hidden-cmdi"), hidden("s3-hidden-cmdi"), "cpu"),
     C("s3-valid-frame-executes", "S3", "S3.4 CMDI behaviour", "A valid CMDI frame carrying SAMPLE_APP NOOP sent to UDP 1234 must "
-      "execute, counted in FramesReceived and FramesAccepted.", l3.c_valid_frame_executes, "ports", live=True),
+      "execute, counted in FramesReceived and FramesAccepted.", l3.c_valid_frame_executes, "isolated", live=True),
     C("s3-unframed-format", "S3", "S3.4 CMDI behaviour (unframed packets)", "An unframed SAMPLE_APP NOOP sent to UDP 1234 must be "
-      "a FORMAT rejection (FormatErrors, CMDI_REJECT_ERR_EID naming FORMAT) and not execute.", l3.c_unframed_format, "ports",
+      "a FORMAT rejection (FormatErrors, CMDI_REJECT_ERR_EID naming FORMAT) and not execute.", l3.c_unframed_format, "isolated",
       live=True),
     C("s3-rejection-reasons", "S3", "S3.1 Frame format and S3.4 rejections", "Frames with a bad CRC, a bad MAC, an unlisted "
       "source, a timestamp outside the window or a malformed header (magic, version, flags, length, over 1074 bytes) must each be "
       "rejected in the S3.2 order, counted under their reason with one CMDI_REJECT_ERR_EID naming the reason and, except for "
-      "FORMAT, the source ID, and not execute.", l3.c_rejection_reasons, "ports", live=True),
+      "FORMAT, the source ID, and not execute.", l3.c_rejection_reasons, "isolated", live=True),
     C("s3-set-enable-mask", "S3", "S3.4 SET_ENABLE_MASK", "SET_ENABLE_MASK sent as a valid frame must change the checks from the "
       "next frame (a cleared HMAC bit lets a bad MAC through), reject masks above 0x0F with CMDI_SET_PARAM_ERR_EID, and an "
-      "unframed or bad-MAC SET_ENABLE_MASK must change nothing.", l3.c_set_enable_mask, "ports", live=True),
+      "unframed or bad-MAC SET_ENABLE_MASK must change nothing.", l3.c_set_enable_mask, "isolated", live=True),
     C("s3-set-max-age", "S3", "S3.4 SET_MAX_AGE", "SET_MAX_AGE sent as a valid frame must widen the age window (1..86400), "
       "values 0 and 86401 must be rejected, and an unframed or bad-MAC SET_MAX_AGE must change nothing.", l3.c_set_max_age,
-      "ports", live=True),
+      "isolated", live=True),
     C("s3-cmdi-commands", "S3", "S3.4 Commands and C.4", "CMDI NOOP, RESET_COUNTERS (command and frame counters), an unknown "
-      "function code and a wrong length must behave as in C.4.", l3.c_cmdi_commands, "ports", live=True),
+      "function code and a wrong length must behave as in C.4.", l3.c_cmdi_commands, "isolated", live=True),
     C("s3-harness-functions", "S3", "S3.5 Frame builder", "tools/udp_harness.py must provide CMDI_DEFAULT_KEY, "
       "CMDI_DEFAULT_SOURCE_ID, CMDI_BASE_PORT, TLMO_BASE_PORT, node_ports, crc16_ccitt_false, build_frame, onboard_seconds, "
       "send_frame and send_framed_command with the pinned signatures, building byte-identical S3.1 frames, raising HarnessError "
@@ -422,11 +453,11 @@ CHECKS: list[CheckSpec] = [
     C("s3-harness-cli", "S3", "S3.5 Frame builder (CLI)", "udp_harness.py send-framed must send one framed command to node N's "
       "CMDI port (default 1) with --payload-hex, --key-hex, --source-id, --time-seconds and --sequence, reading onboard time from "
       "node N's TLMO port otherwise, and print the frame length and sequence; recv --node N listens on node N's TLMO port; "
-      "errors give exit status 1 and a one-line message.", hc.c_harness_cli, "ports"),
+      "errors give exit status 1 and a one-line message.", hc.c_harness_cli, "isolated"),
     C("s3-harness-live", "S3", "S3 Acceptance (harness frame)", "A frame built and sent with tools/udp_harness.py send-framed "
-      "must be accepted by cpu1 and execute.", l3.c_harness_live, "ports", live=True),
+      "must be accepted by cpu1 and execute.", l3.c_harness_live, "isolated", live=True),
     C("s3-cpu2-frame", "S3", "S3 Acceptance (cpu2)", "On cpu2 a valid frame carrying cpu2's SAMPLE_APP NOOP sent to UDP 1235 "
-      "must execute there.", l3.c_cpu2_frame, "ports", live=True),
+      "must execute there.", l3.c_cpu2_frame, "isolated", live=True),
     # ---------------------------------------------------------------- S4
     C("s4-default-table", "S4", "S4.1 Table", "The installed PriorityTable (/cf/tlmo_tbl.tbl, 516 bytes) of each node must "
       "default to budget 16, capacity 64 and the 48 streams of S4.1 in their classes, with that node's MIDs.", table("TLMO"),
@@ -434,74 +465,80 @@ CHECKS: list[CheckSpec] = [
     C("s4-hidden-tlmo", "S4", "S4 Acceptance (coverage tests)", hidden_text("s4-hidden-tlmo"), hidden("s4-hidden-tlmo"), "cpu"),
     C("s4-default-telemetry", "S4", "S4.2 Behaviour (always on)", "With no enable command, housekeeping of cFE ES, EVS, SB, TBL "
       "and TIME, SAMPLE_APP, STOR, CMDI, TLMO, GW and SFI and event messages must arrive on UDP 2234 within one housekeeping "
-      "period.", l4.c_default_telemetry, "ports", live=True),
+      "period.", l4.c_default_telemetry, "isolated", live=True),
     C("s4-hold-drop-arithmetic", "S4", "S4.2 Enqueue (eviction)", "With the budget at 0 and the queue full, an arriving packet "
       "must evict the oldest packet of the lowest-priority class present when that class is lower than its own, else be dropped "
-      "itself; DroppedByClass, SentByClass and PacketsReceived must count exactly that.", l4.c_hold_drop_arithmetic, "ports",
+      "itself; DroppedByClass, SentByClass and PacketsReceived must count exactly that.", l4.c_hold_drop_arithmetic, "isolated",
       live=True),
     C("s4-drain-order", "S4", "S4.2 Drain", "After SET_BUDGET to a small value, held datagrams must arrive class 0 first, then "
-      "1, 2 and 3, each class in arrival order, at most the budget per 10 Hz WAKEUP.", l4.c_drain_order, "ports", live=True),
+      "1, 2 and 3, each class in arrival order, at most the budget per 10 Hz WAKEUP.", l4.c_drain_order, "isolated", live=True),
     C("s4-set-class", "S4", "S4.3 SET_CLASS", "SET_CLASS must move a used stream to another class for packets enqueued "
       "afterwards (TLMO_SET_CLASS_INF_EID) and reject unused streams and classes above 3 (TLMO_SET_CLASS_ERR_EID).",
-      l4.c_set_class, "ports", live=True),
+      l4.c_set_class, "isolated", live=True),
     C("s4-set-budget", "S4", "S4.3 SET_BUDGET", "SET_BUDGET must accept 0..256 (TLMO_SET_BUDGET_INF_EID, BudgetPacketsPerCycle) "
       "and reject larger values (TLMO_SET_BUDGET_ERR_EID); a budget of 1 sends one packet per WAKEUP.", l4.c_set_budget,
-      "ports", live=True),
+      "isolated", live=True),
     C("s4-add-remove-stream", "S4", "S4.3 ADD_STREAM and REMOVE_STREAM", "ADD_STREAM must fill the lowest unused slot and make "
       "the stream's packets arrive, rejecting used streams, classes above 3 and invalid MIDs; REMOVE_STREAM must stop a stream "
-      "(also a table stream) and reject unused ones, with events 20 to 23.", l4.c_add_remove_stream, "ports", live=True),
+      "(also a table stream) and reject unused ones, with events 20 to 23.", l4.c_add_remove_stream, "isolated", live=True),
     C("s4-table-update", "S4", "S4.2 Table update", "A PriorityTable update through cFE Table Services must replace the runtime "
       "list (dropping added streams), reset classes and budget to the table, send TLMO_TBL_UPDATE_INF_EID, and a table with a "
-      "class above 3 must be rejected.", l4.c_table_update, "ports", live=True),
+      "class above 3 must be rejected.", l4.c_table_update, "isolated", live=True),
     C("s4-class-map", "S4", "S4.3 SEND_CLASS_MAP", "SEND_CLASS_MAP must send one TLMO_ClassTlm_t with the budget, StreamCount and "
-      "the runtime list in slot order (TLMO_CLASS_MAP_INF_EID).", l4.c_class_map, "ports", live=True),
+      "the runtime list in slot order (TLMO_CLASS_MAP_INF_EID).", l4.c_class_map, "isolated", live=True),
     C("s4-tlmo-commands", "S4", "S4.3 Commands and telemetry", "TLMO housekeeping must report QueueCapacity, ActiveStreams, "
       "budget, PacketsReceived and SentByClass; NOOP, RESET_COUNTERS, an unknown function code and a wrong length must behave "
-      "as in C.4.", l4.c_tlmo_commands, "ports", live=True),
+      "as in C.4.", l4.c_tlmo_commands, "isolated", live=True),
     C("s4-cpu2-telemetry", "S4", "S4 Acceptance (cpu2)", "cpu2's telemetry (its own MIDs) must arrive on UDP 2235 without any "
-      "enable command.", l4.c_cpu2_telemetry, "ports", live=True),
+      "enable command.", l4.c_cpu2_telemetry, "isolated", live=True),
     C("s4-pipe-depth-probe", "S4", "S4.2 Behaviour (pipe depth 48)", "TLMO's pipe of depth 48 with a message limit of 32 must take "
       "the 48 default streams and bursts of verification packets without software bus pipe overflows or message-limit errors.",
-      l4.c_pipe_depth_probe, "ports", live=True),
+      l4.c_pipe_depth_probe, "isolated", live=True),
     # ---------------------------------------------------------------- S5
     C("s5-default-table", "S5", "S5.1 Table", "The installed ConnTable (/cf/gw_tbl.tbl, 1216 bytes) must have every slot unused.",
       table("GW"), "misc"),
     C("s5-hidden-gw", "S5", "S5 Acceptance (coverage tests)", hidden_text("s5-hidden-gw"), hidden("s5-hidden-gw"), "cpu"),
     C("s5-udp-egress", "S5", "S5.2 Outbound and egress framing", "A UDP connection added by ADD_CONN must egress each subscribed "
       "packet as a valid CMDI frame under the table key with SourceId the node ID, onboard TimeSeconds and Sequence from 1, "
-      "counted in PacketsEgressed and the connection's TxPackets, with ValTableShared 1.", l5.c_udp_egress, "ports", live=True),
+      "counted in PacketsEgressed and the connection's TxPackets, with ValTableShared 1.", l5.c_udp_egress, "isolated", live=True),
     C("s5-udp-ingress", "S5", "S5.2 Inbound", "A valid frame carrying SAMPLE_APP NOOP arriving on a GW UDP connection must be "
-      "published and execute (PacketsIngressed, FramesReceived); an unframed packet must not.", l5.c_udp_ingress, "ports",
+      "published and execute (PacketsIngressed, FramesReceived); an unframed packet must not.", l5.c_udp_ingress, "isolated",
       live=True),
     C("s5-ingress-rejections", "S5", "S5.2 Ingress validation", "Frames on a GW connection with a bad CRC, a bad MAC, an unlisted "
       "source, a timestamp outside the window or a malformed header or size must each be counted under their reason and in the "
       "connection's RxErrors with one GW_FRAME_REJECT_ERR_EID naming the connection, the reason and, except FORMAT, the source "
-      "ID, and not execute.", l5.c_ingress_rejections, "ports", live=True),
+      "ID, and not execute.", l5.c_ingress_rejections, "isolated", live=True),
     C("s5-loop-drop", "S5", "S5.2 Inbound (loop rule)", "An accepted frame embedding a command whose MID is in the Subs of an "
-      "enabled connection must be dropped (LoopDrops) and not published.", l5.c_loop_drop, "ports", live=True),
+      "enabled connection must be dropped (LoopDrops) and not published.", l5.c_loop_drop, "isolated", live=True),
     C("s5-valtable-key-change", "S5", "S5.2 Validation table", "After a CMDI.ValTable update with a new key, GW must reject "
       "old-key frames (HmacErrors), accept new-key frames and frame its egress under the new key.", l5.c_valtable_key_change,
-      "ports", live=True),
+      "isolated", live=True),
     C("s5-tcp", "S5", "S5.2 TCP", "A TCP connection must stay CONNECTING until a listener appears, then reach UP "
-      "(GW_CONN_UP_INF_EID, ConnectionsUp), carry marker-framed CMDI frames both ways (split frames, garbage before a marker, an "
-      "out-of-range length as a FORMAT rejection, a bad MAC rejected) and return to CONNECTING when the peer closes.",
-      l5.c_tcp, "ports", live=True),
+      "(GW_CONN_UP_INF_EID, ConnectionsUp) within one attempt period, carry marker-framed CMDI frames both ways (split frames, "
+      "garbage before a marker, an out-of-range length as a FORMAT rejection, a bad MAC rejected) and begin a new connect cycle "
+      "with an attempt at once when the peer closes.",
+      l5.c_tcp, "isolated", live=True),
+    C("s5-tcp-down", "S5", "S5.2 TCP connect cycle", "Against a peer that never listens, a TCP connection must make four "
+      "attempts 5 s apart (a first attempt and GW_TCP_MAX_RETRIES retries, each bounded by GW_TCP_ATTEMPT_SEC) without "
+      "blocking GW, then enter DOWN (3) with one GW_CONN_TIMEOUT_ERR_EID naming the connection, RemoteAddr and RemotePort "
+      "about 20 s after it was opened, make no further attempt (egress counts as errors), and begin a new cycle with an "
+      "attempt at once on DISABLE_CONN then ENABLE_CONN.", l5.c_tcp_down, "isolated", live=True),
     C("s5-serial", "S5", "S5.2 SERIAL", "A SERIAL connection on a PTY slave set to raw mode by the other side must carry "
       "marker-framed CMDI frames both ways, including split frames, garbage before a marker, a bad MAC and an out-of-range "
-      "length.", l5.c_pty, "ports", live=True),
+      "length.", l5.c_pty, "isolated", live=True),
     C("s5-pty-idle-probe", "S5", "S5.2 SERIAL (non-blocking reads)", "With a SERIAL connection open and nothing pending on the PTY, "
       "GW must keep answering housekeeping requests at once and keep its heartbeat (no SFI miss): reads of the PTY must never "
-      "block the main loop.", l5.c_pty_idle_probe, "ports", live=True),
+      "block the main loop.", l5.c_pty_idle_probe, "isolated", live=True),
     C("s5-restart-serial-probe", "S5", "S5.2 SERIAL (restart)", "GW stopped with ES STOP_APP and started with ES START_APP "
       "(/cf/gw.so, GW_AppMain, 70, 131072) after a SERIAL connection was used must initialize without errors and carry traffic "
-      "both ways over a new SERIAL connection on a fresh PTY.", l5.c_restart_serial_probe, "ports", live=True),
+      "both ways over a new SERIAL connection on a fresh PTY.", l5.c_restart_serial_probe, "isolated", live=True),
     C("s5-conn-commands", "S5", "S5.3 Commands and telemetry", "ADD_CONN must reject every invalid definition and slot "
       "(GW_CONN_ADD_ERR_EID); DISABLE_CONN, ENABLE_CONN, REMOVE_CONN and RELOAD and their error cases must behave as specified, "
       "with Subscriptions, ConnectionsConfigured, the connection status packet and RESET_COUNTERS.", l5.c_conn_commands,
-      "ports", live=True),
+      "isolated", live=True),
     C("s5-valtable-share-probe", "S5", "S5.2 Validation table (share and retry)", "GW must share CMDI.ValTable when it starts "
       "before CMDI registers it, retrying on WAKEUP, and share it again after CMDI is restarted, so that ingress works in both "
-      "cases.", l5.c_valtable_share_probe, "ports", live=True),
+      "cases.", l5.c_valtable_share_probe, "isolated", live=True),
     # ---------------------------------------------------------------- S6
     C("s6-default-table", "S6", "S6.1 Table", "The installed SfiTable (/cf/sfi_tbl.tbl, 520 bytes) of each node must default to "
       "N 3, W 5, H 60, the apps STOR, CMDI, TLMO, GW, SFI_T1, SFI_T2, SFI_T3 and the six watches of S6.1 with that node's MIDs.",
@@ -509,20 +546,20 @@ CHECKS: list[CheckSpec] = [
     C("s6-hidden-sfi-clusters", "S6", "S6.3 Clustering (SFI_ComputeClusters)", hidden_text("s6-hidden-sfi-clusters"), hidden("s6-hidden-sfi-clusters"), "cpu"),
     C("s6-hidden-sfi", "S6", "S6 Acceptance (coverage tests)", hidden_text("s6-hidden-sfi"), hidden("s6-hidden-sfi"), "cpu"),
     C("s6-apps-ok-after-startup", "S6", "S6.2 Heartbeats (start-up)", "After start-up STOR, CMDI, TLMO and GW must be OK in the "
-      "status packet with no misses, heartbeats counted in TotalHeartbeats.", l6.c_apps_ok_after_startup, "ports", live=True),
+      "status packet with no misses, heartbeats counted in TotalHeartbeats.", l6.c_apps_ok_after_startup, "isolated", live=True),
     C("s6-gw-stop-miss", "S6", "S6.2 Heartbeats (miss and restore)", "Stopping GW with ES STOP_APP must give one SFI_HB_MISS_ERR_EID "
       "naming GW within N + 2 seconds, AppsMissing 1 and an onset in the status packet and history; ES START_APP restores it "
-      "with SFI_HB_RESTORED_INF_EID.", l6.c_gw_stop_miss, "ports", live=True),
+      "with SFI_HB_RESTORED_INF_EID.", l6.c_gw_stop_miss, "isolated", live=True),
     C("s6-cluster-and-clear", "S6", "S6.3 Clustering", "Heartbeats of SFI_T1 and SFI_T2 stopping at once must give a cluster of "
       "size 2 (CLUSTERED, SFI_CLUSTER_ERR_EID); after CLEAR_HISTORY two misses more than W apart must give UNCORRELATED.",
-      l6.c_cluster_and_clear, "ports", live=True),
+      l6.c_cluster_and_clear, "isolated", live=True),
     C("s6-stall-rate", "S6", "S6.4 Counter watches", "Verification packets on reserved MIDs 0xEC and 0xED must raise and clear the "
       "STALL and RATE faults as specified (including a counter reset), with SFI_STALL_ERR_EID, SFI_RATE_ERR_EID and "
-      "SFI_WATCH_CLEAR_INF_EID once per transition and StallFaults, RateFaults and WatchesInFault.", l6.c_stall_rate, "ports",
+      "SFI_WATCH_CLEAR_INF_EID once per transition and StallFaults, RateFaults and WatchesInFault.", l6.c_stall_rate, "isolated",
       live=True),
     C("s6-sfi-commands", "S6", "S6.5 Commands and telemetry", "SET_MISS_LIMIT (1..60), SET_CLUSTER_WINDOW (1..600), SEND_STATUS, "
       "RESET_COUNTERS and the C.4 error cases must behave as specified, reflected in SFI housekeeping.", l6.c_sfi_commands,
-      "ports", live=True),
+      "isolated", live=True),
     # ---------------------------------------------------------------- S7
     C("s7-setup-fresh", "S7", "S7.1 Where CTF code goes (setup_ctf.sh)", "ctf/setup_ctf.sh must create a fresh CTF checkout and "
       "venv, apply every patch in ctf/shims/patches/, and be idempotent (a second run succeeds and leaves the same patched tree).",
@@ -541,12 +578,12 @@ CHECKS: list[CheckSpec] = [
     C("s7-run-system-tests", "S7", "S7.5 Run order", "ctf/run_system_tests.sh must run the two smoke scripts and then the eight "
       "system test scripts of S7.5 in order with run_ctf.sh.", cc.c_run_system_tests_script, "misc"),
     C("s7-listener-probe", "S7", "S7.3 tlm_order_plugin (CTF telemetry listener)", "CTF's telemetry listener must keep parsing "
-      "telemetry while command-type and short datagrams arrive on the telemetry port.", cc.c_listener_probe, "ports"),
+      "telemetry while command-type and short datagrams arrive on the telemetry port.", cc.c_listener_probe, "isolated"),
 ] + [
     C(f"s7-{name.removesuffix('.json').replace('_', '-')}", "S7", f"S7.5 {name}",
       f"ctf/tests/{name} must exist, send commands only through the CMDI frame plugins (no SendCfsCommand"
       f"{', no TO_LAB enable step' if name in cc.SMOKE else ''}), register and shut down its own nodes, and pass when run with "
-      f"ctf/run_ctf.sh against scratch copies of both installed nodes within 300 seconds.", script(name), "ports")
+      f"ctf/run_ctf.sh against scratch copies of both installed nodes within 300 seconds.", script(name), "isolated")
     for name in cc.SMOKE + cc.SYSTEM
 ]
 
@@ -555,7 +592,7 @@ assert len(BY_ID) == len(CHECKS), "duplicate check ids"
 assert all(ID_RE.match(c.check_id) for c in CHECKS)
 assert all(c.check_id.split("-", 1)[0].upper() == c.sub for c in CHECKS), "check ids are prefixed by their subsystem"
 assert set(HIDDEN_CHECKS) <= set(BY_ID)
-assert all(c.lane in ("build", "ports", "cpu", "misc") for c in CHECKS)
+assert all(c.lane in ("build", "isolated", "cpu", "misc") for c in CHECKS)
 
 # Execution order within each lane (the build lane runs first; the others in parallel after it starts).
 RUN_ORDER = {
@@ -566,7 +603,7 @@ RUN_ORDER = {
              "s6-default-table", "s3-cmdval-self-contained", "s7-ccdd-layout", "s7-setup-fresh", "s7-plugin-info"],
     "cpu": ["n-unit-tests", "n-coverage-tests", "n-coverage", "s3-hidden-cmdval-lib", "s3-hidden-cmdi", "s4-hidden-tlmo",
             "s5-hidden-gw", "s6-hidden-sfi-clusters", "s6-hidden-sfi", "s1-hidden-stor", "s2-hidden-stor-transfer"],
-    "ports": ["s3-harness-cli", "n-run-scripts", "n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks",
+    "isolated": ["s3-harness-cli", "n-run-scripts", "n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks",
               "s4-default-telemetry", "s3-valid-frame-executes", "s3-unframed-format", "s3-rejection-reasons",
               "s3-set-enable-mask", "s3-set-max-age", "s3-cmdi-commands", "s3-harness-live", "s3-cpu2-frame",
               "s4-hold-drop-arithmetic", "s4-drain-order", "s4-set-class", "s4-set-budget", "s4-add-remove-stream",
@@ -578,7 +615,7 @@ RUN_ORDER = {
               "s2-ground-transfer", "s2-tlm-transfer-archive", "s2-peer-transfer", "s2-peer-exists-nak",
               "s2-abort-and-rejections",
               "s5-udp-egress", "s5-udp-ingress", "s5-ingress-rejections", "s5-loop-drop", "s5-valtable-key-change",
-              "s5-tcp", "s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe", "s5-conn-commands",
+              "s5-tcp", "s5-tcp-down", "s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe", "s5-conn-commands",
               "s5-valtable-share-probe",
               "s6-apps-ok-after-startup", "s6-gw-stop-miss", "s6-cluster-and-clear", "s6-stall-rate", "s6-sfi-commands",
               "s7-listener-probe"] + [f"s7-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
@@ -587,22 +624,58 @@ assert sorted(sum(RUN_ORDER.values(), [])) == sorted(BY_ID), "RUN_ORDER must lis
 for _lane, _ids in RUN_ORDER.items():
     assert all(BY_ID[i].lane == _lane for i in _ids), f"lane mismatch in {_lane}"
 
+# Isolated groups: checks that share nodes through Ctx.cache run in one group, in order. The CTF scripts share
+# the one set-up ctf/ tree (its venv and patched checkout), so they run one after another in one group as well.
+# Every other isolated check is a group of its own. Groups are started longest first.
+SHARED_GROUPS = {
+    "ctf": ["s7-listener-probe"] + [f"s7-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
+    "tlmo-hold": ["s4-hold-drop-arithmetic", "s4-drain-order", "s4-set-class", "s4-set-budget"],
+    "gw-udp": ["s5-udp-egress", "s5-udp-ingress", "s5-ingress-rejections", "s5-loop-drop"],
+    "gw-serial": ["s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe"],
+    "stor-peer": ["s2-peer-transfer", "s2-peer-exists-nak"],
+    "two-nodes": ["n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks"],
+}
+FIRST_SINGLES = ["s5-tcp-down", "s5-tcp", "s6-stall-rate", "s6-cluster-and-clear", "s6-gw-stop-miss", "s1-idle-file-close",
+                 "s1-rollover", "s1-purge-order", "s1-quota-drop", "n-run-scripts"]
+
+
+def isolated_groups() -> list[tuple[str, list[str]]]:
+    grouped = {cid for ids in SHARED_GROUPS.values() for cid in ids}
+    order = RUN_ORDER["isolated"]
+    groups = [(name, [cid for cid in order if cid in ids]) for name, ids in SHARED_GROUPS.items()]
+    singles = FIRST_SINGLES + [cid for cid in order if cid not in grouped and cid not in FIRST_SINGLES]
+    groups += [(cid, [cid]) for cid in singles]
+    return groups
+
+
+_GROUPS = isolated_groups()
+assert sorted(c for _n, ids in _GROUPS for c in ids) == sorted(RUN_ORDER["isolated"]), "every isolated check in one group"
+assert all(BY_ID[c].lane == "isolated" for ids in SHARED_GROUPS.values() for c in ids)
+assert not set(FIRST_SINGLES) & {c for ids in SHARED_GROUPS.values() for c in ids}, "a check in two groups"
+
 
 # ============================================================================ running
 
 class Results:
     def __init__(self) -> None:
-        self.lock = threading.Lock()
+        self.lock = threading.Condition()
         self.items: dict[str, dict[str, object]] = {}
         self.ran: set[str] = set()
 
-    def put(self, cid: str, passed: bool, feedback: str, detail: str, ran: bool = True) -> None:
+    def put(self, cid: str, passed: bool, feedback: str, detail: str, ran: bool = True, echo: bool = True) -> None:
         assert cid in BY_ID
         with self.lock:
             self.items[cid] = {"id": cid, "passed": passed, "feedback": "" if passed else feedback, "detail": detail}
             if ran:
                 self.ran.add(cid)
-        print(f"[{cid}] {'ok' if passed else 'FAILED'}: {detail[:300]}", flush=True)
+            self.lock.notify_all()
+        if echo:
+            print(f"[{cid}] {'ok' if passed else 'FAILED'}: {detail[:300]}", flush=True)
+
+    def wait_for(self, cid: str, timeout: float) -> bool:
+        """Wait until `cid` has a result; False when `timeout` passed first."""
+        with self.lock:
+            return self.lock.wait_for(lambda: cid in self.items, timeout=max(timeout, 0.0))
 
 
 def run_one(ctx: Ctx, spec_: CheckSpec, results: Results) -> None:
@@ -652,8 +725,156 @@ def run_lane(ctx: Ctx, lane: str, results: Results, only: set[str]) -> None:
             for rest in ids[i + 1:]:
                 results.put(rest, False, BY_ID[rest].feedback, "not run: the review's time budget ran out", ran=False)
             break
-    if lane == "ports":
+    if lane == "isolated":
         ctx.shutdown_session()
+
+
+class GroupProcesses:
+    """The isolated groups running now, so that every one of them can be killed when the review ends early."""
+
+    def __init__(self) -> None:
+        self.lock = threading.Lock()
+        self.procs: set[subprocess.Popen[str]] = set()
+        self.closed = False
+
+    def start(self, argv: list[str]) -> subprocess.Popen[str] | None:
+        with self.lock:
+            if self.closed:
+                return None
+            proc = subprocess.Popen(argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                    text=True, errors="replace", bufsize=1)
+            self.procs.add(proc)
+            return proc
+
+    def done(self, proc: subprocess.Popen[str]) -> None:
+        with self.lock:
+            self.procs.discard(proc)
+
+    def kill_all(self) -> None:
+        with self.lock:
+            self.closed = True
+            for proc in self.procs:
+                with contextlib.suppress(OSError):
+                    proc.kill()
+
+
+GROUP_PROCS = GroupProcesses()
+
+
+def run_group(ctx: Ctx, name: str, ids: list[str], results: Results) -> None:
+    """Run one group of isolated checks in live_worker.py inside its own namespaces and record their results."""
+    assert ids and all(BY_ID[c].lane == "isolated" for c in ids)
+    gdir = ctx.work / "groups" / name
+    gdir.mkdir(parents=True)
+    spec_: dict[str, object] = {"repo": str(ctx.repo), "tree": str(ctx.tree), "work": str(gdir / "work"),
+                                "deadline_wall": time.time() + ctx.remaining(), "checks": ids,
+                                "boot_fail_dir": str(ctx.work / "boot-failures")}
+    if any(BY_ID[c].sub == "S7" for c in ids):
+        # The fresh set-up and its idempotence re-run (s7-setup-fresh) must be over before a script runs.
+        if not results.wait_for("s7-setup-fresh", ctx.remaining() - 30):
+            raise BudgetExceeded("the review's time budget ran out")
+        env = cc.ctf_env(ctx)
+        try:
+            env.setup()
+        except PrereqFail:
+            pass  # recorded in env; every script in the group reports it
+        spec_.update(ctf_root=str(env.root), ctf_setup_ok=env.setup_ok, ctf_setup_detail=env.setup_detail)
+    spec_file, result_file = gdir / "spec.json", gdir / "result.json"
+    spec_file.write_text(json.dumps(spec_))
+    argv = isolation.wrap([sys.executable, "-I", "-B", str(PACK / "live_worker.py"), str(spec_file), str(result_file)])
+    proc = GROUP_PROCS.start(argv)
+    if proc is None:
+        raise BudgetExceeded("the review is ending")
+    tail: list[str] = []
+
+    def relay() -> None:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            tail.append(line.rstrip("\n"))
+            del tail[:-40]
+            print(f"<{name}> {line.rstrip()}", flush=True)
+
+    reader = threading.Thread(target=relay, name=f"relay-{name}", daemon=True)
+    reader.start()
+    timed_out = False
+    try:
+        proc.wait(timeout=max(ctx.remaining() - 5, 1))
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        proc.kill()
+        proc.wait()
+    finally:
+        GROUP_PROCS.done(proc)
+    reader.join(timeout=10)
+    got: dict[str, dict[str, object]] = {}
+    ran: set[str] = set()
+    if result_file.is_file():
+        data = json.loads(result_file.read_text())
+        got, ran = data["items"], set(data["ran"])
+    for cid in ids:
+        if cid in got:
+            item = got[cid]
+            results.put(cid, bool(item["passed"]), str(item["feedback"]), str(item["detail"]), ran=cid in ran, echo=False)
+        elif timed_out or ctx.remaining() < 20:
+            results.put(cid, False, BY_ID[cid].feedback, "not run: the review's time budget ran out", ran=False)
+        else:
+            detail = (f"infrastructure problem: the isolated group {name} ended with status {proc.returncode} before "
+                      f"this check finished; output tail: " + " | ".join(tail[-8:]))
+            print(f"INFRASTRUCTURE PROBLEM in {cid}: {detail}", file=sys.stderr, flush=True)
+            results.put(cid, False, BY_ID[cid].feedback, detail)
+
+
+def group_jobs() -> int:
+    """T5_PACK_JOBS (isolated groups run at once), validated up front; ValueError names the problem."""
+    raw = os.environ.get("T5_PACK_JOBS", str(DEFAULT_GROUP_JOBS))
+    if not raw.isdigit() or not 1 <= int(raw) <= 64:
+        raise ValueError(f"T5_PACK_JOBS must be a whole number from 1 to 64, not {raw!r}")
+    return int(raw)
+
+
+def run_isolated(ctx: Ctx, results: Results, only: set[str], jobs: int) -> None:
+    """The isolated lane: every group in its own namespaces, `jobs` at a time. When the build failed, or nested
+    namespaces cannot be made here, the lane runs in this process one check after another (nothing then runs
+    two nodes on the same ports at once)."""
+    if not ctx.build_ok:
+        run_lane(ctx, "isolated", results, only)
+        return
+    ok, why = isolation.available()
+    if not ok:
+        print(f"WARNING: nested namespaces are not available ({why}); running the isolated checks one at a time",
+              file=sys.stderr, flush=True)
+        run_lane(ctx, "isolated", results, only)
+        return
+    ctx.boot_fail_dir = ctx.work / "boot-failures"
+    groups = []
+    for name, ids in _GROUPS:
+        for cid in ids:
+            if only and cid not in only:
+                results.put(cid, False, BY_ID[cid].feedback, "not run (selected subset)", ran=False)
+        mine = [cid for cid in ids if not only or cid in only]
+        if mine:
+            groups.append((name, mine))
+
+    def one(name: str, ids: list[str]) -> None:
+        try:
+            if ctx.remaining() < 35:
+                raise BudgetExceeded("the review's time budget ran out")
+            run_group(ctx, name, ids, results)
+        except BudgetExceeded as exc:
+            for cid in ids:
+                if cid not in results.items:
+                    results.put(cid, False, BY_ID[cid].feedback, f"not run: {exc}", ran=False)
+        except Exception as exc:  # noqa: BLE001 - one group must never take the review down
+            tb = traceback.format_exc()
+            print(tb, file=sys.stderr, flush=True)
+            for cid in ids:
+                if cid not in results.items:
+                    results.put(cid, False, BY_ID[cid].feedback,
+                                f"infrastructure problem: group {name}: {type(exc).__name__}: {exc}")
+
+    with ThreadPoolExecutor(max_workers=jobs, thread_name_prefix="group") as pool:
+        for fut in [pool.submit(one, name, ids) for name, ids in groups]:
+            fut.result()
 
 
 def summarize(checks: list[dict[str, object]], ran: set[str]) -> dict[str, object]:
@@ -688,6 +909,11 @@ def main(argv: list[str]) -> int:
         if shutil.which(tool) is None:
             print(f"required tool {tool} not found", file=sys.stderr)
             return 2
+    try:
+        jobs = group_jobs()
+    except ValueError as exc:
+        print(f"configuration error: {exc}", file=sys.stderr)
+        return 2
     deadline = time.monotonic() + float(os.environ.get("T5_PACK_BUDGET_S", TOTAL_BUDGET_S))
     signal.signal(signal.SIGTERM, lambda *_: sys.exit(2))
     base = os.environ.get("T5_PACK_TMP") or "/workspace/tmp-acceptance"
@@ -705,13 +931,14 @@ def main(argv: list[str]) -> int:
         misc = threading.Thread(target=run_lane, args=(ctx, "misc", results, only), name="lane-misc")
         misc.start()
         run_lane(ctx, "build", results, only)
-        lanes = [threading.Thread(target=run_lane, args=(ctx, lane, results, only), name=f"lane-{lane}")
-                 for lane in ("ports", "cpu")]
+        lanes = [threading.Thread(target=run_isolated, args=(ctx, results, only, jobs), name="lane-isolated"),
+                 threading.Thread(target=run_lane, args=(ctx, "cpu", results, only), name="lane-cpu")]
         for t in lanes:
             t.start()
         for t in lanes + [misc]:
             t.join()
     finally:
+        GROUP_PROCS.kill_all()
         ctx.shutdown_session()
         if os.environ.get("T5_PACK_KEEP") != "1":
             shutil.rmtree(work, ignore_errors=True)

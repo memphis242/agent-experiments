@@ -28,7 +28,7 @@ The harness copies the pack to `<run-dir>/acceptance/` for the duration of one r
 
 | Variable | Meaning |
 |----------|---------|
-| `ACCEPT_NO_NAMESPACE` | Set to `1` by the harness; packs must skip any namespace or isolation setup of their own when it is present. The harness already runs the pack inside its isolation wrapper, whose uid-mapped inner namespace has no capabilities. |
+| `ACCEPT_NO_NAMESPACE` | Set to `1` by the harness, which already runs the pack inside its isolation wrapper (private network, mount, IPC and PID namespaces; the uid-mapped inner user namespace has no capabilities). When it is present, a pack must not set up isolation that touches networking outside the wrapper: no pasta or slirp4netns, no veth pairs, bridges or routes to another network namespace, and no attempt to leave or replace the wrapper. Nested unprivileged namespaces created inside the wrapper for per-check isolation are permitted: user, network (with only its own loopback), mount, IPC and PID namespaces that the pack's own checks run in, and that the pack tears down (for example `unshare --kill-child`). Skipping all isolation of its own when the variable is present also conforms (Task 2's pack does). |
 
 ## Rounds
 

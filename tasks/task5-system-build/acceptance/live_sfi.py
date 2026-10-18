@@ -241,6 +241,7 @@ def c_stall_rate(ctx: "Ctx") -> None:
 def c_sfi_commands(ctx: "Ctx") -> None:
     n = boot(ctx, (1,))[1]
     p = Problems()
+    h0 = n.hk("SFI")
     mark = n.g.mark()
     n.cmd("SFI", "SET_MISS_LIMIT", struct.pack("<B3x", 0))
     n.cmd("SFI", "SET_MISS_LIMIT", struct.pack("<B3x", 61))
@@ -253,9 +254,13 @@ def c_sfi_commands(ctx: "Ctx") -> None:
     p.check(len(n.wait_event(mark, "SFI", EID["SET_PARAM_INF"], count=2)) == 2, "valid SET_* commands did not each produce event 19")
     hk = n.hk("SFI")
     p.check(hk["HbMissLimit"] == 5 and hk["ClusterWindowSec"] == 10, f"HbMissLimit/ClusterWindowSec {hk['HbMissLimit']}/{hk['ClusterWindowSec']}")
+    p.check(hk["CommandErrorCounter"] == h0["CommandErrorCounter"] + 4 and hk["CommandCounter"] == h0["CommandCounter"] + 2,
+            f"four rejected and two accepted SET_* commands moved CommandErrorCounter/CommandCounter by "
+            f"{hk['CommandErrorCounter'] - h0['CommandErrorCounter']}/{hk['CommandCounter'] - h0['CommandCounter']} (expected 4/2)")
     mark = n.g.mark()
     status(n)
     p.check(bool(n.events(mark, "SFI", EID["STATUS_INF"])), "SEND_STATUS produced no event 21")
+    p.check(n.hk("SFI")["CommandCounter"] == hk["CommandCounter"] + 1, "SEND_STATUS did not increment CommandCounter")
     mark = n.g.mark()
     n.cmd("SFI", "RESET_COUNTERS")
     p.check(bool(n.wait_event(mark, "SFI", EID["RESET_INF"])), "RESET_COUNTERS produced no event 4")
@@ -267,4 +272,7 @@ def c_sfi_commands(ctx: "Ctx") -> None:
     n.send(spec.app_mid("SFI", "CMD"), 0, b"\0\0\0\0")
     time.sleep(0.5)
     p.check(bool(n.events(mark, "SFI", 2)) and bool(n.events(mark, "SFI", 6)), "an unknown code and a wrong length did not produce events 2 and 6")
+    h2 = n.hk("SFI")
+    p.check(h2["CommandErrorCounter"] == hk["CommandErrorCounter"] + 2 and h2["CommandCounter"] == hk["CommandCounter"],
+            "an unknown code and a wrong length did not each count once in CommandErrorCounter (and not in CommandCounter)")
     p.raise_if()

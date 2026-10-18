@@ -968,6 +968,15 @@ static void Test_CommandErrors(void)
     n = t5_build_cmd(msg, M_FOREIGN, 0, NULL, 0);
     deliver_to_cmd_pipe(msg, n);
     UtAssert_True(t5_count_ev(EID_MID_ERR, ev0) == 1, "an unexpected message ID emits SFI_MID_ERR_EID (5)");
+    if (get_hk(&h0))
+        UtAssert_True(h0.cec == (uint8)(h.cec + 1) && h0.cc == h.cc,
+                      "the unexpected message ID counts as one rejected command (CommandErrorCounter %u -> %u)", h.cec, h0.cec);
+    cmd(CC_SEND_STATUS, NULL, 0);
+    cmd(CC_CLEAR_HISTORY, NULL, 0);
+    if (get_hk(&h))
+        UtAssert_True(h.cc == (uint8)(h0.cc + 2) && h.cec == h0.cec,
+                      "SEND_STATUS and CLEAR_HISTORY are accepted commands and each increment CommandCounter (%u -> %u)",
+                      h0.cc, h.cc);
 }
 
 static void Test_TableUpdate(void)

@@ -10,8 +10,9 @@
 #      fixtures, the frame-builder checks against a reference tools/udp_harness.py;
 #   2. component behaviour tests through the review's glue: partial references (selftest/hidden_reference)
 #      pass all eight checks, do-nothing stand-ins fail all eight without crashing;
-#   3. live checks of S3, S4 and C.1 against fake nodes in a private network/mount namespace (all pass),
-#      and with seeded faults in the fake (the targeted checks fail);
+#   3. live checks of S3, S4 and C.1 against fake nodes through the review's isolated lane (groups in their
+#      own namespaces, T5_PACK_JOBS at a time; all pass), and with seeded faults in the fake (the targeted
+#      checks fail); the five runs go at once, which also shows the groups do not interfere;
 #   4. dry run of run.sh against the unmodified template inside the harness's isolation wrapper: exit 1, a
 #      valid result, only the properties the template already has pass, every other check fails with
 #      feedback and no pack error, the per-subsystem summary is written; its time is reported.
@@ -43,10 +44,17 @@ for mode in reference fake; do
 done
 
 echo "== 3. live checks against fake nodes"
-python3 -B "$here/selftest/live_fake.py" "$work/live" > "$work/live.log" 2>&1 || { fail "live fake"; grep -E "^BAD" "$work/live.log"; }
+pids=()
+python3 -B "$here/selftest/live_fake.py" "$work/live" > "$work/live.log" 2>&1 & pids+=("$!")
+mutants=(evict-newest format-as-crc budget-ignored max-age-ignored)
+for m in "${mutants[@]}"; do
+    python3 -B "$here/selftest/live_fake.py" "$work/live-$m" --mutant "$m" > "$work/live-$m.log" 2>&1 & pids+=("$!")
+done
+wait "${pids[0]}" || { fail "live fake"; grep -E "^BAD" "$work/live.log"; }
 tail -n 1 "$work/live.log"
-for m in evict-newest format-as-crc budget-ignored max-age-ignored; do
-    python3 -B "$here/selftest/live_fake.py" "$work/live" --mutant "$m" > "$work/live-$m.log" 2>&1 || fail "live fake mutant $m"
+for i in "${!mutants[@]}"; do
+    m="${mutants[$i]}"
+    wait "${pids[$((i + 1))]}" || { fail "live fake mutant $m"; grep -E "^BAD" "$work/live-$m.log"; }
     tail -n 1 "$work/live-$m.log"
 done
 

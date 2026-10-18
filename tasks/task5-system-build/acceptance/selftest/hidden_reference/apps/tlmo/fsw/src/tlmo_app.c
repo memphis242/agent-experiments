@@ -398,7 +398,10 @@ void TLMO_AppMain(void)
                 case TLMO_CMD_MID: Cmd(b); break;
                 case TLMO_SEND_HK_MID: Hk(); break;
                 case TLMO_WAKEUP_MID: Wakeup(); break;
-                default: CFE_EVS_SendEvent(5, CFE_EVS_EventType_ERROR, "TLMO: bad MID 0x%04X", (unsigned)V(mid)); break;
+                default:
+                    G.Cec++;
+                    CFE_EVS_SendEvent(5, CFE_EVS_EventType_ERROR, "TLMO: bad MID 0x%04X", (unsigned)V(mid));
+                    break;
             }
         }
     }

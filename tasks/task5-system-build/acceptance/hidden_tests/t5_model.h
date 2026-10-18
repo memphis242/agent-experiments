@@ -1474,6 +1474,8 @@ typedef struct
     bool   connected;
     uint16 peer_port;
     bool   peer_closed;
+    bool   pending;             /* a connect attempt is in progress (OS_SocketConnect returned OS_ERROR_TIMEOUT) */
+    bool   failed;              /* an in-progress attempt ended in failure: readable, and a read reports an error */
     uint8 *dq[T5_DGRAM_Q]; size_t dq_len[T5_DGRAM_Q]; int dq_head, dq_count;
     uint8 *rx; size_t rx_len;   /* stream bytes waiting for the application */
 } t5_sock_t;
@@ -1484,6 +1486,9 @@ T5_VAR t5_sock_t t5_sock[T5_SOCK_MAX];
 T5_VAR t5_sent_t t5_sent[T5_SENT_MAX];
 T5_VAR int       t5_nsent;
 T5_VAR uint16    t5_listen[8];        /* TCP ports the test listens on */
+T5_VAR uint16    t5_listen_pending[8]; /* TCP ports whose connect attempts stay in progress until t5_tcp_complete() */
+T5_VAR int       t5_connect_waiting;  /* connect calls with a nonzero timeout (they would block the caller) */
+T5_VAR int       t5_connect_again;    /* connect calls on a socket whose attempt is still in progress */
 T5_VAR int32     t5_sock_open_rc, t5_bind_rc, t5_sendto_rc;
 T5_VAR uint16    t5_bind_fail_port;   /* binding this port fails */
 T5_VAR int       t5_blocking_recvs;   /* receives that would wait with nothing pending */
@@ -1620,13 +1625,36 @@ T5_FN bool t5_listening(uint16 port)
     return false;
 }
 
-T5_FN void t5_connect(UT_EntryKey_t key, const UT_StubContext_t *c)
+T5_FN bool t5_pending_port(uint16 port)
+{
+    int k;
+    for (k = 0; k < 8; k++) if (t5_listen_pending[k] == port && port != 0) return true;
+    return false;
+}
+
+/* Connect model: a listener accepts at once; a pending listener leaves the attempt in progress
+ * (OS_ERROR_TIMEOUT) until t5_tcp_complete(); anything else refuses (OS_ERROR). */
+T5_FN void t5_connect(UT_EntryKey_t key, const UT_StubContext_t *c, bool waits)
 {
     int k = t5_sock_index(UT_Hook_GetArgValueByName(c, "sock_id", osal_id_t));
     const OS_SockAddr_t *a = UT_Hook_GetArgValueByName(c, "Addr", const OS_SockAddr_t *);
     uint16 port = t5_addr_port(a);
     t5_n_connect++;
+    if (waits) t5_connect_waiting++;
     if (k < 0) { t5_ret(key, OS_ERR_INVALID_ID); return; }
+    if (t5_sock[k].pending || t5_sock[k].connected)
+    {
+        t5_connect_again++;
+        t5_ret(key, OS_ERROR);
+        return;
+    }
+    if (t5_sock[k].stream && t5_pending_port(port))
+    {
+        t5_sock[k].pending = true;
+        t5_sock[k].peer_port = port;
+        t5_ret(key, OS_ERROR_TIMEOUT);
+        return;
+    }
     if (!t5_sock[k].stream || !t5_listening(port)) { t5_ret(key, OS_ERROR); return; }
     t5_sock[k].connected = true;
     t5_sock[k].peer_port = port;
@@ -1635,8 +1663,33 @@ T5_FN void t5_connect(UT_EntryKey_t key, const UT_StubContext_t *c)
     t5_ret(key, OS_SUCCESS);
 }
 
-T5_FN void H_OS_SocketConnect(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c) { (void)ud; t5_connect(key, c); }
-T5_FN void H_OS_SocketConnectAbs(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c) { (void)ud; t5_connect(key, c); }
+T5_FN void H_OS_SocketConnect(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    (void)ud;
+    t5_connect(key, c, UT_Hook_GetArgValueByName(c, "timeout", int32) != 0);
+}
+
+T5_FN void H_OS_SocketConnectAbs(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    OS_time_t abs = UT_Hook_GetArgValueByName(c, "abs_timeout", OS_time_t);
+    (void)ud;
+    t5_connect(key, c, OS_TimeGetTotalMilliseconds(abs) > (int64)t5_now_sec * 1000 + (int64)(((uint64)t5_now_sub * 1000u) >> 32));
+}
+
+/* The test ends every in-progress attempt to `port`: accepted (ok) or refused. */
+T5_FN void t5_tcp_complete(uint16 port, bool ok)
+{
+    int k;
+    for (k = 0; k < T5_SOCK_MAX; k++)
+    {
+        if (!t5_sock[k].used || !t5_sock[k].stream || !t5_sock[k].pending || t5_sock[k].peer_port != port) continue;
+        t5_sock[k].pending = false;
+        t5_sock[k].connected = ok;
+        t5_sock[k].failed = !ok;
+        t5_sock[k].peer_closed = false;
+        t5_sock[k].rx_len = 0;
+    }
+}
 
 /* The test (as a UDP peer) sends one datagram to the application's port. */
 T5_FN bool t5_udp_inject(uint16 port, const void *data, size_t n)
@@ -1660,6 +1713,8 @@ T5_FN int32 t5_recvfrom(int k, void *buf, size_t n, int32 timeout)
     if (t5_sock[k].stream)
     {
         /* a connected stream socket read with RecvFrom yields its pending stream bytes */
+        if (t5_sock[k].failed) return OS_ERROR;
+        if (t5_sock[k].pending) return OS_ERROR_TIMEOUT;
         if (!t5_sock[k].connected) return OS_ERROR;
         if (t5_sock[k].rx_len == 0)
         {
@@ -1794,7 +1849,7 @@ T5_FN int32 do_write(osal_id_t id, const void *buf, size_t n)
     int s = t5_sock_index(id);
     if (s >= 0)
     {
-        if (!t5_sock[s].stream || !t5_sock[s].connected) return OS_ERROR;
+        if (!t5_sock[s].stream || !t5_sock[s].connected || t5_sock[s].pending || t5_sock[s].failed) return OS_ERROR;
         if (t5_sock[s].peer_closed) return OS_ERROR;
         if (t5_nsent < T5_SENT_MAX)
         {
@@ -1834,6 +1889,12 @@ T5_FN int32 do_read(osal_id_t id, void *buf, size_t n, int32 timeout)
     if (s >= 0)
     {
         if (!t5_sock[s].stream) return t5_recvfrom(s, buf, n, timeout);
+        if (t5_sock[s].failed) return OS_ERROR;
+        if (t5_sock[s].pending)
+        {
+            if (timeout != 0) t5_blocking_recvs++;
+            return OS_ERROR_TIMEOUT;
+        }
         if (!t5_sock[s].connected) return OS_ERROR;
         if (t5_sock[s].rx_len == 0)
         {
@@ -1909,7 +1970,8 @@ T5_FN bool t5_readable(osal_id_t id)
     mfd_t *d = fd_of(id);
     int s = t5_sock_index(id);
     if (s >= 0)
-        return t5_sock[s].stream ? (t5_sock[s].rx_len > 0 || t5_sock[s].peer_closed) : t5_sock[s].dq_count > 0;
+        return t5_sock[s].stream ? (t5_sock[s].rx_len > 0 || t5_sock[s].peer_closed || t5_sock[s].failed)
+                                 : t5_sock[s].dq_count > 0;
     if (d == NULL) return false;
     return mf[d->file].dev ? mf[d->file].rx_len > 0 : true;
 }
@@ -1923,7 +1985,8 @@ T5_FN void H_OS_SelectSingle(void *ud, UT_EntryKey_t key, const UT_StubContext_t
     (void)ud;
     if (fd_of(id) == NULL && t5_sock_index(id) < 0) { t5_ret(key, OS_ERR_INVALID_ID); return; }
     if ((want & OS_STREAM_STATE_READABLE) && t5_readable(id)) got |= OS_STREAM_STATE_READABLE;
-    if (want & OS_STREAM_STATE_WRITABLE) got |= OS_STREAM_STATE_WRITABLE;
+    if ((want & OS_STREAM_STATE_WRITABLE) && !(t5_sock_index(id) >= 0 && t5_sock[t5_sock_index(id)].pending))
+        got |= OS_STREAM_STATE_WRITABLE;
     *flags = got;
     if (got == 0)
     {
@@ -2594,6 +2657,8 @@ T5_FN void t5_setup(void)
     memset(t5_sent, 0, sizeof(t5_sent));
     t5_nsent = 0;
     memset(t5_listen, 0, sizeof(t5_listen));
+    memset(t5_listen_pending, 0, sizeof(t5_listen_pending));
+    t5_connect_waiting = t5_connect_again = 0;
     t5_sock_open_rc = t5_bind_rc = t5_sendto_rc = OS_SUCCESS;
     t5_bind_fail_port = 0;
     t5_blocking_recvs = 0;

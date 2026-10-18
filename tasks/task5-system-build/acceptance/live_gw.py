@@ -391,8 +391,9 @@ def c_tcp(ctx: "Ctx") -> None:
     srv = TcpServer(port)
     ctx.on_session_end(srv.close)
     mark = n.g.mark()
-    if not srv.accept(4.0):
-        raise Fail("GW did not connect within 4 s after the listener appeared")
+    if not srv.accept(spec.GW_TCP_ATTEMPT_SEC + 2.5):
+        raise Fail(f"GW did not connect within {spec.GW_TCP_ATTEMPT_SEC + 2.5:.1f} s after the listener appeared (attempts "
+                   f"start every {spec.GW_TCP_ATTEMPT_SEC} s while CONNECTING)")
     p.check(bool(n.wait_event(mark, "GW", EID["CONN_UP_INF"], 3.0)), "no GW_CONN_UP_INF_EID after the connection was made")
     p.check(wait_hk_field(n, "GW", lambda h: h["ConnectionsUp"] >= 1, 3.0, "ConnectionsUp is 0")["ConnectionsUp"] >= 1, "ConnectionsUp")
     pkts = [fr.build_verification(E5, 40, counter=i) for i in range(2)]
@@ -403,10 +404,50 @@ def c_tcp(ctx: "Ctx") -> None:
     for item in stream_ingress_battery(n, srv.write, "TCP"):
         p.check(False, item)
     srv.close_conn()
-    time.sleep(1.0)
-    p.check(conn_status(n)[2]["State"] == spec.GW_STATE["CONNECTING"] or srv.accept(0.1),
-            "after the peer closed, the connection did not return to CONNECTING")
-    p.check(srv.conn is not None or srv.accept(4.0), "GW did not reconnect after the peer closed")
+    p.check(srv.accept(3.0), "after the peer closed, GW did not begin a new connect cycle with an attempt at once")
+    p.check(wait_hk_field(n, "GW", lambda h: h["ConnectionsUp"] >= 1, 3.0, "ConnectionsUp did not return to 1")["ConnectionsUp"] >= 1,
+            "ConnectionsUp after the reconnect")
+    p.raise_if()
+
+
+def c_tcp_down(ctx: "Ctx") -> None:
+    """S5.2 connect cycle: four attempts 5 s apart against a peer that never listens, then DOWN with
+    GW_CONN_TIMEOUT_ERR_EID about 20 s after the connection was opened, no further attempt, and a new cycle on
+    DISABLE_CONN then ENABLE_CONN."""
+    n = boot(ctx, (1,))[1]
+    n.ensure_command_path()
+    p = Problems()
+    port = free_port(socket.SOCK_STREAM)
+    mark = n.g.mark()
+    t0 = time.monotonic()
+    add_conn(n, 4, tb.ConnDef(spec.GW_IF["TCP"], 1, 0, "127.0.0.1", port, "", (E5,)))
+    p.check(conn_status(n)[4]["State"] == spec.GW_STATE["CONNECTING"], "a TCP connection to a peer that does not listen is not "
+                                                                         "CONNECTING after ADD_CONN")
+    down = n.wait_event(mark, "GW", EID["CONN_TIMEOUT_ERR"], 32.0)
+    expected = spec.GW_TCP_ATTEMPT_SEC * (1 + spec.GW_TCP_MAX_RETRIES)
+    if not p.check(bool(down), f"no GW_CONN_TIMEOUT_ERR_EID within 32 s (expected about {expected} s after ADD_CONN)"):
+        p.raise_if()
+    took = down[0].t - t0
+    p.check(expected - 2 <= took <= expected + 6, f"GW_CONN_TIMEOUT_ERR_EID came {took:.1f} s after ADD_CONN; four attempts "
+                                                  f"5 s apart give DOWN at about {expected} s (accepted {expected - 2}..{expected + 6} s)")
+    p.check("4" in down[0].text and str(port) in down[0].text,
+            f"GW_CONN_TIMEOUT_ERR_EID does not name connection 4 and port {port}: {down[0].text!r}")
+    p.check(len(n.events(mark, "GW", EID["CONN_TIMEOUT_ERR"])) == 1, "more than one GW_CONN_TIMEOUT_ERR_EID for one cycle")
+    st = conn_status(n)[4]
+    p.check(st["State"] == spec.GW_STATE["DOWN"] and st["Enabled"] == 1, f"after the cycle the connection status is {st} "
+                                                                          f"(DOWN is 3, Enabled stays 1)")
+    h1 = n.hk("GW")
+    n.inject([fr.build_verification(E5, 40, counter=1)], burst=1)
+    time.sleep(0.5)
+    p.check(n.hk("GW")["EgressErrors"] > h1["EgressErrors"], "a packet for a DOWN connection was not counted as an egress error")
+    srv = TcpServer(port)
+    ctx.on_session_end(srv.close)
+    p.check(not srv.accept(spec.GW_TCP_ATTEMPT_SEC + 2.5), "GW attempted a connection again while DOWN")
+    mark = n.g.mark()
+    n.cmd("GW", "DISABLE_CONN", struct.pack("<B3x", 4))
+    n.cmd("GW", "ENABLE_CONN", struct.pack("<B3x", 4))
+    p.check(srv.accept(3.0), "DISABLE_CONN then ENABLE_CONN did not begin a new cycle with an attempt at once")
+    p.check(bool(n.wait_event(mark, "GW", EID["CONN_UP_INF"], 3.0)), "no GW_CONN_UP_INF_EID after the new cycle connected")
     p.raise_if()
 
 
@@ -534,6 +575,7 @@ def c_conn_commands(ctx: "Ctx") -> None:
     add_conn(n, 0, udp_conn(0, peer.port, (E4, E5)))
     add_conn(n, 1, udp_conn(local, peer.port, (E5,)))
     hk = n.hk("GW")
+    base = hk
     p.check(hk["ConnectionsConfigured"] == 2 and hk["Subscriptions"] == 2, f"ConnectionsConfigured/Subscriptions {hk['ConnectionsConfigured']}/"
                                                                             f"{hk['Subscriptions']} (union of two MIDs)")
     bad = [
@@ -555,7 +597,12 @@ def c_conn_commands(ctx: "Ctx") -> None:
     time.sleep(0.6)
     got = len(n.events(mark, "GW", EID["CONN_ADD_ERR"]))
     p.check(got == len(bad), f"{got} GW_CONN_ADD_ERR_EID events for {len(bad)} invalid ADD_CONN commands")
-    p.check(n.hk("GW")["ConnectionsConfigured"] == 2, "an invalid ADD_CONN configured a connection")
+    after = n.hk("GW")
+    p.check(after["ConnectionsConfigured"] == 2, "an invalid ADD_CONN configured a connection")
+    p.check((after["CommandErrorCounter"] - base["CommandErrorCounter"]) % 256 == len(bad) and
+            after["CommandCounter"] == base["CommandCounter"],
+            f"{len(bad)} rejected ADD_CONN commands moved CommandErrorCounter/CommandCounter by "
+            f"{(after['CommandErrorCounter'] - base['CommandErrorCounter']) % 256}/{after['CommandCounter'] - base['CommandCounter']}")
     mark = n.g.mark()
     n.cmd("GW", "DISABLE_CONN", struct.pack("<B3x", 0))
     p.check(bool(n.wait_event(mark, "GW", EID["CONN_DISABLE_INF"])), "DISABLE_CONN produced no event 17")
@@ -564,11 +611,13 @@ def c_conn_commands(ctx: "Ctx") -> None:
     peer.drain()
     n.inject([fr.build_verification(E4, 40, counter=1)], burst=1)
     p.check(not peer.recv_all(0.8), "a disabled connection still egresses")
+    e0 = n.hk("GW")["CommandErrorCounter"]
     mark = n.g.mark()
     n.cmd("GW", "DISABLE_CONN", struct.pack("<B3x", 0))
     n.cmd("GW", "ENABLE_CONN", struct.pack("<B3x", 1))
     n.cmd("GW", "REMOVE_CONN", struct.pack("<B3x", 5))
     time.sleep(0.5)
+    p.check((n.hk("GW")["CommandErrorCounter"] - e0) % 256 == 3, "three rejected connection commands did not each count as an error")
     for eid, label in ((EID["CONN_DISABLE_ERR"], "DISABLE of a disabled"), (EID["CONN_ENABLE_ERR"], "ENABLE of an enabled"),
                        (EID["CONN_REMOVE_ERR"], "REMOVE of an unused")):
         p.check(bool(n.events(mark, "GW", eid)), f"{label} connection produced no error event {eid}")
