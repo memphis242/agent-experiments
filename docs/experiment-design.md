@@ -19,7 +19,7 @@ against a baseline. Started 2026-10-17.
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (11 arms)
+## Experiment A: model tiering (12 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -62,7 +62,7 @@ drops a run.
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
 
-Runs: 11 arms x 4 tasks x 3 repetitions = 132 runs, plus repair rounds.
+Runs: 12 arms x 4 tasks x 3 repetitions = 144 runs, plus repair rounds.
 Budget is not a constraint: a run that hits a subscription usage limit is
 dropped and rerun after the limit is raised. Run order is the plain
 arm x task x repetition product; the experiment is short enough that
