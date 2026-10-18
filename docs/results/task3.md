@@ -1,11 +1,13 @@
-# Task 3 results (housekeeping staleness detection), 27 runs, 2026-10-18
+# Task 3 results (housekeeping staleness detection), 36 runs, 2026-10-18
 
-All 27 valid runs passed acceptance. Billed cost includes compaction requests
+All 36 valid runs passed acceptance. Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the three repetitions;
 spend per pass is total spend over all attempts divided by passes. Nineteen
 attempts from the first wave were cut off by the subscription session limit
 (recorded as `cli_error`), dropped and rerun from scratch; they are excluded here.
-The first eight runs were made on six parallel slots, the rest on three.
+The first eight runs were made on six parallel slots, the rest on three. A10 to A12
+were added later and run on six; nine of their attempts stopped at a session limit
+within seconds of starting (recorded as `usage_limit`) and were likewise rerun.
 
 ## Spread across arms
 
@@ -28,13 +30,16 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A7 | Sonnet 5 subagents, conservative | task3 | 3/3 | 8.40 | 7.94 to 8.85 | 0.91 | 21.5 to 31.3 | 106 to 123 | 0 | 1 | 0 | 287.8 to 296.2 | - |
 | A8 | Sonnet 4.6 subagents, eager | task3 | 3/3 | 15.31 | 10.05 to 18.95 | 8.90 | 35.5 to 43.6 | 22 to 104 | 2 to 4 | 1 to 3 | 0 to 1 | 196.6 to 251.2 | 163.0 to 165.3 |
 | A9 | Sonnet 4.6 subagents, conservative | task3 | 3/3 | 7.58 | 6.60 to 8.81 | 2.21 | 19.1 to 27.4 | 96 to 114 | 0 | 1 | 0 | 250.3 to 318.7 | - |
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A3 0.78, A4 0.78, A9 0.86,
-A7 0.95, A5 0.96, A2 1.35, A6 1.60, A8 1.73.
+| A10 | solo Sonnet 5.5, xhigh effort | task3 | 3/3 | 7.00 | 6.39 to 7.73 | 1.34 | 30.2 to 35.0 | 6 to 121 | 0 | 1 | 0 | 429.6 to 456.2 | - |
+| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 3/3 | 2.64 | 2.05 to 3.01 | 0.97 | 22.9 to 52.6 | 1 to 27 | 1 to 2 | 1 to 2 | 0 | 166.3 to 227.8 | 237.4 to 267.6 |
+| A12 | solo Sonnet 5.5, high effort | task3 | 3/3 | 4.03 | 3.74 to 4.52 | 0.77 | 21.8 to 28.0 | 97 to 107 | 0 | 2 | 0 | 265.8 to 316.1 | - |
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.30, A12 0.46, A3 0.78,
+A4 0.78, A10 0.79, A9 0.86, A7 0.95, A5 0.96, A2 1.35, A6 1.60, A8 1.73.
 
 Notes:
 
-- Eager Sonnet 5.5 delegation (A4) is the cheapest arm together with conservative
-  Opus (A3), 22 percent under solo, with the tightest spread of the task (0.62 USD).
+- Among the Opus 5.5 main-agent arms, eager Sonnet 5.5 delegation (A4) is the
+  cheapest together with conservative Opus (A3), 22 percent under solo, with the tightest spread of the task (0.62 USD).
   Its three runs each took seven main-agent turns: the orchestrator did little
   besides delegate, and the main agent's context peaked at about half of solo's.
   This is the first task on which a delegation arm separates from solo rather than
@@ -55,7 +60,25 @@ Notes:
   at 172K tokens (195 seconds for the compaction request). Sonnet 4.6 runs in a 200K
   window; no main agent compacted, including solo runs peaking at 331K on Opus 5.5's
   1M window.
-- Solo and conservative main agents peaked at 242K to 331K tokens; eager main agents
+- Solo and conservative Opus main agents peaked at 242K to 331K tokens; eager main agents
   at 143K to 251K; eager subagents at 148K to 382K.
-- Second or later acceptance rounds: A6 three runs, A8 two runs; every other run
-  passed on the first round.
+- Second or later acceptance rounds: A6 three runs, A8 two runs, A11 one run, A12
+  three runs; every other run passed on the first round.
+- A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs
+  0.46 of A1, but all three of its runs needed a second round for the same genuine
+  defect: no fresh event (ID 41) when input resumes after a stale period, caught by
+  the hidden unit tests and the live check. Each run fixed it from the round-one
+  feedback. A11 rep 3 missed the same event and also passed in round two; no Opus
+  5.5 main-agent run failed that check.
+- At xhigh effort (A10) solo Sonnet 5.5 passed every run in the first round, at 0.79
+  of A1 and the slowest wall time of the single-round arms (30 to 35 min). Its main
+  context peaked at 430K to 456K tokens, the highest of any arm on Tasks 1 to 3, still
+  well inside the 1M window with no compaction.
+- A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester only) is the cheapest arm at
+  0.30 of A1. Unlike Task 2 it delegated in every run: a Haiku tester in all three
+  (two in rep 3) and a Haiku implementer once. Its subagents reached 237K to 268K
+  tokens of context, above its own main agent's 166K to 228K. Rep 3's 53 minutes
+  include the second round.
+- Turn counts below the arm's typical range (A10's 6, A11's 1) are the CLI counting
+  artefact described in the Task 2 notes; the column will be recomputed from
+  transcripts.
