@@ -320,5 +320,43 @@ class CommandTest(unittest.TestCase):
         self.assertEqual(cmd[cmd.index("--autocompact") + 1], "100000")
 
 
+class AcceptanceTimeoutTest(unittest.TestCase):
+    def parse(self, timeout_file, *flags):
+        with tempfile.TemporaryDirectory() as tmp:
+            pack = Path(tmp) / "task1-utlog-translator" / "acceptance"
+            pack.mkdir(parents=True)
+            if timeout_file is not None:
+                (pack / "timeout_s").write_bytes(timeout_file)
+            _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--tasks-dir", tmp, *flags])
+        return cfg.acceptance_timeout_s
+
+    def test_no_file_gives_default(self):
+        self.assertEqual(self.parse(None), 2400.0)
+        self.assertEqual(self.parse(None, "--acceptance-timeout", "30"), 30.0)
+
+    def test_file_gives_its_value(self):
+        self.assertEqual(self.parse(b"2760"), 2760.0)
+        self.assertEqual(self.parse(b"2760\n"), 2760.0)
+
+    def test_explicit_flag_at_or_above_file_wins(self):
+        self.assertEqual(self.parse(b"2760\n", "--acceptance-timeout", "3000"), 3000.0)
+        self.assertEqual(self.parse(b"2760\n", "--acceptance-timeout", "2760"), 2760.0)
+
+    def test_explicit_flag_below_file_is_an_error(self):
+        with self.assertRaises(SystemExit):
+            self.parse(b"2760\n", "--acceptance-timeout", "2400")
+
+    def test_malformed_file_is_an_error(self):
+        for content in (b"", b"\n", b"abc", b"0", b"-5", b"27.5", b"2760 s", b"2760\n\n", b" 2760", b"\xff"):
+            with self.subTest(content=content), self.assertRaises(SystemExit):
+                self.parse(content)
+
+    def test_unreadable_file_is_an_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "timeout_s").mkdir()
+            with self.assertRaises(run.RunError):
+                run.pack_timeout_s(Path(tmp))
+
+
 if __name__ == "__main__":
     unittest.main()

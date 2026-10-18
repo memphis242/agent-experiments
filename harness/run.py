@@ -606,6 +606,37 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     print(claude_line(sample_feedback, "<session_id>"))
 
 
+DEFAULT_ACCEPTANCE_TIMEOUT_S = 2400.0
+PACK_TIMEOUT_FILE = "timeout_s"
+
+
+def pack_timeout_s(pack: Path) -> float | None:
+    """The minimum acceptance timeout a pack declares in `timeout_s` (one positive integer,
+    optional trailing newline), or None when the pack has no such file."""
+    path = pack / PACK_TIMEOUT_FILE
+    if not path.exists():
+        return None
+    try:
+        text = path.read_text(encoding="ascii")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RunError(f"cannot read {path}: {exc}") from exc
+    if not re.fullmatch(r"[0-9]+\n?", text) or int(text) < 1:
+        raise RunError(f"{path} must hold a single positive integer number of seconds, got {text!r}")
+    return float(int(text))
+
+
+def resolve_acceptance_timeout(explicit: float | None, pack: Path) -> float:
+    """The explicit --acceptance-timeout, else the pack's declared timeout, else the default.
+    An explicit value below the pack's declared minimum is an error."""
+    declared = pack_timeout_s(pack)
+    if explicit is None:
+        return DEFAULT_ACCEPTANCE_TIMEOUT_S if declared is None else declared
+    if declared is not None and explicit < declared:
+        raise RunError(f"--acceptance-timeout {explicit:g} is below the {declared:g} s that "
+                       f"{pack / PACK_TIMEOUT_FILE} declares as this pack's minimum")
+    return explicit
+
+
 def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfig]:
     p = argparse.ArgumentParser(description="Run one arm x task x repetition.")
     p.add_argument("--arm", required=True, choices=list(arms.ARMS))
@@ -619,7 +650,9 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--gaps", type=Path, default=DEFAULT_GAPS, help="gaps.json from gaps.py")
     p.add_argument("--max-rounds", type=int, default=5,
                    help="agent invocations in total: the initial one plus up to N-1 repair resumes (default 5)")
-    p.add_argument("--acceptance-timeout", type=float, default=2400.0, help="seconds per acceptance run (default 2400)")
+    p.add_argument("--acceptance-timeout", type=float, default=None,
+                   help="seconds per acceptance run (default: the pack's acceptance/timeout_s, else 2400; "
+                        "may not be lower than the pack's)")
     p.add_argument("--cli-timeout", type=float, default=21600.0, help="seconds per claude invocation (default 6 hours)")
     p.add_argument("--seed", type=int, default=0, help="seed for simulated pause sampling")
     p.add_argument("--claude-bin", default="claude")
@@ -635,8 +668,13 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
         short, directory = resolve_task(a.tasks_dir, a.task)
     except RunError as exc:
         p.error(str(exc))
+    try:
+        acceptance_timeout = resolve_acceptance_timeout(a.acceptance_timeout, a.tasks_dir / directory / "acceptance")
+    except RunError as exc:
+        p.error(str(exc))
+    assert acceptance_timeout > 0
     cfg = RunConfig(a.arm, short, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
-                    a.gaps, a.max_rounds, a.acceptance_timeout, a.cli_timeout, a.seed,
+                    a.gaps, a.max_rounds, acceptance_timeout, a.cli_timeout, a.seed,
                     a.claude_bin, directory, not a.no_netns)
     return a, cfg
 

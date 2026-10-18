@@ -13,6 +13,13 @@ an agent failure.
 The working directory is the copied pack. The script must not modify the
 repository. It runs under a timeout (`--acceptance-timeout`, default 2400 s). A timeout is recorded as a failed round (spend kept) and the run continues with the generic feedback "The acceptance run did not complete; verify the build, tests and runtime behavior end to end." Packs must catch exceptions per check and report them as failed checks; exit 2 is reserved for faults that precede any use of the agent's code.
 
+## Timeout declaration
+
+A pack may declare the minimum acceptance timeout it needs in `acceptance/timeout_s`: a single positive
+integer number of seconds with an optional trailing newline (for example `2760`). Without the file the
+timeout is 2400 s. `--acceptance-timeout` overrides the default but may not be lower than the declared
+value; a lower flag value, or a `timeout_s` that is not a positive integer, fails argument parsing.
+
 ## Hidden answer key
 
 The harness copies the pack to `<run-dir>/acceptance/` for the duration of one run, without any `selftest/` directory, and deletes the copy afterwards. The pack's environment carries no `CLAUDE_CODE_OAUTH_TOKEN`.
