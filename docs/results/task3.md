@@ -31,9 +31,9 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A8 | Sonnet 4.6 subagents, eager | task3 | 3/3 | 15.31 | 10.05 to 18.95 | 8.90 | 35.5 to 43.6 | 22 to 104 | 2 to 4 | 1 to 3 | 0 to 1 | 196.6 to 251.2 | 163.0 to 165.3 |
 | A9 | Sonnet 4.6 subagents, conservative | task3 | 3/3 | 7.58 | 6.60 to 8.81 | 2.21 | 19.1 to 27.4 | 96 to 114 | 0 | 1 | 0 | 250.3 to 318.7 | - |
 | A10 | solo Sonnet 5.5, xhigh effort | task3 | 3/3 | 7.00 | 6.39 to 7.73 | 1.34 | 30.2 to 35.0 | 6 to 121 | 0 | 1 | 0 | 429.6 to 456.2 | - |
-| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 3/3 | 2.64 | 2.05 to 3.01 | 0.97 | 22.9 to 52.6 | 1 to 27 | 1 to 2 | 1 to 2 | 0 | 166.3 to 227.8 | 237.4 to 267.6 |
+| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 3/3 | 3.51 | 3.20 to 3.80 | 0.60 | 22.9 to 52.6 | 1 to 27 | 1 to 2 | 1 to 2 | 0 | 166.3 to 227.8 | 237.4 to 267.6 |
 | A12 | solo Sonnet 5.5, high effort | task3 | 3/3 | 4.03 | 3.74 to 4.52 | 0.77 | 21.8 to 28.0 | 97 to 107 | 0 | 2 | 0 | 265.8 to 316.1 | - |
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.30, A12 0.46, A3 0.78,
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.40, A12 0.46, A3 0.78,
 A4 0.78, A10 0.79, A9 0.86, A7 0.95, A5 0.96, A2 1.35, A6 1.60, A8 1.73.
 
 Notes:
@@ -75,10 +75,13 @@ Notes:
   context peaked at 430K to 456K tokens, the highest of any arm on Tasks 1 to 3, still
   well inside the 1M window with no compaction.
 - A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester only) is the cheapest arm at
-  0.30 of A1. Unlike Task 2 it delegated in every run: a Haiku tester in all three
+  0.40 of A1. Unlike Task 2 it delegated in every run: a Haiku tester in all three
   (two in rep 3) and a Haiku implementer once. Its subagents reached 237K to 268K
   tokens of context, above its own main agent's 166K to 228K. Rep 3's 53 minutes
   include the second round.
 - Turn counts below the arm's typical range (A10's 6, A11's 1) are the CLI counting
   artefact described in the Task 2 notes; the column will be recomputed from
   transcripts.
+- Haiku 5.5 is billed at five times its base rates for any request whose prompt
+  exceeds 100,000 tokens. Costs here apply that rule per request; A11's Haiku subagents
+  crossed it in some runs.

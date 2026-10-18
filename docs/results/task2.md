@@ -28,10 +28,10 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A8 | Sonnet 4.6 subagents, eager | task2 | 10/10 | 5.56 | 4.59 to 7.18 | 2.59 | 14.7 to 25.6 | 2 to 17 | 2 to 4 | 1 | 0 | 97.2 to 169.9 | 77.2 to 129.5 |
 | A9 | Sonnet 4.6 subagents, conservative | task2 | 10/10 | 3.81 | 3.18 to 4.89 | 1.71 | 10.3 to 17.8 | 3 to 75 | 0 | 1 to 2 | 0 | 150.7 to 203.3 | - |
 | A10 | solo Sonnet 5.5, xhigh effort | task2 | 10/10 | 3.13 | 2.61 to 4.09 | 1.48 | 17.3 to 25.1 | 66 to 99 | 0 | 1 | 0 | 218.1 to 290.6 | - |
-| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task2 | 10/10 | 1.25 | 1.02 to 2.02 | 1.00 | 7.3 to 20.7 | 1 to 52 | 0 to 1 | 1 | 0 | 118.6 to 169.4 | 140.6 to 154.4 |
+| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task2 | 10/10 | 1.30 | 1.02 to 2.02 | 1.00 | 7.3 to 20.7 | 1 to 52 | 0 to 1 | 1 | 0 | 118.6 to 169.4 | 140.6 to 154.4 |
 | A12 | solo Sonnet 5.5, high effort | task2 | 10/10 | 1.39 | 1.13 to 1.96 | 0.83 | 7.8 to 21.6 | 37 to 52 | 0 | 1 to 2 | 0 | 124.3 to 169.3 | - |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.32, A12 0.35, A10 0.79,
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.33, A12 0.35, A10 0.79,
 A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.73.
 
 Notes:
@@ -61,8 +61,8 @@ Notes:
   effort (A10) the cost rises 2.3-fold (0.79 of A1), wall time roughly doubles (17.3 to
   25.1 min) and the main context peaks at 218 to 291K tokens, above every other arm.
 - A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester only) is the cheapest arm at
-  0.32 of A1. It spawned a Haiku tester in 2 of 10 runs (to write coverage tests) and
-  otherwise worked alone; the two delegating runs cost 1.14 and 1.34 USD, within its
+  0.33 of A1. It spawned a Haiku tester in 2 of 10 runs (to write coverage tests) and
+  otherwise worked alone; the two delegating runs cost 1.31 and 1.62 USD, within its
   solo runs' range.
 - Grader fix: the report check required a literal `%` sign in the coverage figures,
   and its feedback did not say so. Three Sonnet 5.5 runs stated coverage as a Percent
@@ -76,3 +76,6 @@ Notes:
   completion notification triggers a short final turn, the CLI's reported turn count
   covers only that turn. The transcripts show the full tool activity; the column will
   be recomputed from transcripts.
+- Haiku 5.5 is billed at five times its base rates for any request whose prompt
+  exceeds 100,000 tokens. Costs here apply that rule per request; A11's Haiku subagents
+  crossed it in some runs.
