@@ -81,7 +81,7 @@ AXIS_HEADROOM = 1.04            # the axis extends at least this far past the ma
 # Subagent model family -> saturated colour. Order matters: first matching marker wins.
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     # (marker substring of the description, family label, saturated colour)
-    ("tiered", "Tiered Opus/Sonnet/Haiku", "#fbbf24"),
+    ("tiered", "Tiered", "#fbbf24"),
     ("Opus 5.5 subagents", "Opus 5.5", "#a78bfa"),
     ("Sonnet 5.5 subagents", "Sonnet 5.5", "#60a5fa"),
     ("Sonnet 5 subagents", "Sonnet 5", "#2dd4bf"),
@@ -317,6 +317,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
         f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
     add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, "did not pass", LEGEND_FONT_SIZE, MUTED_COLOR))
+    legend_end = lx + 2 * LEGEND_SWATCH_RADIUS + 6 + len("did not pass") * LEGEND_CHAR_WIDTH
+    assert legend_end <= (annot_x - ANNOT_GAP if annotate else card_x + card_w - PAD_X), "legend overflows its row"
     if annotate:
         add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
 

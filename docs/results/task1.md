@@ -1,6 +1,6 @@
-# Task 1 results (ut_assert log translator), 36 runs, 2026-10-18
+# Task 1 results (ut_assert log translator), 45 runs, 2026-10-18
 
-All 36 runs passed acceptance. Billed cost includes compaction requests (none occurred). Ranges are min to max over the three repetitions; spend per pass is total spend over all attempts divided by passes.
+All 45 runs passed acceptance. Billed cost includes compaction requests (none occurred). Ranges are min to max over the three repetitions; spend per pass is total spend over all attempts divided by passes.
 
 ## Spread across arms
 
@@ -26,6 +26,13 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A10 | solo Sonnet 5.5, xhigh effort | task1 | 3/3 | 1.32 | 1.25 to 1.41 | 0.16 | 8.0 to 9.5 | 30 to 31 | 0 | 1 | 0 | 105.1 to 118.3 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task1 | 3/3 | 0.45 | 0.31 to 0.55 | 0.24 | 1.6 to 2.9 | 15 to 19 | 0 | 1 | 0 | 37.7 to 63.4 | - |
 | A12 | solo Sonnet 5.5, high effort | task1 | 3/3 | 0.52 | 0.50 to 0.55 | 0.05 | 3.0 to 9.1 | 1 to 21 | 0 | 1 | 0 | 52.2 to 56.4 | - |
+| A13 | solo Opus 5.5, medium effort | task1 | 3/3 | 1.06 | 0.78 to 1.21 | 0.43 | 2.8 to 4.8 | 17 to 31 | 0 | 1 | 0 | 45.0 to 64.2 | - |
+| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5 tiered | task1 | 3/3 | 0.57 | 0.55 to 0.60 | 0.04 | 3.6 to 5.4 | 2 to 3 | 2 | 1 | 0 | 25.5 to 29.0 | 50.3 to 83.5 |
+| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5 tiered | task1 | 3/3 | 1.11 | 0.96 to 1.33 | 0.38 | 6.8 to 10.9 | 3 to 7 | 2 to 4 | 1 to 2 | 0 | 49.6 to 60.7 | 95.6 to 99.5 |
+
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.32, A12 0.37, A14 0.40,
+A13 0.75, A15 0.78, A3 0.87, A7 0.92, A10 0.93, A9 0.97, A5 1.25, A4 1.41, A6 1.92,
+A2 1.99, A8 2.61.
 
 Notes: every conservative arm spawned zero subagents on this task, so A3, A5, A7, A9 are
 behaviourally solo runs. One A5 run needed four rounds on the Markdown failures section
@@ -33,3 +40,15 @@ check. Eager arms spawned 2 to 4 subagents (implementer, tester, reviewer; occas
 built-in general-purpose agent, which the validator confirmed ran on the arm's model).
 
 A10 to A12 (added later, same task, harness run code reviewed as equivalent): solo Sonnet 5.5 at high effort (A12) cost about 0.37 of solo Opus 5.5 (A1) per pass, and at xhigh effort (A10) about 0.93, with wall time roughly doubling. A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester) spawned nothing on this task, so it is behaviourally a solo Sonnet 5.5 high run; its 0.31 to 0.55 cost overlaps A12. The A12 turns range "1 to 21" is a counting artefact: in one run the CLI's final result came from a short turn triggered by a background-build notification, so `num_turns` reported 1 although the transcript shows 22 tool calls; that run's 9.1 minutes includes waiting on the background build.
+
+A13 to A15 (added later; launched from a harness revision whose run code is reviewed as
+equivalent): solo Opus 5.5 at medium effort (A13) costs 0.75 of A1 per pass with a shorter
+wall time (2.8 to 4.8 min) and a lower main context peak (45 to 64K). The tiered arms run
+an Opus 5.5 orchestrator with a Sonnet 5.5 implementer and Haiku 5.5 small-implementer and
+tester. With the orchestrator at low effort (A14) every run delegated (one implementer and
+one tester) and cost 0.55 to 0.60 USD, 0.40 of A1, the cheapest Opus-led arm, with the
+main context peaking at only 26 to 29K. At medium effort (A15) the same split costs 0.78 of
+A1; one A15 run used all three agent types (four spawns) and needed a second round. Every
+A14 and A15 subagent ran on its agent's assigned model (no validation violations). A14's
+two to three main-agent turns are CLI-reported turn counts, which undercount when a final
+short turn follows a background notification; they will be recomputed from transcripts.
