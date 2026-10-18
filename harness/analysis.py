@@ -4,6 +4,7 @@ Shared by run.py (after each round) and reanalyze.py (from archived files).
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
 
@@ -62,6 +63,40 @@ def session_model_usage(record: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def cache_ttl_report(requests: Sequence[cost.Request], expected_main: str,
+                     expected_subagent: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Cache-write TTL actually used per thread kind, plus a cache_ttl violation per mismatched kind.
+
+    A request mismatches when it writes cache with the TTL other than the one expected for
+    its thread kind. Requests whose usage carried no 1h/5m split are counted as unsplit and
+    never judged. Reported, never acted on."""
+    ttls = {"1h": "cache_write_1h_tokens", "5m": "cache_write_5m_tokens"}
+    expected = {"main": expected_main, "subagent": expected_subagent}
+    assert set(expected.values()) <= set(ttls)
+    summary: dict[str, Any] = {}
+    violations: list[dict[str, Any]] = []
+    for source, want in expected.items():
+        group = [r for r in requests if r.source == source]
+        other = "5m" if want == "1h" else "1h"
+        broken = [r for r in group if r.ttl_split_known and getattr(r, ttls[other]) > 0]
+        stamps = [r.timestamp for r in broken if r.timestamp > 0]
+        first = (datetime.fromtimestamp(min(stamps), timezone.utc).isoformat().replace("+00:00", "Z")
+                 if stamps else None)
+        summary[source] = {
+            "expected": want,
+            "write_1h_tokens": sum(r.cache_write_1h_tokens for r in group),
+            "write_5m_tokens": sum(r.cache_write_5m_tokens for r in group),
+            "requests_with_5m_write": sum(1 for r in group if r.cache_write_5m_tokens > 0),
+            "mismatched_requests": len(broken),
+            "unsplit_requests": sum(1 for r in group if not r.ttl_split_known),
+            "first_mismatch_timestamp": first,
+        }
+        if broken:
+            violations.append({"kind": "cache_ttl", "source": source, "file": "-", "expected": want,
+                               "observed": other, "count": len(broken), "first_timestamp": first})
+    return summary, violations
+
+
 def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Sequence[Path],
                   resume_indices: Sequence[int], gaps_path: Path, seed: int,
                   definition_models: dict[str, str]) -> None:
@@ -98,6 +133,9 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         peaks = cost.context_peaks(requests)
         behavior["max_context_main"] = peaks["main"]
         behavior["max_context_subagent"] = peaks["subagent"]
+        ttl, ttl_violations = cache_ttl_report(requests, arms.PROMPT_CACHE_TTL, arms.SUBAGENT_PROMPT_CACHE_TTL)
+        behavior["cache_ttl"] = ttl
+        behavior["cache_ttl_drop"] = ttl["main"]["mismatched_requests"] > 0
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         arm = arms.get_arm(record["arm"])
@@ -105,6 +143,7 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model,
                                                 arm.subagent_models, arms.effort_map(arm), forbidden,
                                                 {a: arm.model_for(a) for a in arm.agents} if arm.multi_model else None)
+        violations += ttl_violations
         inventory = [{**{k: v for k, v in i.items() if k != "path"},
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]

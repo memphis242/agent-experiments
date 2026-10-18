@@ -86,6 +86,7 @@ class Request:
     cache_write_5m_tokens: int
     cache_write_1h_tokens: int
     thread: str = ""            # transcript file stem for subagent requests
+    ttl_split_known: bool = True  # False when the usage carried no 1h/5m split (writes then count as 5m)
 
     def __post_init__(self) -> None:
         assert self.source in SOURCES
@@ -107,6 +108,7 @@ def _request_from_usage(message: dict, usage: dict, entry: dict, source: str, ma
             w5m = created - w1h
     else:
         w1h, w5m = 0, created
+    split_known = isinstance(split, dict)
     assert w1h >= 0 and w5m >= 0 and w1h + w5m == created
     stamp = entry.get("timestamp")
     return Request(
@@ -121,6 +123,7 @@ def _request_from_usage(message: dict, usage: dict, entry: dict, source: str, ma
         cache_write_5m_tokens=w5m,
         cache_write_1h_tokens=w1h,
         thread=thread,
+        ttl_split_known=split_known,
     )
 
 

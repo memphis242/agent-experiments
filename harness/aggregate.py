@@ -128,6 +128,11 @@ def render(runs: Sequence[dict[str, Any]], scenario: str, tasks: Sequence[str] |
     shown = [r for g in groups.values() for r in g]
     problems = [f"run {r['_dir']}: analysis_error: {r['analysis_error']}" for r in shown if r.get("analysis_error")]
     problems += hash_warnings(runs)
+    drops = Counter(r["arm"] for r in shown if (r.get("behavior") or {}).get("cache_ttl_drop") is True)
+    if drops:
+        lines += ["", "Runs with a main-agent cache TTL drop (5m writes although 1h was expected): "
+                  + ", ".join(f"{arm} {n}/{sum(1 for r in shown if r['arm'] == arm)}"
+                              for arm, n in sorted(drops.items()))]
     if problems:
         lines += ["", "Warnings:", ""] + [f"- {p}" for p in problems]
     return "\n".join(lines) + "\n"
