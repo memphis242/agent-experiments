@@ -31,6 +31,9 @@ EQUIVALENT_RUN_CODES: frozenset[str] = frozenset({
     # 84adedf (A10 to A12 waves and the full Task 4 wave): the current change adds per-agent
     # subagent models and tiered arms; A1 to A12 config roots and validation results are unchanged.
     "6614d502a0031f6b92920ea6754a322c30c6882a48cff7fca34d72a2b4151fb6",
+    # 4122116 (A13 to A15 waves): the current change only lets a pack declare its acceptance
+    # timeout; packs without the declaration keep 2400 s.
+    "72a53602f78e97f9692bc56aab09601efd2a2a553c49076a738bc1bf6cb06792",
 })
 
 
