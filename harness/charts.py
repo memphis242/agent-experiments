@@ -28,7 +28,8 @@ CARD_RADIUS = 14
 CARD_FILL = "#0d1117"
 CARD_STROKE = "#30363d"
 PAD_X = 28                      # card edge to content
-GUTTER_WIDTH = 250              # arm id / description column
+GUTTER_WIDTH = 340              # arm id / description column
+ARM_ID_WIDTH = 42               # arm id to description text
 PLOT_WIDTH = 518                # x extent of the plot area (value 0 to the axis limit)
 PLOT_RIGHT_PAD = 120            # room right of the axis end for the range text
 ANNOT_GAP = 14                  # gap between the range-text zone and the annotation column
@@ -85,7 +86,8 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("Sonnet 5 subagents", "Sonnet 5", "#2dd4bf"),
     ("Sonnet 4.6 subagents", "Sonnet 4.6", "#fb923c"),
     ("Haiku 5.5", "Haiku 5.5", "#4ade80"),
-    ("solo", "Solo", "#9ca3af"),
+    ("solo Sonnet 5.5", "Solo Sonnet 5.5", "#f472b6"),
+    ("solo Opus 5.5", "Solo Opus 5.5", "#9ca3af"),
 )
 FALLBACK_FAMILY = ("Other", "#9ca3af")
 TINT_MARKERS = ("conservative", "roles")     # description words that select the lighter tint
@@ -140,7 +142,7 @@ def family_style(description: str) -> tuple[str, str]:
             break
     lowered = description.lower()
     fill = base
-    if label != "Solo" and any(word in lowered for word in TINT_MARKERS):
+    if not label.startswith("Solo") and any(word in lowered for word in TINT_MARKERS):
         fill = mix(base, (255, 255, 255), TINT)
     return label, fill
 
@@ -300,7 +302,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     legend_y = subtitle_y + LEGEND_GAP
     add(_text(left, title_y, title, TITLE_SIZE, TEXT_COLOR, "700"))
     add(_text(left, subtitle_y,
-              f"{n_runs} runs across {len(rows)} arms; bar = min to max, dot = one run, tick = median",
+              f"{n_runs} runs across {len(rows)} arms; bar = min to max, dot = one run, tick = median, "
+              "light tint = conservative",
               SUBTITLE_SIZE, MUTED_COLOR))
 
     # Legend: colour families present, then the hollow marker.
@@ -313,8 +316,6 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
         f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
     add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, "did not pass", LEGEND_FONT_SIZE, MUTED_COLOR))
-    add(_text(range_limit, legend_y + 4, "light tint = conservative", LEGEND_FONT_SIZE, FAINT_COLOR,
-              anchor="end"))
     if annotate:
         add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
 
@@ -336,8 +337,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     for i, row in enumerate(rows):
         cy = rows_top + i * ROW_HEIGHT + ROW_HEIGHT / 2
         add(_text(left, cy - 3, row.arm, ARM_ID_SIZE, TEXT_COLOR, "700"))
-        add(_text(left + 30, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
-        add(_text(left + 30, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
+        add(_text(left + ARM_ID_WIDTH, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
+        add(_text(left + ARM_ID_WIDTH, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
         values = [p.value for p in row.points]
         lo, hi = min(values), max(values)
         bar_x = x_of(lo) - BAR_HEIGHT / 2

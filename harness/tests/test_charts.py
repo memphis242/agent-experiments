@@ -40,7 +40,7 @@ class AxisTest(unittest.TestCase):
 class FamilyTest(unittest.TestCase):
     def test_family_mapping(self):
         cases = {
-            "solo Opus 5.5": "Solo",
+            "solo Opus 5.5": "Solo Opus 5.5",
             "Opus 5.5 subagents, eager": "Opus 5.5",
             "Sonnet 5.5 subagents, eager": "Sonnet 5.5",
             "Sonnet 5 subagents, conservative": "Sonnet 5",
