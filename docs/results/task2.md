@@ -20,6 +20,12 @@ pass is total spend over all attempts divided by passes.
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A4 0.83, A3 0.93, A7 0.93,
 A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.73.
 
+## Spread across arms
+
+![Task 2 billed cost per run](figures/task2-cost.svg)
+
+![Task 2 wall time per run](figures/task2-time.svg)
+
 Notes:
 
 - Every conservative arm (A3, A5, A7, A9) spawned zero subagents in all 40 runs, so

@@ -1,0 +1,357 @@
+#!/usr/bin/env python3
+"""Render per-arm spread charts (billed cost and wall time per run) as standalone SVG files.
+
+One chart per metric, one row per arm: a range bar from the arm's minimum to maximum, one dot per
+run (hollow when the run did not pass), and a tick at the median. Standard library only; the
+output is deterministic for a given input.
+"""
+from __future__ import annotations
+
+import argparse
+import math
+import re
+import statistics
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Sequence
+from xml.sax.saxutils import escape
+
+import aggregate
+import cost
+
+# ---- Design parameters ------------------------------------------------------------------------
+FONT_STACK = '-apple-system, "Segoe UI", Inter, Roboto, "Helvetica Neue", Arial, sans-serif'
+WIDTH = 960
+ROW_HEIGHT = 44
+CARD_MARGIN = 8                 # space between the SVG edge and the card
+CARD_RADIUS = 14
+CARD_FILL = "#ffffff"
+CARD_STROKE = "#d8dee4"
+PAD_X = 28                      # card edge to content
+GUTTER_WIDTH = 250              # arm id / description column
+PLOT_RIGHT_PAD = 120            # room right of the axis end for the range text
+HEADER_TOP = 40                 # card top to the title baseline
+TITLE_SIZE = 20
+SUBTITLE_SIZE = 13
+SUBTITLE_GAP = 22
+LEGEND_GAP = 26                 # subtitle baseline to legend row centre
+LEGEND_TO_ROWS = 26             # legend row centre to the top of the first row
+LEGEND_ITEM_GAP = 22
+LEGEND_FONT_SIZE = 12
+LEGEND_SWATCH_RADIUS = 5
+LEGEND_CHAR_WIDTH = 6.4         # approximate glyph width used to space legend items
+AXIS_HEIGHT = 44                # space under the last row for tick labels
+CARD_BOTTOM_PAD = 16
+ARM_ID_SIZE = 14
+DESC_SIZE = 12
+COUNT_SIZE = 11
+RANGE_TEXT_SIZE = 12
+TICK_LABEL_SIZE = 11
+TEXT_COLOR = "#1f2328"
+MUTED_COLOR = "#59636e"
+FAINT_COLOR = "#8c959f"
+GRID_COLOR = "#e6e9ed"
+AXIS_COLOR = "#c3c9d0"
+ROW_STRIPE_COLOR = "#f6f8fa"
+BAR_HEIGHT = 16
+BAR_OPACITY = 0.30
+DOT_RADIUS = 4.6
+DOT_OPACITY = 0.92
+HOLLOW_STROKE_WIDTH = 1.8
+JITTER = 7.0                    # largest vertical dot offset from the row centre
+JITTER_PATTERN = (0.0, -0.6, 0.6, -1.0, 1.0, -0.3, 0.3, -0.8, 0.8)  # fractions of JITTER
+MEDIAN_HALF_HEIGHT = 11
+MEDIAN_WIDTH = 2.6
+DARKEN = 0.38                   # mix toward black for the median tick
+TINT = 0.50                     # mix toward white for conservative arms
+TARGET_TICKS = 6
+AXIS_HEADROOM = 1.04            # the axis extends at least this far past the maximum value
+
+# Subagent model family -> saturated colour. Order matters: first matching marker wins.
+FAMILIES: tuple[tuple[str, str, str], ...] = (
+    # (marker substring of the description, family label, saturated colour)
+    ("Opus 5.5 subagents", "Opus 5.5", "#7c3aed"),
+    ("Sonnet 5.5 subagents", "Sonnet 5.5", "#2563eb"),
+    ("Sonnet 5 subagents", "Sonnet 5", "#0d9488"),
+    ("Sonnet 4.6 subagents", "Sonnet 4.6", "#ea7a0c"),
+    ("Haiku 5.5", "Haiku 5.5", "#16a34a"),
+    ("solo", "Solo", "#6b7280"),
+)
+FALLBACK_FAMILY = ("Other", "#6b7280")
+TINT_MARKERS = ("conservative", "roles")     # description words that select the lighter tint
+
+# Metric id -> output file name
+CHART_FILES = {"cost": "{task}-cost.svg", "time": "{task}-time.svg"}
+
+
+@dataclass(frozen=True)
+class Point:
+    value: float
+    passed: bool
+
+
+@dataclass(frozen=True)
+class ArmRow:
+    arm: str
+    description: str
+    family: str
+    color: str          # fill colour for bar and dots
+    dark: str           # median tick colour
+    points: tuple[Point, ...] = field(default_factory=tuple)
+
+
+# ---- Colour helpers ---------------------------------------------------------------------------
+def _rgb(hex_color: str) -> tuple[int, int, int]:
+    return int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
+
+
+def mix(hex_color: str, target: tuple[int, int, int], amount: float) -> str:
+    assert 0.0 <= amount <= 1.0
+    r, g, b = (round(c + (t - c) * amount) for c, t in zip(_rgb(hex_color), target))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def family_style(description: str) -> tuple[str, str, str]:
+    """(family label, fill colour, dark colour) for an arm description."""
+    label, base = FALLBACK_FAMILY
+    for marker, fam, color in FAMILIES:
+        if marker in description:
+            label, base = fam, color
+            break
+    lowered = description.lower()
+    fill = base
+    if label != "Solo" and any(word in lowered for word in TINT_MARKERS):
+        fill = mix(base, (255, 255, 255), TINT)
+    dark = mix(base, (0, 0, 0), DARKEN)
+    return label, fill, dark
+
+
+# ---- Data -------------------------------------------------------------------------------------
+def arm_number(arm: str) -> tuple[int, str]:
+    found = re.search(r"\d+", arm)
+    return (int(found.group(0)) if found else 10**9, arm)
+
+
+def wall_minutes(run: dict[str, Any]) -> float:
+    return sum(float(r.get("wall_time_s") or 0.0) for r in run.get("rounds") or []) / 60.0
+
+
+def build_rows(runs: Sequence[dict[str, Any]], task: str, metric: str, scenario: str,
+               drop_status: Sequence[str] = ()) -> list[ArmRow]:
+    """One ArmRow per arm with at least one completed run carrying the metric."""
+    assert metric in CHART_FILES
+    dropped = set(drop_status)
+    by_arm: dict[str, list[Point]] = {}
+    for run in runs:
+        if run.get("task") != task or run.get("status") != "completed" or run.get("status") in dropped:
+            continue
+        value = aggregate.scenario_cost(run, scenario) if metric == "cost" else wall_minutes(run)
+        if value is None:
+            continue
+        by_arm.setdefault(run.get("arm", "?"), []).append(Point(float(value), bool(run.get("passed"))))
+    rows: list[ArmRow] = []
+    for arm in sorted(by_arm, key=arm_number):
+        description = aggregate.ARM_DESCRIPTIONS.get(arm, arm)
+        family, fill, dark = family_style(description)
+        points = tuple(sorted(by_arm[arm], key=lambda p: (p.value, not p.passed)))
+        rows.append(ArmRow(arm, description, family, fill, dark, points))
+    return rows
+
+
+# ---- Axis -------------------------------------------------------------------------------------
+def nice_step(span: float, target: int = TARGET_TICKS) -> float:
+    """Smallest 1, 2 or 5 x 10^k step that gives at most `target` intervals over `span`."""
+    assert span > 0 and target > 0
+    exponent = math.floor(math.log10(span / target))
+    for exp in (exponent, exponent + 1):
+        for mult in (1, 2, 5):
+            step = mult * 10.0 ** exp
+            if span / step <= target + 1e-9:
+                return step
+    raise AssertionError("unreachable: 10^(exponent+1) always satisfies the target")
+
+
+def axis_ticks(max_value: float) -> list[float]:
+    """Tick values from 0 to a limit at least AXIS_HEADROOM x max_value; the last is the axis limit."""
+    top = max(max_value, 0.0) * AXIS_HEADROOM
+    if top <= 0:
+        top = 1.0
+    step = nice_step(top)
+    count = math.ceil(top / step - 1e-9)
+    return [round(i * step, 10) for i in range(count + 1)]
+
+
+def _tick_text(value: float, step: float, prefix: str, suffix: str) -> str:
+    decimals = 0 if step >= 1 else max(0, -math.floor(math.log10(step)))
+    return f"{prefix}{value:.{decimals}f}{suffix}"
+
+
+# ---- SVG --------------------------------------------------------------------------------------
+def _num(x: float) -> str:
+    return f"{x:.1f}"
+
+
+def _text(x: float, y: float, content: str, size: int, fill: str, weight: str = "400",
+          anchor: str = "start") -> str:
+    return (f'<text x="{_num(x)}" y="{_num(y)}" font-size="{size}" font-weight="{weight}" '
+            f'fill="{fill}" text-anchor="{anchor}">{escape(content)}</text>')
+
+
+def legend_entries(rows: Sequence[ArmRow]) -> list[tuple[str, str]]:
+    """(family label, saturated colour) for each family present, in FAMILIES order."""
+    present = {row.family for row in rows}
+    known = [(f, c) for _, f, c in FAMILIES if f in present]
+    return known + ([FALLBACK_FAMILY] if FALLBACK_FAMILY[0] in present else [])
+
+
+def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
+    """The SVG text of one chart. `unit` is 'cost' (dollar prefix) or 'time' (min suffix)."""
+    assert unit in ("cost", "time")
+    prefix, suffix = ("$", "") if unit == "cost" else ("", " min")
+    max_value = max((p.value for r in rows for p in r.points), default=0.0)
+    ticks = axis_ticks(max_value)
+    limit = ticks[-1]
+    step = ticks[1] - ticks[0] if len(ticks) > 1 else 1.0
+    n_runs = sum(len(r.points) for r in rows)
+
+    card_x, card_y = CARD_MARGIN, CARD_MARGIN
+    card_w = WIDTH - 2 * CARD_MARGIN
+    plot_left = card_x + PAD_X + GUTTER_WIDTH
+    plot_right = card_x + card_w - PAD_X - PLOT_RIGHT_PAD
+    scale = (plot_right - plot_left) / limit
+    rows_top = card_y + HEADER_TOP + SUBTITLE_GAP + LEGEND_GAP + LEGEND_TO_ROWS
+    rows_bottom = rows_top + ROW_HEIGHT * len(rows)
+    card_h = rows_bottom - card_y + AXIS_HEIGHT + CARD_BOTTOM_PAD
+    height = card_h + 2 * CARD_MARGIN
+
+    def x_of(v: float) -> float:
+        return plot_left + v * scale
+
+    out: list[str] = []
+    add = out.append
+    add('<?xml version="1.0" encoding="UTF-8"?>')
+    add(f'<svg xmlns="http://www.w3.org/2000/svg" width="{WIDTH}" height="{_num(height)}" '
+        f'viewBox="0 0 {WIDTH} {_num(height)}" role="img" aria-label="{escape(title)}" '
+        f'font-family=\'{FONT_STACK.replace(chr(34), "&quot;")}\'>')
+    add(f'<title>{escape(title)}</title>')
+    add(f'<rect x="{card_x}" y="{card_y}" width="{card_w}" height="{_num(card_h)}" rx="{CARD_RADIUS}" '
+        f'fill="{CARD_FILL}" stroke="{CARD_STROKE}" stroke-width="1"/>')
+
+    left = card_x + PAD_X
+    title_y = card_y + HEADER_TOP
+    subtitle_y = title_y + SUBTITLE_GAP
+    legend_y = subtitle_y + LEGEND_GAP
+    add(_text(left, title_y, title, TITLE_SIZE, TEXT_COLOR, "700"))
+    add(_text(left, subtitle_y,
+              f"{n_runs} runs across {len(rows)} arms; bar = min to max, dot = one run, tick = median",
+              SUBTITLE_SIZE, MUTED_COLOR))
+
+    # Legend: colour families present, then the hollow marker.
+    lx = float(left)
+    for label, color in legend_entries(rows):
+        add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" '
+            f'r="{LEGEND_SWATCH_RADIUS}" fill="{color}"/>')
+        add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, label, LEGEND_FONT_SIZE, MUTED_COLOR))
+        lx += 2 * LEGEND_SWATCH_RADIUS + 6 + len(label) * LEGEND_CHAR_WIDTH + LEGEND_ITEM_GAP
+    add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
+        f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
+    add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, "did not pass", LEGEND_FONT_SIZE, MUTED_COLOR))
+    add(f'<text x="{_num(plot_right + PLOT_RIGHT_PAD)}" y="{_num(legend_y + 4)}" font-size="{LEGEND_FONT_SIZE}" '
+        f'fill="{FAINT_COLOR}" text-anchor="end">light tint = conservative</text>')
+
+    # Row stripes, grid and axis.
+    for i in range(len(rows)):
+        if i % 2 == 0:
+            add(f'<rect x="{left - 8}" y="{_num(rows_top + i * ROW_HEIGHT)}" width="{_num(card_w - 2 * PAD_X + 16)}" '
+                f'height="{ROW_HEIGHT}" rx="6" fill="{ROW_STRIPE_COLOR}"/>')
+    for t in ticks:
+        gx = x_of(t)
+        add(f'<line x1="{_num(gx)}" y1="{_num(rows_top)}" x2="{_num(gx)}" y2="{_num(rows_bottom)}" '
+            f'stroke="{GRID_COLOR}" stroke-width="1"/>')
+        add(_text(gx, rows_bottom + 20, _tick_text(t, step, prefix, suffix), TICK_LABEL_SIZE, MUTED_COLOR,
+                  anchor="middle"))
+    add(f'<line x1="{_num(plot_left)}" y1="{_num(rows_bottom)}" x2="{_num(plot_right)}" y2="{_num(rows_bottom)}" '
+        f'stroke="{AXIS_COLOR}" stroke-width="1"/>')
+
+    fmt = "{:.2f}" if unit == "cost" else "{:.1f}"
+    for i, row in enumerate(rows):
+        cy = rows_top + i * ROW_HEIGHT + ROW_HEIGHT / 2
+        add(_text(left, cy - 3, row.arm, ARM_ID_SIZE, TEXT_COLOR, "700"))
+        add(_text(left + 30, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
+        add(_text(left + 30, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
+        values = [p.value for p in row.points]
+        lo, hi = min(values), max(values)
+        bar_x = x_of(lo) - BAR_HEIGHT / 2
+        bar_w = max(x_of(hi) - x_of(lo), 0.0) + BAR_HEIGHT
+        add(f'<rect x="{_num(bar_x)}" y="{_num(cy - BAR_HEIGHT / 2)}" width="{_num(bar_w)}" height="{BAR_HEIGHT}" '
+            f'rx="{BAR_HEIGHT / 2}" fill="{row.color}" fill-opacity="{BAR_OPACITY}"/>')
+        for k, p in enumerate(row.points):
+            dy = JITTER * JITTER_PATTERN[k % len(JITTER_PATTERN)]
+            px, py = x_of(p.value), cy + dy
+            if p.passed:
+                add(f'<circle cx="{_num(px)}" cy="{_num(py)}" r="{DOT_RADIUS}" fill="{row.color}" '
+                    f'fill-opacity="{DOT_OPACITY}"/>')
+            else:
+                add(f'<circle cx="{_num(px)}" cy="{_num(py)}" r="{DOT_RADIUS}" fill="{CARD_FILL}" '
+                    f'stroke="{row.color}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
+        mx = x_of(statistics.median(values))
+        add(f'<line x1="{_num(mx)}" y1="{_num(cy - MEDIAN_HALF_HEIGHT)}" x2="{_num(mx)}" '
+            f'y2="{_num(cy + MEDIAN_HALF_HEIGHT)}" stroke="{row.dark}" stroke-width="{MEDIAN_WIDTH}" '
+            f'stroke-linecap="round"/>')
+        low_t, high_t = fmt.format(lo), fmt.format(hi)
+        label = low_t if low_t == high_t else f"{low_t} to {high_t}"
+        add(_text(x_of(hi) + BAR_HEIGHT / 2 + 8, cy + 4, label, RANGE_TEXT_SIZE, TEXT_COLOR))
+    add('</svg>')
+    return "\n".join(out) + "\n"
+
+
+# ---- CLI --------------------------------------------------------------------------------------
+def task_label(task: str) -> str:
+    found = re.fullmatch(r"task(\d+)", task)
+    return f"Task {found.group(1)}" if found else task
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    p = argparse.ArgumentParser(description=__doc__)
+    p.add_argument("--runs-dir", type=Path, required=True)
+    p.add_argument("--task", required=True, help="task1..task4")
+    p.add_argument("--out-dir", type=Path, required=True)
+    p.add_argument("--scenario", choices=cost.SCENARIOS, default=cost.PRIMARY_SCENARIO)
+    p.add_argument("--drop-status", nargs="+", default=(), metavar="STATUS",
+                   help="exclude attempts with these statuses (only completed runs are charted anyway)")
+    a = p.parse_args(argv)
+    if not a.runs_dir.is_dir():
+        print(f"charts: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
+        return 1
+    task = aggregate.short_task(a.task)
+    runs = aggregate.load_runs(a.runs_dir)
+    try:
+        a.out_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"charts: error: cannot create {a.out_dir}: {exc}", file=sys.stderr)
+        return 1
+    label = task_label(task)
+    titles = {"cost": f"{label}: {a.scenario} cost per run", "time": f"{label}: wall time per run"}
+    for metric, name in CHART_FILES.items():
+        rows = build_rows(runs, task, metric, a.scenario, a.drop_status)
+        if not rows:
+            print(f"charts: error: no completed {task} runs with {metric} data in {a.runs_dir}", file=sys.stderr)
+            return 1
+        missing = sum(1 for r in runs if r.get("task") == task and r.get("status") == "completed"
+                      and r.get("status") not in set(a.drop_status)) - sum(len(r.points) for r in rows)
+        if missing:
+            print(f"charts: warning: {missing} completed {task} run(s) lack {metric} data and are not drawn",
+                  file=sys.stderr)
+        path = a.out_dir / name.format(task=task)
+        try:
+            path.write_text(render_chart(rows, titles[metric], metric), encoding="utf-8")
+        except OSError as exc:
+            print(f"charts: error: cannot write {path}: {exc}", file=sys.stderr)
+            return 1
+        print(f"charts: wrote {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

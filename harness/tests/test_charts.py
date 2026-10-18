@@ -1,0 +1,106 @@
+import math
+import unittest
+import xml.etree.ElementTree as ET
+
+import _support  # noqa: F401
+import charts
+
+
+def run(arm, cost_usd, minutes, passed=True, task="task1", status="completed"):
+    return {"arm": arm, "task": task, "status": status, "passed": passed,
+            "rounds": [{"wall_time_s": minutes * 60.0}],
+            "cost": None if cost_usd is None else {"scenarios": {"billed": {"total_usd": cost_usd}}}}
+
+
+def rows_for(runs, metric="cost", drop=()):
+    return charts.build_rows(runs, "task1", metric, "billed", drop)
+
+
+class AxisTest(unittest.TestCase):
+    def test_ticks_start_at_zero_and_pass_the_maximum(self):
+        for top in (0.7, 4.73, 10.94, 44.8, 123.0):
+            ticks = charts.axis_ticks(top)
+            self.assertEqual(ticks[0], 0)
+            self.assertGreaterEqual(ticks[-1], top)
+            self.assertLessEqual(len(ticks), charts.TARGET_TICKS + 2)
+
+    def test_step_is_one_two_or_five_times_a_power_of_ten(self):
+        for span in (0.3, 1.0, 4.9, 11.4, 46.6, 700.0):
+            step = charts.nice_step(span)
+            mantissa = step / 10.0 ** round(math.log10(step))
+            self.assertTrue(any(abs(mantissa - m) < 1e-9 for m in (0.1, 0.2, 0.5, 1, 2, 5, 10)), step)
+
+    def test_empty_maximum_still_gives_an_axis(self):
+        self.assertGreater(len(charts.axis_ticks(0.0)), 1)
+
+
+class FamilyTest(unittest.TestCase):
+    def test_family_mapping(self):
+        cases = {
+            "solo Opus 5.5": "Solo",
+            "Opus 5.5 subagents, eager": "Opus 5.5",
+            "Sonnet 5.5 subagents, eager": "Sonnet 5.5",
+            "Sonnet 5 subagents, conservative": "Sonnet 5",
+            "Sonnet 4.6 subagents, eager": "Sonnet 4.6",
+            "Haiku 5.5 subagents, eager": "Haiku 5.5",
+            "A12": "Other",
+        }
+        for description, family in cases.items():
+            self.assertEqual(charts.family_style(description)[0], family, description)
+
+    def test_conservative_is_lighter_than_eager_of_the_same_family(self):
+        eager = charts.family_style("Sonnet 5 subagents, eager")[1]
+        tint = charts.family_style("Sonnet 5 subagents, conservative")[1]
+        self.assertNotEqual(eager, tint)
+        self.assertGreater(sum(charts._rgb(tint)), sum(charts._rgb(eager)))
+        self.assertEqual(charts.family_style("solo Opus 5.5")[1], charts.FAMILIES[-1][2])
+
+
+class ChartTest(unittest.TestCase):
+    def setUp(self):
+        self.runs = [run("A2", 3.0, 6.0), run("A2", 4.0, 8.0, passed=False), run("A10", 2.0, 5.0),
+                     run("A1", 1.5, 4.0), run("A1", 9.9, 1.0, status="cli_error"),
+                     run("A1", None, 3.0), run("A1", 9.9, 1.0, task="task2")]
+
+    def test_rows_are_ordered_by_arm_number_and_filtered(self):
+        rows = rows_for(self.runs)
+        self.assertEqual([r.arm for r in rows], ["A1", "A2", "A10"])
+        self.assertEqual(len(rows[0].points), 1)          # missing cost, other status and other task excluded
+        self.assertEqual(len(rows_for(self.runs, "time")[0].points), 2)  # time does not need a cost report
+        self.assertEqual(rows_for(self.runs, "time")[1].points[0].value, 6.0)
+
+    def test_drop_status_excludes_runs(self):
+        runs = [run("A1", 1.0, 1.0), run("A1", 2.0, 2.0, status="running")]
+        self.assertEqual(len(rows_for(runs, drop=["running"])[0].points), 1)
+
+    def test_output_parses_and_is_deterministic(self):
+        rows = rows_for(self.runs)
+        first = charts.render_chart(rows, "T", "cost")
+        self.assertEqual(first, charts.render_chart(rows_for(self.runs), "T", "cost"))
+        self.assertNotIn("—", first)
+        root = ET.fromstring(first)
+        self.assertTrue(root.tag.endswith("svg"))
+
+    def test_failed_run_draws_hollow(self):
+        ns = "{http://www.w3.org/2000/svg}"
+        runs = [run("A2", 3.0, 6.0, passed=False), run("A2", 4.0, 8.0)]
+        root = ET.fromstring(charts.render_chart(rows_for(runs), "T", "cost"))
+        dots = [c for c in root.iter(ns + "circle") if float(c.get("r")) == charts.DOT_RADIUS]
+        hollow = [c for c in dots if c.get("fill") == charts.CARD_FILL]
+        self.assertEqual((len(dots), len(hollow)), (2, 1))
+        self.assertNotEqual(hollow[0].get("stroke"), charts.CARD_FILL)
+
+    def test_single_run_arm_has_a_visible_bar_and_one_value_label(self):
+        ns = "{http://www.w3.org/2000/svg}"
+        svg = charts.render_chart(rows_for([run("A1", 1.5, 4.0)]), "T", "cost")
+        root = ET.fromstring(svg)
+        bars = [r for r in root.iter(ns + "rect") if r.get("fill-opacity") == str(charts.BAR_OPACITY)]
+        self.assertEqual(len(bars), 1)
+        self.assertGreater(float(bars[0].get("width")), 0)
+        texts = [t.text for t in root.iter(ns + "text")]
+        self.assertIn("1.50", texts)
+        self.assertIn("n=1", texts)
+
+
+if __name__ == "__main__":
+    unittest.main()

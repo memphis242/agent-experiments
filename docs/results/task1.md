@@ -14,6 +14,12 @@ All 27 runs passed acceptance. Billed cost includes compaction requests (none oc
 | A8 | Sonnet 4.6 subagents, eager | task1 | 3/3 | 3.70 | 3.39 to 3.92 | 0.53 | 15.9 to 25.6 | 3 to 17 | 3 to 4 | 1 | 0 | 69.6 to 77.0 | 52.7 to 72.9 |
 | A9 | Sonnet 4.6 subagents, conservative | task1 | 3/3 | 1.38 | 1.23 to 1.46 | 0.23 | 5.1 to 5.4 | 25 to 29 | 0 | 1 | 0 | 64.0 to 76.8 | - |
 
+## Spread across arms
+
+![Task 1 billed cost per run](figures/task1-cost.svg)
+
+![Task 1 wall time per run](figures/task1-time.svg)
+
 Notes: every conservative arm spawned zero subagents on this task, so A3, A5, A7, A9 are
 behaviourally solo runs. One A5 run needed four rounds on the Markdown failures section
 check. Eager arms spawned 2 to 4 subagents (implementer, tester, reviewer; occasionally a

@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="586.0" viewBox="0 0 960 586.0" role="img" aria-label="Task 1: billed cost per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<title>Task 1: billed cost per run</title>
+<rect x="8" y="8" width="944" height="570.0" rx="14" fill="#ffffff" stroke="#d8dee4" stroke-width="1"/>
+<text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#1f2328" text-anchor="start">Task 1: billed cost per run</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#59636e" text-anchor="start">27 runs across 9 arms; bar = min to max, dot = one run, tick = median</text>
+<circle cx="41.0" cy="96.0" r="5" fill="#7c3aed"/>
+<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Opus 5.5</text>
+<circle cx="130.2" cy="96.0" r="5" fill="#2563eb"/>
+<text x="141.2" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5.5</text>
+<circle cx="232.2" cy="96.0" r="5" fill="#0d9488"/>
+<text x="243.2" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5</text>
+<circle cx="321.4" cy="96.0" r="5" fill="#ea7a0c"/>
+<text x="332.4" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 4.6</text>
+<circle cx="423.4" cy="96.0" r="5" fill="#6b7280"/>
+<text x="434.4" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Solo</text>
+<circle cx="487.0" cy="96.0" r="4.1" fill="#ffffff" stroke="#8c959f" stroke-width="1.8"/>
+<text x="498.0" y="100.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">did not pass</text>
+<text x="924.0" y="100.0" font-size="12" fill="#8c959f" text-anchor="end">light tint = conservative</text>
+<rect x="28" y="122.0" width="904.0" height="44" rx="6" fill="#f6f8fa"/>
+<rect x="28" y="210.0" width="904.0" height="44" rx="6" fill="#f6f8fa"/>
+<rect x="28" y="298.0" width="904.0" height="44" rx="6" fill="#f6f8fa"/>
+<rect x="28" y="386.0" width="904.0" height="44" rx="6" fill="#f6f8fa"/>
+<rect x="28" y="474.0" width="904.0" height="44" rx="6" fill="#f6f8fa"/>
+<line x1="286.0" y1="122.0" x2="286.0" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="286.0" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$0</text>
+<line x1="389.6" y1="122.0" x2="389.6" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="389.6" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$1</text>
+<line x1="493.2" y1="122.0" x2="493.2" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="493.2" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$2</text>
+<line x1="596.8" y1="122.0" x2="596.8" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="596.8" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$3</text>
+<line x1="700.4" y1="122.0" x2="700.4" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="700.4" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$4</text>
+<line x1="804.0" y1="122.0" x2="804.0" y2="518.0" stroke="#e6e9ed" stroke-width="1"/>
+<text x="804.0" y="538.0" font-size="11" font-weight="400" fill="#59636e" text-anchor="middle">$5</text>
+<line x1="286.0" y1="518.0" x2="804.0" y2="518.0" stroke="#c3c9d0" stroke-width="1"/>
+<text x="36.0" y="141.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A1</text>
+<text x="66.0" y="141.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">solo Opus 5.5</text>
+<text x="66.0" y="155.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="397.6" y="136.0" width="68.1" height="16" rx="8.0" fill="#6b7280" fill-opacity="0.3"/>
+<circle cx="405.6" cy="144.0" r="4.6" fill="#6b7280" fill-opacity="0.92"/>
+<circle cx="435.9" cy="139.8" r="4.6" fill="#6b7280" fill-opacity="0.92"/>
+<circle cx="457.7" cy="148.2" r="4.6" fill="#6b7280" fill-opacity="0.92"/>
+<line x1="435.9" y1="133.0" x2="435.9" y2="155.0" stroke="#42474f" stroke-width="2.6" stroke-linecap="round"/>
+<text x="473.7" y="148.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.15 to 1.66</text>
+<text x="36.0" y="185.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A2</text>
+<text x="66.0" y="185.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Opus 5.5 subagents, eager</text>
+<text x="66.0" y="199.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="522.1" y="180.0" width="107.4" height="16" rx="8.0" fill="#7c3aed" fill-opacity="0.3"/>
+<circle cx="530.1" cy="188.0" r="4.6" fill="#7c3aed" fill-opacity="0.92"/>
+<circle cx="584.8" cy="183.8" r="4.6" fill="#7c3aed" fill-opacity="0.92"/>
+<circle cx="621.5" cy="192.2" r="4.6" fill="#7c3aed" fill-opacity="0.92"/>
+<line x1="584.8" y1="177.0" x2="584.8" y2="199.0" stroke="#4d2493" stroke-width="2.6" stroke-linecap="round"/>
+<text x="637.5" y="192.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">2.36 to 3.24</text>
+<text x="36.0" y="229.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A3</text>
+<text x="66.0" y="229.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Opus 5.5 subagents, conservative</text>
+<text x="66.0" y="243.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="386.8" y="224.0" width="50.4" height="16" rx="8.0" fill="#be9cf6" fill-opacity="0.3"/>
+<circle cx="394.8" cy="232.0" r="4.6" fill="#be9cf6" fill-opacity="0.92"/>
+<circle cx="415.5" cy="227.8" r="4.6" fill="#be9cf6" fill-opacity="0.92"/>
+<circle cx="429.1" cy="236.2" r="4.6" fill="#be9cf6" fill-opacity="0.92"/>
+<line x1="415.5" y1="221.0" x2="415.5" y2="243.0" stroke="#4d2493" stroke-width="2.6" stroke-linecap="round"/>
+<text x="445.1" y="236.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.05 to 1.38</text>
+<text x="36.0" y="273.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A4</text>
+<text x="66.0" y="273.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5.5 subagents, eager</text>
+<text x="66.0" y="287.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="450.2" y="268.0" width="113.3" height="16" rx="8.0" fill="#2563eb" fill-opacity="0.3"/>
+<circle cx="458.2" cy="276.0" r="4.6" fill="#2563eb" fill-opacity="0.92"/>
+<circle cx="465.0" cy="271.8" r="4.6" fill="#2563eb" fill-opacity="0.92"/>
+<circle cx="555.5" cy="280.2" r="4.6" fill="#2563eb" fill-opacity="0.92"/>
+<line x1="465.0" y1="265.0" x2="465.0" y2="287.0" stroke="#173d92" stroke-width="2.6" stroke-linecap="round"/>
+<text x="571.5" y="280.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.66 to 2.60</text>
+<text x="36.0" y="317.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A5</text>
+<text x="66.0" y="317.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5.5 subagents, conservative</text>
+<text x="66.0" y="331.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="409.6" y="312.0" width="156.0" height="16" rx="8.0" fill="#92b1f5" fill-opacity="0.3"/>
+<circle cx="417.6" cy="320.0" r="4.6" fill="#92b1f5" fill-opacity="0.92"/>
+<circle cx="431.9" cy="315.8" r="4.6" fill="#92b1f5" fill-opacity="0.92"/>
+<circle cx="557.6" cy="324.2" r="4.6" fill="#92b1f5" fill-opacity="0.92"/>
+<line x1="431.9" y1="309.0" x2="431.9" y2="331.0" stroke="#173d92" stroke-width="2.6" stroke-linecap="round"/>
+<text x="573.6" y="324.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.27 to 2.62</text>
+<text x="36.0" y="361.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A6</text>
+<text x="66.0" y="361.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5 subagents, eager</text>
+<text x="66.0" y="375.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="521.8" y="356.0" width="127.9" height="16" rx="8.0" fill="#0d9488" fill-opacity="0.3"/>
+<circle cx="529.8" cy="364.0" r="4.6" fill="#0d9488" fill-opacity="0.92"/>
+<circle cx="534.3" cy="359.8" r="4.6" fill="#0d9488" fill-opacity="0.92"/>
+<circle cx="641.7" cy="368.2" r="4.6" fill="#0d9488" fill-opacity="0.92"/>
+<line x1="534.3" y1="353.0" x2="534.3" y2="375.0" stroke="#085c54" stroke-width="2.6" stroke-linecap="round"/>
+<text x="657.7" y="368.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">2.35 to 3.43</text>
+<text x="36.0" y="405.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A7</text>
+<text x="66.0" y="405.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 5 subagents, conservative</text>
+<text x="66.0" y="419.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="401.0" y="400.0" width="35.2" height="16" rx="8.0" fill="#86cac4" fill-opacity="0.3"/>
+<circle cx="409.0" cy="408.0" r="4.6" fill="#86cac4" fill-opacity="0.92"/>
+<circle cx="424.7" cy="403.8" r="4.6" fill="#86cac4" fill-opacity="0.92"/>
+<circle cx="428.2" cy="412.2" r="4.6" fill="#86cac4" fill-opacity="0.92"/>
+<line x1="424.7" y1="397.0" x2="424.7" y2="419.0" stroke="#085c54" stroke-width="2.6" stroke-linecap="round"/>
+<text x="444.2" y="412.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.19 to 1.37</text>
+<text x="36.0" y="449.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A8</text>
+<text x="66.0" y="449.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 4.6 subagents, eager</text>
+<text x="66.0" y="463.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="629.5" y="444.0" width="70.5" height="16" rx="8.0" fill="#ea7a0c" fill-opacity="0.3"/>
+<circle cx="637.5" cy="452.0" r="4.6" fill="#ea7a0c" fill-opacity="0.92"/>
+<circle cx="679.9" cy="447.8" r="4.6" fill="#ea7a0c" fill-opacity="0.92"/>
+<circle cx="692.1" cy="456.2" r="4.6" fill="#ea7a0c" fill-opacity="0.92"/>
+<line x1="679.9" y1="441.0" x2="679.9" y2="463.0" stroke="#914c07" stroke-width="2.6" stroke-linecap="round"/>
+<text x="708.1" y="456.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">3.39 to 3.92</text>
+<text x="36.0" y="493.0" font-size="14" font-weight="700" fill="#1f2328" text-anchor="start">A9</text>
+<text x="66.0" y="493.0" font-size="12" font-weight="400" fill="#59636e" text-anchor="start">Sonnet 4.6 subagents, conservative</text>
+<text x="66.0" y="507.0" font-size="11" font-weight="400" fill="#8c959f" text-anchor="start">n=3</text>
+<rect x="405.7" y="488.0" width="40.0" height="16" rx="8.0" fill="#f4bc86" fill-opacity="0.3"/>
+<circle cx="413.7" cy="496.0" r="4.6" fill="#f4bc86" fill-opacity="0.92"/>
+<circle cx="436.9" cy="491.8" r="4.6" fill="#f4bc86" fill-opacity="0.92"/>
+<circle cx="437.7" cy="500.2" r="4.6" fill="#f4bc86" fill-opacity="0.92"/>
+<line x1="436.9" y1="485.0" x2="436.9" y2="507.0" stroke="#914c07" stroke-width="2.6" stroke-linecap="round"/>
+<text x="453.7" y="500.0" font-size="12" font-weight="400" fill="#1f2328" text-anchor="start">1.23 to 1.46</text>
+</svg>
