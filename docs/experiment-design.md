@@ -85,9 +85,13 @@ drops a run.
 Delegation style is set by the arm's CLAUDE.md text only. Actual spawn
 counts per run are recorded as the manipulation check.
 
-Runs: 10 repetitions per arm on Tasks 1 and 2 and 3 on Tasks 3 and 4, so 26 runs per
-arm: 390 for A1 to A15, plus up to 52 for A16 and A17 (fewer if one stops advancing),
+Runs: 10 repetitions per arm on Tasks 1 to 3 and 3 on Task 4, so 33 runs per arm:
+495 for A1 to A15, plus up to 66 for A16 and A17 (fewer if one stops advancing),
 plus repair rounds.
+
+Task 5 takes the top three arms of Task 4. An arm qualifies only if it also passes
+the task gate above on Task 4: no run failing all five rounds, and at most one of
+its three repetitions needing the fifth round.
 Budget is not a constraint: a run that hits a subscription usage limit is
 dropped and rerun after the limit is raised. Run order is the plain
 arm x task x repetition product; the experiment is short enough that
