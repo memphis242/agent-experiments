@@ -44,12 +44,28 @@ class TranscriptTest(unittest.TestCase):
         self.assertEqual(by_type, {"Explore": [SONNET], "general-purpose": [OPUS]})
 
     def test_validation_reports_violations(self):
-        v = transcript.validate_models([self.main], [self.sub], OPUS, SONNET, {OPUS: "high", SONNET: "high"}, ["Workflow"])
+        v = transcript.validate_models([self.main], [self.sub], OPUS, {SONNET}, {OPUS: "high", SONNET: "high"}, ["Workflow"])
         kinds = {(x["kind"], x["observed"]) for x in v}
         self.assertIn(("model", "claude-sonnet-4-6"), kinds)   # main on the wrong model
         self.assertIn(("model", OPUS), kinds)                  # subagent on the wrong model
         self.assertIn(("forbidden_tool", "Workflow"), kinds)
         self.assertNotIn(("model", SONNET), kinds)
+
+    def test_validation_multi_model_subagents(self):
+        haiku = "claude-haiku-5-5"
+        sub = Path(self.tmp.name) / "t" / "subagents"
+        write_jsonl(sub / "agent-b1.jsonl", [asst("t1", SONNET, "2026-10-17T10:00:05Z", 1, 1, 0)])
+        write_jsonl(sub / "agent-b2.jsonl", [asst("t2", haiku, "2026-10-17T10:00:06Z", 1, 1, 0)])
+        write_jsonl(sub / "agent-b3.jsonl", [asst("t3", OPUS, "2026-10-17T10:00:07Z", 1, 1, 0)])
+        write_jsonl(sub / "agent-b4.jsonl", [asst("t4", haiku, "2026-10-17T10:00:08Z", 1, 1, 0)])
+        for name, kind in (("b1", "implementer"), ("b2", "tester"), ("b3", "Explore"), ("b4", "implementer")):
+            (sub / f"agent-{name}.meta.json").write_text(json.dumps({"agentType": kind}))
+        efforts = {OPUS: "high", SONNET: "high", haiku: "high"}
+        v = transcript.validate_models([], [sub], OPUS, {SONNET, haiku}, efforts, [],
+                                       {"implementer": SONNET, "tester": haiku})
+        self.assertEqual({(x["kind"], x["file"], x["observed"]) for x in v},
+                         {("model", "agent-b3.jsonl", OPUS), ("agent_type", "agent-b3.jsonl", "Explore"),
+                          ("model", "agent-b4.jsonl", haiku)})
 
     def test_leak_scan_is_incremental(self):
         hits, total = transcript.scan_new_lines(self.main, 0)

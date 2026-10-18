@@ -29,6 +29,11 @@ KNOWN_MODELS: frozenset[str] = frozenset({OPUS_55, SONNET_55, SONNET_5, SONNET_4
 EFFORT_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 SUBAGENT_NAMES: tuple[str, ...] = ("explorer", "implementer", "tester", "debugger", "reviewer")
+# Every agent template that exists; SUBAGENT_NAMES is the default roster.
+KNOWN_AGENT_NAMES: tuple[str, ...] = (*SUBAGENT_NAMES, "small-implementer")
+# Agent types Claude Code 2.1.302 ships with. A multi-model arm denies each so that
+# only the arm's own agents can be spawned.
+BUILTIN_AGENT_TYPES: tuple[str, ...] = ("Explore", "Plan", "general-purpose", "statusline-setup", "claude-code-guide")
 # Tools denied in every arm. Agent, Skill, WebSearch, and WebFetch stay available;
 # A1 additionally denies Agent. These either spawn or message other agents
 # outside the Agent tool, schedule work, or change the working tree location,
@@ -46,29 +51,56 @@ SUBAGENT_PROMPT_CACHE_TTL = "5m"
 class ArmSpec:
     arm_id: str
     subagent_model: str | None  # None: the Agent tool is denied
-    delegation: str | None      # "eager", "conservative", "roles", or None
+    delegation: str | None      # "eager", "conservative", "roles", "tiered", or None
     main_model: str = OPUS_55
     main_effort: str = "high"
     subagent_effort: str = "high"
     agents: tuple[str, ...] = SUBAGENT_NAMES  # subagent definitions written for the arm
+    # (agent name, model) pairs overriding subagent_model for those agents.
+    agent_models: tuple[tuple[str, str], ...] = ()
 
     def __post_init__(self) -> None:
         assert (self.subagent_model is None) == (self.delegation is None)
-        assert self.delegation in (None, "eager", "conservative", "roles")
+        assert self.delegation in (None, "eager", "conservative", "roles", "tiered")
         assert self.main_model in KNOWN_MODELS
         assert self.subagent_model is None or self.subagent_model in KNOWN_MODELS
         assert self.main_effort in EFFORT_LEVELS and self.subagent_effort in EFFORT_LEVELS
-        assert set(self.agents) <= set(SUBAGENT_NAMES) and len(set(self.agents)) == len(self.agents)
-        assert self.subagent_model != self.main_model or self.subagent_effort == self.main_effort
+        assert set(self.agents) <= set(KNOWN_AGENT_NAMES) and len(set(self.agents)) == len(self.agents)
+        overridden = [name for name, _ in self.agent_models]
+        assert len(set(overridden)) == len(overridden) and set(overridden) <= set(self.agents)
+        assert not self.agent_models or self.subagent_model is not None
+        assert all(model in KNOWN_MODELS for _, model in self.agent_models)
+        assert all(model != self.main_model or self.subagent_effort == self.main_effort
+                   for model in self.subagent_models)
+
+    def model_for(self, agent: str) -> str:
+        """The model the named subagent runs on."""
+        assert self.subagent_model is not None and agent in self.agents
+        return dict(self.agent_models).get(agent, self.subagent_model)
+
+    @property
+    def subagent_models(self) -> frozenset[str]:
+        """Every model a subagent of this arm runs on; empty without subagents."""
+        if self.subagent_model is None:
+            return frozenset()
+        return frozenset(self.model_for(name) for name in self.agents)
+
+    @property
+    def multi_model(self) -> bool:
+        """Whether subagents run on more than one model."""
+        return len(self.subagent_models) > 1
 
 
 def effort_map(arm: ArmSpec) -> Mapping[str, str]:
     """Model to effort level for the arm's main agent and, when present, its subagents."""
     efforts = {arm.main_model: arm.main_effort}
-    if arm.subagent_model is not None:
-        efforts[arm.subagent_model] = arm.subagent_effort
+    for model in arm.subagent_models:
+        efforts[model] = arm.subagent_effort
     return MappingProxyType(efforts)
 
+
+TIERED_AGENTS: tuple[str, ...] = ("implementer", "small-implementer", "tester")
+TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", HAIKU_55), ("tester", HAIKU_55))
 
 ARMS: Mapping[str, ArmSpec] = MappingProxyType({
     a.arm_id: a for a in (
@@ -84,6 +116,9 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A10", None, None, main_model=SONNET_55, main_effort="xhigh"),
         ArmSpec("A11", HAIKU_55, "roles", main_model=SONNET_55, agents=("implementer", "tester")),
         ArmSpec("A12", None, None, main_model=SONNET_55, main_effort="high"),
+        ArmSpec("A13", None, None, main_effort="medium"),
+        ArmSpec("A14", SONNET_55, "tiered", main_effort="low", agents=TIERED_AGENTS, agent_models=TIERED_MODELS),
+        ArmSpec("A15", SONNET_55, "tiered", main_effort="medium", agents=TIERED_AGENTS, agent_models=TIERED_MODELS),
     )
 })
 
@@ -120,6 +155,11 @@ def build_settings(arm: ArmSpec) -> dict[str, object]:
     }
     if arm.subagent_model is None:
         settings["permissions"] = {"deny": ["Agent", *DENIED_TOOLS]}
+    elif arm.multi_model:
+        # FORCE would override the per-agent frontmatter models, so the built-in
+        # agent types are denied and only the arm's own agents can be spawned.
+        deny = [*DENIED_TOOLS, *(f"Agent({name})" for name in BUILTIN_AGENT_TYPES)]
+        settings["permissions"] = {"deny": deny}
     else:
         settings["permissions"] = {"deny": list(DENIED_TOOLS)}
         # Built-in agent types (Explore, Plan, general-purpose) would otherwise
@@ -151,7 +191,7 @@ def build_agents(arm: ArmSpec) -> dict[str, str]:
     for name in arm.agents:
         text = _read_template(f"agents/{name}.md")
         assert "{{MODEL}}" in text
-        agents[f"{name}.md"] = text.replace("{{MODEL}}", arm.subagent_model)
+        agents[f"{name}.md"] = text.replace("{{MODEL}}", arm.model_for(name))
     return agents
 
 

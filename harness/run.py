@@ -411,7 +411,9 @@ class Runner:
             "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir,
             "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
-            "models": {"main": arm.main_model, "subagent": arm.subagent_model},
+            "models": {"main": arm.main_model,
+                       "subagent": ({n: arm.model_for(n) for n in arm.agents} if arm.multi_model
+                                    else arm.subagent_model)},
             "delegation": arm.delegation,
             "settings": settings, "config_sha256": config_hash,
             "provenance": provenance(self.cfg, task_root / "spec.md", task_root / "acceptance"),

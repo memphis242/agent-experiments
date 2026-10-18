@@ -81,6 +81,7 @@ AXIS_HEADROOM = 1.04            # the axis extends at least this far past the ma
 # Subagent model family -> saturated colour. Order matters: first matching marker wins.
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     # (marker substring of the description, family label, saturated colour)
+    ("tiered", "Tiered Opus/Sonnet/Haiku", "#fbbf24"),
     ("Opus 5.5 subagents", "Opus 5.5", "#a78bfa"),
     ("Sonnet 5.5 subagents", "Sonnet 5.5", "#60a5fa"),
     ("Sonnet 5 subagents", "Sonnet 5", "#2dd4bf"),

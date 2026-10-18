@@ -6,7 +6,7 @@ import re
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Mapping, Sequence
+from typing import Collection, Iterator, Mapping, Sequence
 
 SPAWN_TOOL_NAMES: frozenset[str] = frozenset({"Agent", "Task"})
 
@@ -92,20 +92,25 @@ def _assistant_messages(path: Path) -> Iterator[tuple[dict, dict]]:
         yield entry, message
 
 
+def _read_meta(path: Path) -> dict:
+    """The subagent transcript's .meta.json content; empty when absent or unreadable."""
+    meta_path = path.with_suffix(".meta.json")
+    if not meta_path.is_file():
+        return {}
+    try:
+        loaded = json.loads(meta_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return loaded if isinstance(loaded, dict) else {}
+
+
 def subagent_inventory(subagent_dirs: Sequence[Path]) -> list[dict[str, object]]:
     """One record per subagent transcript: type and tool_use id from its .meta.json,
     and the models and efforts actually observed in the transcript."""
     inventory: list[dict[str, object]] = []
     for directory in subagent_dirs:
         for path in subagent_files(directory):
-            meta: dict = {}
-            meta_path = path.with_suffix(".meta.json")
-            if meta_path.is_file():
-                try:
-                    loaded = json.loads(meta_path.read_text(encoding="utf-8"))
-                    meta = loaded if isinstance(loaded, dict) else {}
-                except (OSError, json.JSONDecodeError):
-                    meta = {}
+            meta = _read_meta(path)
             models: Counter[str] = Counter()
             efforts: Counter[str] = Counter()
             for entry, message in _assistant_messages(path):
@@ -120,21 +125,26 @@ def subagent_inventory(subagent_dirs: Sequence[Path]) -> list[dict[str, object]]
 
 
 def validate_models(main_paths: Sequence[Path], subagent_dirs: Sequence[Path], main_model: str,
-                    subagent_model: str | None, expected_effort: Mapping[str, str],
-                    forbidden_tools: Sequence[str]) -> list[dict[str, object]]:
-    """Violations of the arm's model, effort, and tool policy (reported, never acted on)."""
+                    subagent_models: Collection[str], expected_effort: Mapping[str, str],
+                    forbidden_tools: Sequence[str],
+                    agent_type_models: Mapping[str, str] | None = None) -> list[dict[str, object]]:
+    """Violations of the arm's model, effort, and tool policy (reported, never acted on).
+
+    A subagent request may use any model in subagent_models, each at its expected effort.
+    With agent_type_models, each subagent transcript must instead use the model mapped to
+    its recorded agent type, and a type outside the mapping is flagged."""
     found: Counter[tuple[str, str, str, str, str]] = Counter()
 
-    def check(path: Path, source: str, expected_model: str | None) -> None:
+    def check(path: Path, source: str, expected_models: frozenset[str]) -> None:
         for entry, message in _assistant_messages(path):
             model = str(message.get("model"))
-            if expected_model is None:
+            if not expected_models:
                 found[("unexpected_subagent", source, path.name, "none", model)] += 1
                 continue
-            if model != expected_model:
-                found[("model", source, path.name, expected_model, model)] += 1
+            if model not in expected_models:
+                found[("model", source, path.name, "|".join(sorted(expected_models)), model)] += 1
             effort = entry.get("effort")
-            wanted = expected_effort.get(expected_model)
+            wanted = expected_effort.get(model) if model in expected_models else None
             if isinstance(effort, str) and wanted and effort != wanted:
                 found[("effort", source, path.name, wanted, effort)] += 1
             content = message.get("content")
@@ -143,10 +153,18 @@ def validate_models(main_paths: Sequence[Path], subagent_dirs: Sequence[Path], m
                     found[("forbidden_tool", source, path.name, "not used", str(block.get("name")))] += 1
 
     for path in main_paths:
-        check(path, "main", main_model)
+        check(path, "main", frozenset({main_model}))
     for directory in subagent_dirs:
         for path in subagent_files(directory):
-            check(path, "subagent", subagent_model)
+            if agent_type_models is None:
+                check(path, "subagent", frozenset(subagent_models))
+                continue
+            agent_type = _read_meta(path).get("agentType")
+            if agent_type not in agent_type_models:
+                found[("agent_type", "subagent", path.name, "|".join(sorted(agent_type_models)), str(agent_type))] += 1
+                check(path, "subagent", frozenset(subagent_models))
+                continue
+            check(path, "subagent", frozenset({agent_type_models[agent_type]}))
     return [{"kind": k[0], "source": k[1], "file": k[2], "expected": k[3], "observed": k[4], "count": n}
             for k, n in sorted(found.items())]
 

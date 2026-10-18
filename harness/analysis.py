@@ -102,8 +102,9 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         summarize_delegation(record, behavior)
         arm = arms.get_arm(record["arm"])
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
-        violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model, arm.subagent_model,
-                                                arms.effort_map(arm), forbidden)
+        violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model,
+                                                arm.subagent_models, arms.effort_map(arm), forbidden,
+                                                {a: arm.model_for(a) for a in arm.agents} if arm.multi_model else None)
         inventory = [{**{k: v for k, v in i.items() if k != "path"},
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]

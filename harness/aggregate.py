@@ -49,6 +49,9 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A8": "Sonnet 4.6 subagents, eager", "A9": "Sonnet 4.6 subagents, conservative",
     "A10": "solo Sonnet 5.5, xhigh effort", "A11": "Sonnet 5.5 main, Haiku 5.5 implementer and tester",
     "A12": "solo Sonnet 5.5, high effort",
+    "A13": "solo Opus 5.5, medium effort",
+    "A14": "Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5 tiered",
+    "A15": "Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5 tiered",
 }
 
 
