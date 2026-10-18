@@ -196,3 +196,11 @@ agent type and observed model, compaction counts, layer 2 cost.
   recorded per run.
 - Pack validation under heavy parallel load: not pursued; three slots on a
   32-thread machine.
+- Usage-limit classifier: the subscription session limit surfaces as
+  "You've hit your session limit", which the run module's pattern does not
+  match, so such runs are recorded as `cli_error` and the driver keeps
+  launching cells. Fixing the pattern changes the run-code hash and would
+  invalidate finished cells, so it waits until all waves are complete.
+  Affected attempts (19 in the first Task 3 wave on 2026-10-18) are
+  excluded from reports with `aggregate.py --drop-status cli_error` and
+  rerun from scratch.

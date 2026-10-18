@@ -131,11 +131,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--scenario", choices=cost.SCENARIOS, default=cost.PRIMARY_SCENARIO)
     p.add_argument("--task", nargs="+", help="only these tasks (task1..task4 or full directory names)")
     p.add_argument("--markdown-out", type=Path, help="also write the table to this file")
+    p.add_argument("--drop-status", nargs="+", default=(), metavar="STATUS",
+                   help="exclude attempts with these run statuses (for example cli_error for runs cut off "
+                        "by a subscription limit and rerun from scratch); the count dropped is reported")
     a = p.parse_args(argv)
     if not a.runs_dir.is_dir():
         print(f"aggregate: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
         return 1
-    text = render(load_runs(a.runs_dir), a.scenario, a.task)
+    runs = load_runs(a.runs_dir)
+    dropped = [r for r in runs if r.get("status") in set(a.drop_status)]
+    if dropped:
+        runs = [r for r in runs if r not in dropped]
+        print(f"aggregate: dropped {len(dropped)} attempt(s) with status in {sorted(set(a.drop_status))}",
+              file=sys.stderr)
+    text = render(runs, a.scenario, a.task)
     sys.stdout.write(text)
     if a.markdown_out:
         try:
