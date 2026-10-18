@@ -6,10 +6,13 @@ import _support  # noqa: F401
 import charts
 
 
-def run(arm, cost_usd, minutes, passed=True, task="task1", status="completed"):
+def run(arm, cost_usd, minutes, passed=True, task="task1", status="completed", tokens=None, ctx=None):
+    cost = None if cost_usd is None else {"scenarios": {"billed": {"total_usd": cost_usd}}}
+    if cost is not None and tokens is not None:
+        cost["tokens"] = tokens
     return {"arm": arm, "task": task, "status": status, "passed": passed,
-            "rounds": [{"wall_time_s": minutes * 60.0}],
-            "cost": None if cost_usd is None else {"scenarios": {"billed": {"total_usd": cost_usd}}}}
+            "rounds": [{"wall_time_s": minutes * 60.0}], "cost": cost,
+            "behavior": {"max_context_main": ctx}}
 
 
 def rows_for(runs, metric="cost", drop=()):
@@ -100,6 +103,29 @@ class ChartTest(unittest.TestCase):
         texts = [t.text for t in root.iter(ns + "text")]
         self.assertIn("1.50", texts)
         self.assertIn("n=1", texts)
+
+
+class AnnotationTest(unittest.TestCase):
+    def test_humanize_two_significant_figures(self):
+        cases = {None: "-", 0: "0", 820: "820", 2100: "2.1K", 59000: "59K", 185000: "185K",
+                 999600: "1.0M", 7.04e6: "7.0M", 2.5e9: "2.5G"}
+        for value, text in cases.items():
+            self.assertEqual(charts.humanize(value), text, value)
+
+    def test_maxima_sum_threads_then_take_the_max_over_runs(self):
+        def toks(i, o, c):
+            return {"m|main": {"input": i, "output": o, "cache_read": c},
+                    "s|subagent": {"input": 1, "output": 2, "cache_read": 3}}
+        runs = [run("A1", 1.0, 1.0, tokens=toks(100, 50, 1000), ctx=9000),
+                run("A1", 2.0, 2.0, tokens=toks(10, 500, 10), ctx=7000)]
+        m = rows_for(runs)[0].maxima
+        self.assertEqual((m.input, m.output, m.cache_read, m.ctx), (101, 502, 1003, 9000))
+
+    def test_missing_token_data_gives_none_and_label_stays_clear_of_the_column(self):
+        m = rows_for([run("A1", 1.0, 1.0)])[0].maxima
+        self.assertEqual((m.input, m.ctx), (None, None))
+        svg = charts.render_chart(rows_for([run("A1", 1.0, 1.0), run("A1", 99999.0, 1.0)]), "T", "cost")
+        ET.fromstring(svg)
 
 
 if __name__ == "__main__":
