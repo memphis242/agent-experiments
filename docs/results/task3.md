@@ -1,6 +1,6 @@
-# Task 3 results (housekeeping staleness detection), 36 runs, 2026-10-18
+# Task 3 results (housekeeping staleness detection), 45 runs, 2026-10-18
 
-All 36 valid runs passed acceptance. Billed cost includes compaction requests
+All 45 valid runs passed acceptance. Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the three repetitions;
 spend per pass is total spend over all attempts divided by passes. Nineteen
 attempts from the first wave were cut off by the subscription session limit
@@ -8,6 +8,8 @@ attempts from the first wave were cut off by the subscription session limit
 The first eight runs were made on six parallel slots, the rest on three. A10 to A12
 were added later and run on six; nine of their attempts stopped at a session limit
 within seconds of starting (recorded as `usage_limit`) and were likewise rerun.
+A13 to A15 were added after that and run with up to nine runs in parallel, with no
+dropped attempts.
 
 ## Spread across arms
 
@@ -33,8 +35,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A10 | solo Sonnet 5.5, xhigh effort | task3 | 3/3 | 7.00 | 6.39 to 7.73 | 1.34 | 30.2 to 35.0 | 6 to 121 | 0 | 1 | 0 | 429.6 to 456.2 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 3/3 | 3.51 | 3.20 to 3.80 | 0.60 | 22.9 to 52.6 | 1 to 27 | 1 to 2 | 1 to 2 | 0 | 166.3 to 227.8 | 237.4 to 267.6 |
 | A12 | solo Sonnet 5.5, high effort | task3 | 3/3 | 4.03 | 3.74 to 4.52 | 0.77 | 21.8 to 28.0 | 97 to 107 | 0 | 2 | 0 | 265.8 to 316.1 | - |
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.40, A12 0.46, A3 0.78,
-A4 0.78, A10 0.79, A9 0.86, A7 0.95, A5 0.96, A2 1.35, A6 1.60, A8 1.73.
+| A13 | solo Opus 5.5, medium effort | task3 | 3/3 | 7.40 | 6.30 to 8.04 | 1.74 | 21.5 to 28.6 | 89 to 129 | 0 | 1 | 0 | 257.5 to 282.4 | - |
+| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 3/3 | 3.38 | 3.06 to 3.57 | 0.51 | 20.8 to 26.5 | 14 to 20 | 3 | 1 to 2 | 0 | 66.8 to 91.5 | 216.0 to 302.2 |
+| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 3/3 | 4.77 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 7 | 3 to 4 | 1 | 0 | 144.5 to 158.5 | 230.7 to 248.0 |
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A14 0.38, A11 0.40, A12 0.46,
+A15 0.54, A3 0.78, A4 0.78, A10 0.79, A13 0.84, A9 0.86, A7 0.95, A5 0.96, A2 1.35,
+A6 1.60, A8 1.73.
 
 Notes:
 
@@ -63,7 +69,7 @@ Notes:
 - Solo and conservative Opus main agents peaked at 242K to 331K tokens; eager main agents
   at 143K to 251K; eager subagents at 148K to 382K.
 - Second or later acceptance rounds: A6 three runs, A8 two runs, A11 one run, A12
-  three runs; every other run passed on the first round.
+  three runs, A14 one run; every other run passed on the first round.
 - A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs
   0.46 of A1, but all three of its runs needed a second round for the same genuine
   defect: no fresh event (ID 41) when input resumes after a stale period, caught by
@@ -79,9 +85,29 @@ Notes:
   (two in rep 3) and a Haiku implementer once. Its subagents reached 237K to 268K
   tokens of context, above its own main agent's 166K to 228K. Rep 3's 53 minutes
   include the second round.
+- A13 (solo Opus 5.5 at medium effort) costs 0.84 of A1 with single-round passes and
+  a similar context peak (258K to 282K). Its saving over high effort is smaller than on
+  Task 2 (0.74) and within the A3 to A5 noise band noted above.
+- A14 (Opus 5.5 at low effort orchestrating Sonnet 5.5 and Haiku 5.5) is the cheapest
+  arm on Task 3 at 0.38 of A1, edging out A11, with the tightest cost spread of the task
+  (0.51 USD). Its main agent peaked at only 67K to 92K tokens of context while its
+  subagents reached 216K to 302K. A15 (medium effort) costs 0.54, 41 percent more per
+  pass than A14, with a main-agent peak of 145K to 159K. Both delegated in every run, to
+  a Sonnet 5.5 implementer every time and a Haiku tester every time; the Haiku
+  small-implementer was used in one A14 run and two A15 runs.
+- A14 rep 2's second round came from orchestration rather than a code defect: the main
+  agent ended its round-one turn with "Both testers are running; waiting for results"
+  while two background Haiku testers were still working. In a headless run that ends the
+  round, so acceptance found no report, and the unit-test build stopped on an OSAL test
+  failure (`osal_filesys_UT`), which left coverage unevaluated. The run did not touch
+  OSAL, no other acceptance run has hit that failure, and its cause was not established.
+  Every other check, including the hidden unit test and the live checks, passed in round
+  one; round two added 0.29 USD and passed.
+- A15 rep 2 took 44 minutes in a single round, with seven to nine runs sharing the
+  machine; it was also the arm's most expensive run at 5.64 USD.
 - Turn counts below the arm's typical range (A10's 6, A11's 1) are the CLI counting
   artefact described in the Task 2 notes; the column will be recomputed from
   transcripts.
 - Haiku 5.5 is billed at five times its base rates for any request whose prompt
-  exceeds 100,000 tokens. Costs here apply that rule per request; A11's Haiku subagents
-  crossed it in some runs.
+  exceeds 100,000 tokens. Costs here apply that rule per request; the Haiku subagents of
+  A11, A14 and A15 crossed it in some runs.
