@@ -2,8 +2,9 @@
 """Enumerate arms x tasks x reps and run up to --parallel runs at once.
 
 A cell is skipped only if a run.json with status "completed" exists for it whose
-config_sha256 equals the current arm root's and whose harness SHA equals the
-current one. Cells that ended in usage_limit (or any other status) rerun from
+config_sha256 equals the current arm root's and whose run-code hash (see
+provenance.py) equals the current one; commits touching only docs, analysis or
+this driver do not invalidate finished runs. Cells that ended in usage_limit (or any other status) rerun from
 scratch. Once any run reports a usage limit no new cell is launched. Extra arguments after `--` are passed through to run.py.
 """
 from __future__ import annotations
@@ -20,6 +21,7 @@ from typing import Sequence
 
 import arms
 import proc
+import provenance
 import run
 
 TASKS = ("task1", "task2", "task3", "task4")
@@ -36,13 +38,15 @@ def load_attempts(runs_dir: Path) -> list[dict]:
     return attempts
 
 
-def is_completed(attempts: Sequence[dict], arm: str, task: str, rep: int, config_sha: str, harness_sha: str) -> bool:
-    """A cell is done only by a completed run made with the current arm config and harness SHA.
+def is_completed(attempts: Sequence[dict], arm: str, task: str, rep: int, config_sha: str, run_code: str,
+                 resolve: provenance.Resolver = provenance.run_code_sha) -> bool:
+    """A cell is done only by a completed run made with the current arm config and run code.
     Runs with any other status (including usage_limit) are rerun from scratch."""
+    assert run_code, "the current run-code hash must be known before skipping cells"
     return any(
         a.get("arm") == arm and a.get("task") == task and a.get("rep") == rep and a.get("status") == "completed"
         and a.get("config_sha256") == config_sha
-        and (a.get("provenance") or {}).get("harness_sha") == harness_sha
+        and provenance.recorded_run_code(a, resolve) == run_code
         for a in attempts)
 
 
@@ -66,6 +70,13 @@ def main(argv: Sequence[str] | None = None) -> int:
     extra = a.passthrough[1:] if a.passthrough[:1] == ["--"] else a.passthrough
     cells = build_cells(a.arms, a.tasks, range(1, a.reps + 1))
     harness_sha = run.harness_git()[0]
+    run_code = provenance.run_code_sha("HEAD")
+    if run_code is None:
+        print("matrix: error: cannot hash the run-relevant harness files at HEAD", file=sys.stderr)
+        return 1
+    if provenance.run_code_dirty():
+        print("matrix: warning: run-relevant harness files have uncommitted changes; "
+              "runs will record a commit that does not describe them", file=sys.stderr)
     try:
         config_shas = {arm: run.hash_config_root(arms.arm_root(arm, a.arms_dir)) for arm in a.arms}
     except OSError as exc:
@@ -76,9 +87,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"matrix: error: arm root for {arm} is missing in {a.arms_dir}; run harness/arms.py", file=sys.stderr)
             return 1
     attempts = load_attempts(a.runs_dir)
-    todo = [c for c in cells if not is_completed(attempts, c[0], c[1], c[2], config_shas[c[0]], harness_sha)]
+    todo = [c for c in cells if not is_completed(attempts, c[0], c[1], c[2], config_shas[c[0]], run_code)]
     print(f"{len(cells)} cells, {len(cells) - len(todo)} already completed with matching hashes "
-          f"(harness {harness_sha[:12]}), {len(todo)} to run")
+          f"(harness {harness_sha[:12]}, run code {run_code[:12]}), {len(todo)} to run")
 
     def command(cell: tuple[str, str, int]) -> list[str]:
         arm, task, rep = cell

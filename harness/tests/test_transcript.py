@@ -67,24 +67,48 @@ class AggregateMatrixTest(unittest.TestCase):
     def test_primary_metric_counts_all_attempts(self):
         runs = [self.run_rec("a", "completed", True, 10.0), self.run_rec("b", "completed", False, 30.0),
                 self.run_rec("c", "usage_limit", False, 20.0)]
+        for r, minutes in zip(runs, (12.0, 30.0, 6.0)):
+            r["totals"] = {"wall_time_s": minutes * 60, "turns": 5}
         text = aggregate.render(runs, "billed")
-        self.assertIn("| A1 | task1 | 3 | 1 | cap_hit 1, usage_limit 1 | 60.00 | 60.00 |", text)
+        self.assertIn("| A1 | solo Opus 5.5 | task1 | 1/3 | 60.00 | 10.00 to 30.00 | 20.00 | 6.0 to 30.0 | 5 | ", text)
+        runs[0]["behavior"] = {"max_context_main": 120_000, "max_context_subagent": None}
+        runs[1]["behavior"] = {"max_context_main": 90_500, "max_context_subagent": 40_000}
+        self.assertTrue(aggregate.render(runs, "billed").split("\n")[4].endswith("| 90.5 to 120.0 | 40.0 |"))
+
+    def test_single_value_ranges_and_task_filter(self):
+        one = self.run_rec("a", "completed", True, 1.0)
+        other = self.run_rec("b", "completed", True, 2.0)
+        other["task"] = "task2"
+        text = aggregate.render([one, other], "billed", ["task2-sample-app-status"])
+        self.assertIn("task2", text)
+        self.assertNotIn("task1", text)
+        self.assertEqual(aggregate._range([1.0, 1.0], "{:.2f}"), "1.00")
+        self.assertEqual(aggregate._range([1.15, 1.66], "{:.2f}"), "1.15 to 1.66")
 
     def test_hash_outliers_are_listed(self):
         runs = [self.run_rec("a", "completed", True, 1.0), self.run_rec("b", "completed", True, 1.0),
                 self.run_rec("c", "completed", True, 1.0, cfg="other", sha="old")]
-        warnings = aggregate.hash_warnings(runs)
+        warnings = aggregate.hash_warnings(runs, resolve=lambda commit: {"h": "code1", "old": "code2"}[commit])
         self.assertEqual(len(warnings), 2)
         self.assertTrue(all("run c" in w for w in warnings))
 
     def test_matrix_requires_matching_hashes(self):
         done = self.run_rec("a", "completed", True, 1.0)
         done.update(rep=1)
-        self.assertTrue(matrix.is_completed([done], "A1", "task1", 1, "c", "h"))
-        self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "other", "h"))
-        self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "c", "new"))
+        # Commits "h" and "docs" share run code; "new" changed it.
+        resolve = {"h": "code1", "docs": "code1", "new": "code2"}.get
+        self.assertTrue(matrix.is_completed([done], "A1", "task1", 1, "c", "code1", resolve))
+        self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "other", "code1", resolve))
+        self.assertFalse(matrix.is_completed([done], "A1", "task1", 1, "c", "code2", resolve))
         limited = self.run_rec("b", "usage_limit", False, 1.0)
-        self.assertFalse(matrix.is_completed([limited], "A1", "task1", 1, "c", "h"))
+        self.assertFalse(matrix.is_completed([limited], "A1", "task1", 1, "c", "code1", resolve))
+
+    def test_docs_only_commits_keep_runs_reusable(self):
+        done = self.run_rec("a", "completed", True, 1.0, sha="docs")
+        resolve = {"h": "code1", "docs": "code1", "new": "code2"}.get
+        self.assertTrue(matrix.is_completed([done], "A1", "task1", 1, "c", "code1", resolve))
+        unknown = self.run_rec("b", "completed", True, 1.0, sha="gone")
+        self.assertFalse(matrix.is_completed([unknown], "A1", "task1", 1, "c", "code1", resolve))
 
 
 if __name__ == "__main__":

@@ -104,7 +104,7 @@ A cell is skipped only if a `completed` run exists for it whose `config_sha256` 
 
     python harness/aggregate.py [--runs-dir DIR] [--scenario billed|none|5m|1h|uniform_1h]
 
-Per arm and task: attempts, passes, attrition by status, total spend over all attempts, USD per pass (spend divided by passes; the primary metric), the conditional median and range over passing attempts, and median (range) of rounds, subagent spawns, and compaction events. Warnings list runs with an analysis error and runs whose config or harness hash differs from the majority.
+Per arm and task: passes/attempts, spend per pass (total spend over all attempts divided by passes; the primary metric), and min-to-max ranges over all attempts for cost, wall minutes, main-agent turns, spawns, rounds, and compactions. `--task` filters tasks; `--markdown-out FILE` also writes the table to a file. Warnings list runs with an analysis error and runs whose config or harness hash differs from the majority.
 
 ## Offline cost
 

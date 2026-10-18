@@ -3,20 +3,21 @@
 
 Primary metric per arm x task: total billed spend over ALL attempts (passes,
 cap hits, usage-limit drops, CLI errors, infrastructure errors) divided by the
-number of passes. The conditional median and range over passing attempts, the
-attempt and pass counts, and attrition are reported next to it.
+number of passes, shown beside passes/attempts and min-to-max ranges over all
+attempts of the cell.
 """
 from __future__ import annotations
 
 import argparse
 import json
-import statistics
+import re
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Sequence
 
 import cost
+import provenance
 
 
 def load_runs(runs_dir: Path) -> list[dict[str, Any]]:
@@ -40,15 +41,27 @@ def scenario_cost(run: dict[str, Any], scenario: str) -> float | None:
     return report["scenarios"].get(scenario, {}).get("total_usd")
 
 
-def _med_range(values: Sequence[float], fmt: str) -> str:
+ARM_DESCRIPTIONS: dict[str, str] = {
+    "A1": "solo Opus 5.5",
+    "A2": "Opus 5.5 subagents, eager", "A3": "Opus 5.5 subagents, conservative",
+    "A4": "Sonnet 5.5 subagents, eager", "A5": "Sonnet 5.5 subagents, conservative",
+    "A6": "Sonnet 5 subagents, eager", "A7": "Sonnet 5 subagents, conservative",
+    "A8": "Sonnet 4.6 subagents, eager", "A9": "Sonnet 4.6 subagents, conservative",
+}
+
+
+def _range(values: Sequence[float], fmt: str) -> str:
+    """'min to max', or a single value when they are equal."""
     if not values:
         return "-"
-    return f"{fmt.format(statistics.median(values))} ({fmt.format(min(values))}-{fmt.format(max(values))})"
+    low, high = fmt.format(min(values)), fmt.format(max(values))
+    return low if low == high else f"{low} to {high}"
 
 
-def hash_warnings(runs: Sequence[dict[str, Any]]) -> list[str]:
-    """Runs whose arm config hash differs from their arm's majority, or whose harness SHA
-    differs from the overall majority."""
+def hash_warnings(runs: Sequence[dict[str, Any]],
+                  resolve: provenance.Resolver = provenance.run_code_sha) -> list[str]:
+    """Runs whose arm config hash differs from their arm's majority, or whose run-code hash
+    (the run-relevant harness files at the recorded commit) differs from the overall majority."""
     warnings: list[str] = []
     by_arm: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for r in runs:
@@ -59,43 +72,53 @@ def hash_warnings(runs: Sequence[dict[str, Any]]) -> list[str]:
         for r in group:
             if r.get("config_sha256") != majority:
                 warnings.append(f"run {r['_dir']} ({arm}): config_sha256 differs from the arm's majority")
-    shas = Counter((r.get("provenance") or {}).get("harness_sha") for r in runs)
-    if shas:
-        majority = shas.most_common(1)[0][0]
+    codes = {r["_dir"]: provenance.recorded_run_code(r, resolve) for r in runs}
+    if codes:
+        majority = Counter(codes.values()).most_common(1)[0][0]
         for r in runs:
-            if (r.get("provenance") or {}).get("harness_sha") != majority:
-                warnings.append(f"run {r['_dir']}: harness SHA differs from the majority ({str(majority)[:12]})")
+            if codes[r["_dir"]] != majority:
+                warnings.append(f"run {r['_dir']}: run-code hash differs from the majority ({str(majority)[:12]})")
     return warnings
 
 
-def render(runs: Sequence[dict[str, Any]], scenario: str) -> str:
+def short_task(name: str) -> str:
+    found = re.match(r"task\d+", name)
+    return found.group(0) if found else name
+
+
+def render(runs: Sequence[dict[str, Any]], scenario: str, tasks: Sequence[str] | None = None) -> str:
+    wanted = {short_task(t) for t in tasks} if tasks else None
     groups: dict[tuple[str, str], list[dict[str, Any]]] = defaultdict(list)
     for r in runs:
-        groups[(r["arm"], r["task"])].append(r)
+        if wanted is None or r["task"] in wanted:
+            groups[(r["arm"], r["task"])].append(r)
     lines = [
-        f"Cost scenario: `{scenario}`. Spend is summed over all attempts; USD per pass is the primary metric. "
-        "Conditional cost is median (min-max) over passing attempts.",
+        f"Cost scenario: `{scenario}`. Spend per pass is total spend over all attempts divided by passes. "
+        "Other columns are min to max over all attempts of the cell; turns are main-agent turns summed over rounds.",
         "",
-        "| Arm | Task | Attempts | Passes | Attrition | Spend USD | USD per pass | Conditional USD | Rounds | Spawns | Compactions |",
-        "|-----|------|---------:|-------:|-----------|----------:|-------------:|-----------------|--------|--------|-------------|",
+        "| Arm | Description | Task | Passes/attempts | Spend per pass USD | Cost per run USD | Cost spread USD | Wall min per run | Turns per run | Spawns | Rounds | Compactions | Main ctx peak (K tokens) | Subagent ctx peak (K tokens) |",
+        "|-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|",
     ]
     for (arm, task), group in sorted(groups.items()):
-        passed = [r for r in group if r.get("status") == "completed" and r.get("passed")]
-        spend = sum(scenario_cost(r, scenario) or 0.0 for r in group)
-        pass_costs = [c for c in (scenario_cost(r, scenario) for r in passed) if c is not None]
-        statuses = Counter(("pass" if r in passed else "cap_hit" if r.get("cap_hit") else r.get("status", "?"))
-                           for r in group)
-        attrition = ", ".join(f"{k} {v}" for k, v in sorted(statuses.items()) if k != "pass") or "none"
-        per_pass = f"{spend / len(passed):.2f}" if passed else "-"
+        passes = sum(1 for r in group if r.get("status") == "completed" and r.get("passed"))
+        costs = [c for c in (scenario_cost(r, scenario) for r in group) if c is not None]
+        per_pass = f"{sum(costs) / passes:.2f}" if passes else "-"
+        totals = [(r.get("totals") or {}) for r in group]
         behaviors = [(r.get("behavior") or {}) for r in group]
         lines.append(
-            f"| {arm} | {task} | {len(group)} | {len(passed)} | {attrition} | {spend:.2f} | {per_pass} | "
-            f"{_med_range(pass_costs, '{:.2f}')} | {_med_range([r.get('rounds_used', 0) for r in group], '{:.0f}')} | "
-            f"{_med_range([b.get('subagent_spawns', 0) for b in behaviors], '{:.0f}')} | "
-            f"{_med_range([b.get('compaction_events', 0) for b in behaviors], '{:.0f}')} |")
+            f"| {arm} | {ARM_DESCRIPTIONS.get(arm, '-')} | {task} | {passes}/{len(group)} | {per_pass} | "
+            f"{_range(costs, '{:.2f}')} | {f'{max(costs) - min(costs):.2f}' if costs else '-'} | "
+            f"{_range([t['wall_time_s'] / 60 for t in totals if t.get('wall_time_s') is not None], '{:.1f}')} | "
+            f"{_range([t['turns'] for t in totals if t.get('turns') is not None], '{:.0f}')} | "
+            f"{_range([b['subagent_spawns'] for b in behaviors if 'subagent_spawns' in b], '{:.0f}')} | "
+            f"{_range([r.get('rounds_used', 0) for r in group], '{:.0f}')} | "
+            f"{_range([b['compaction_events'] for b in behaviors if 'compaction_events' in b], '{:.0f}')} | "
+            f"{_range([b['max_context_main'] / 1000 for b in behaviors if b.get('max_context_main') is not None], '{:.1f}')} | "
+            f"{_range([b['max_context_subagent'] / 1000 for b in behaviors if b.get('max_context_subagent') is not None], '{:.1f}')} |")
     if len(lines) == 4:
-        lines.append("| - | - | 0 | 0 | - | - | - | - | - | - | - |")
-    problems = [f"run {r['_dir']}: analysis_error: {r['analysis_error']}" for r in runs if r.get("analysis_error")]
+        lines.append("| - | - | - | 0/0 | - | - | - | - | - | - | - | - | - | - |")
+    shown = [r for g in groups.values() for r in g]
+    problems = [f"run {r['_dir']}: analysis_error: {r['analysis_error']}" for r in shown if r.get("analysis_error")]
     problems += hash_warnings(runs)
     if problems:
         lines += ["", "Warnings:", ""] + [f"- {p}" for p in problems]
@@ -106,11 +129,20 @@ def main(argv: Sequence[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--runs-dir", type=Path, default=Path("/workspace/agent-experiments-runs"))
     p.add_argument("--scenario", choices=cost.SCENARIOS, default=cost.PRIMARY_SCENARIO)
+    p.add_argument("--task", nargs="+", help="only these tasks (task1..task4 or full directory names)")
+    p.add_argument("--markdown-out", type=Path, help="also write the table to this file")
     a = p.parse_args(argv)
     if not a.runs_dir.is_dir():
         print(f"aggregate: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
         return 1
-    sys.stdout.write(render(load_runs(a.runs_dir), a.scenario))
+    text = render(load_runs(a.runs_dir), a.scenario, a.task)
+    sys.stdout.write(text)
+    if a.markdown_out:
+        try:
+            a.markdown_out.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            print(f"aggregate: error: cannot write {a.markdown_out}: {exc}", file=sys.stderr)
+            return 1
     return 0
 
 

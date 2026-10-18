@@ -64,6 +64,8 @@ class ReanalyzeTest(unittest.TestCase):
             self.assertLess(out["cost"]["billed_transcript_usd"], after)
             self.assertIn("exclude untranscribed", out["cost"]["scenarios_note"])
             self.assertEqual(out["totals"]["billed_usd"], after)
+            self.assertEqual(out["behavior"]["max_context_main"], 100 + 10_000 + 2000)
+            self.assertIsNone(out["behavior"]["max_context_subagent"])
 
     def test_missing_model_usage_falls_back_with_warning(self):
         with tempfile.TemporaryDirectory() as tmp:

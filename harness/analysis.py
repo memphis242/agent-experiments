@@ -95,13 +95,18 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         record["cost"] = data
         behavior = transcript.summarize_behavior(list(mains), list(sub_dirs))
         behavior["agent_definition_models"] = definition_models
+        peaks = cost.context_peaks(requests)
+        behavior["max_context_main"] = peaks["main"]
+        behavior["max_context_subagent"] = peaks["subagent"]
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         arm = arms.get_arm(record["arm"])
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
         violations = transcript.validate_models(list(mains), list(sub_dirs), arms.MAIN_MODEL, arm.subagent_model,
                                                 arms.EFFORT_BY_MODEL, forbidden)
-        inventory = [{k: v for k, v in i.items() if k != "path"} for i in transcript.subagent_inventory(list(sub_dirs))]
+        inventory = [{**{k: v for k, v in i.items() if k != "path"},
+                      "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
+                     for i in transcript.subagent_inventory(list(sub_dirs))]
         record["validation"] = {"ok": not violations, "violations": violations, "subagents": inventory}
         record["analysis_error"] = None
     except (cost.CostError, transcript.TranscriptError, OSError) as exc:

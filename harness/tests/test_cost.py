@@ -97,6 +97,19 @@ class CostTest(unittest.TestCase):
         self.assertAlmostEqual(sum(per_round), report.scenarios["billed"].total_usd, places=12)
         self.assertGreater(per_round[1], 0.0)  # m2 at +60 s lands in round 2
 
+    def test_context_peaks_dedup_snapshots(self):
+        root = Path(self.tmp.name)
+        main = root / "p.jsonl"
+        write_jsonl(main, [
+            asst("a", OPUS, "2026-10-17T10:00:00Z", 10, 5, 1000, w1h=100),
+            asst("a", OPUS, "2026-10-17T10:00:01Z", 10, 50, 1000, w1h=100),   # snapshot of the same message
+            asst("b", OPUS, "2026-10-17T10:00:02Z", 20, 5, 3000, w5m=500),
+        ])
+        write_jsonl(root / "p" / "subagents" / "agent-x.jsonl", [asst("s", SONNET46, "2026-10-17T10:00:03Z", 1, 1, 200, w5m=50)])
+        peaks = cost.context_peaks(cost.load_requests(main, root / "p" / "subagents"))
+        self.assertEqual(peaks, {"main": 3520, "subagent": 251, "by_thread": {"agent-x": 251}})
+        self.assertIsNone(cost.context_peaks(cost.load_requests(main))["subagent"])
+
     def test_errors(self):
         reqs = cost.load_requests(self.main, self.sub_dir)
         with self.assertRaises(cost.CostError):

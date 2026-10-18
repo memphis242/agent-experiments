@@ -85,6 +85,7 @@ class Request:
     cache_read_tokens: int
     cache_write_5m_tokens: int
     cache_write_1h_tokens: int
+    thread: str = ""            # transcript file stem for subagent requests
 
     def __post_init__(self) -> None:
         assert self.source in SOURCES
@@ -95,7 +96,8 @@ def _int(value: object) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
-def _request_from_usage(message: dict, usage: dict, entry: dict, source: str, main_index: int | None) -> Request:
+def _request_from_usage(message: dict, usage: dict, entry: dict, source: str, main_index: int | None,
+                        thread: str = "") -> Request:
     created = _int(usage.get("cache_creation_input_tokens"))
     split = usage.get("cache_creation")
     if isinstance(split, dict):
@@ -118,6 +120,7 @@ def _request_from_usage(message: dict, usage: dict, entry: dict, source: str, ma
         cache_read_tokens=_int(usage.get("cache_read_input_tokens")),
         cache_write_5m_tokens=w5m,
         cache_write_1h_tokens=w1h,
+        thread=thread,
     )
 
 
@@ -149,7 +152,7 @@ def _load_file(path: Path, source: str, seen: set[str], start_index: int = 0) ->
     requests: list[Request] = []
     for position, key in enumerate(ordered):
         message, usage, entry = best[key]
-        requests.append(_request_from_usage(message, usage, entry, source, start_index + position if source == "main" else None))
+        requests.append(_request_from_usage(message, usage, entry, source, start_index + position if source == "main" else None, path.stem))
     return requests
 
 
@@ -183,6 +186,24 @@ def _recorded_cost(req: Request) -> float:
     p = price_for(req.model)
     return (req.input_tokens * p.input + req.output_tokens * p.output + req.cache_read_tokens * p.cache_read
             + req.cache_write_5m_tokens * p.write_5m + req.cache_write_1h_tokens * p.write_1h) / _PER_MILLION
+
+
+def context_tokens(req: Request) -> int:
+    """Prompt size of one request: uncached input plus cache reads and writes."""
+    return req.input_tokens + req.cache_read_tokens + req.cache_write_5m_tokens + req.cache_write_1h_tokens
+
+
+def context_peaks(requests: Sequence[Request]) -> dict[str, object]:
+    """Peak context per thread over deduplicated requests: main, all subagents (None if
+    there are none), and each subagent transcript by file stem."""
+    main = [context_tokens(r) for r in requests if r.source == "main"]
+    by_thread: dict[str, int] = {}
+    for r in requests:
+        if r.source == "subagent":
+            by_thread[r.thread] = max(by_thread.get(r.thread, 0), context_tokens(r))
+    return {"main": max(main) if main else None,
+            "subagent": max(by_thread.values()) if by_thread else None,
+            "by_thread": by_thread}
 
 
 def request_cost(req: Request, scenario: str, pause_s: float = 0.0) -> float:
