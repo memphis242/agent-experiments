@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="850.0" viewBox="0 0 1130 850.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="938.0" viewBox="0 0 1130 938.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 1: wall time per run</title>
-<rect x="8" y="8" width="1114" height="834.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1114" height="922.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 1: wall time per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">45 runs across 15 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">170 runs across 17 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
 <text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="117.4" cy="96.0" r="5" fill="#a78bfa"/>
@@ -14,14 +14,16 @@
 <text x="319.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5</text>
 <circle cx="397.8" cy="96.0" r="5" fill="#fb923c"/>
 <text x="408.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6</text>
-<circle cx="499.8" cy="96.0" r="5" fill="#4ade80"/>
-<text x="510.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
-<circle cx="595.4" cy="96.0" r="5" fill="#f472b6"/>
-<text x="606.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
-<circle cx="729.4" cy="96.0" r="5" fill="#9ca3af"/>
-<text x="740.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
-<circle cx="850.6" cy="96.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
-<text x="861.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
+<circle cx="499.8" cy="96.0" r="5" fill="#f87171"/>
+<text x="510.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Haiku 5.5</text>
+<circle cx="627.4" cy="96.0" r="5" fill="#4ade80"/>
+<text x="638.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
+<circle cx="723.0" cy="96.0" r="5" fill="#f472b6"/>
+<text x="734.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
+<circle cx="857.0" cy="96.0" r="5" fill="#9ca3af"/>
+<text x="868.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
+<circle cx="978.2" cy="96.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
+<text x="989.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
 <rect x="28" y="122.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="210.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="298.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
@@ -30,154 +32,292 @@
 <rect x="28" y="562.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="650.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="738.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="122.0" x2="456.0" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
-<line x1="542.3" y1="122.0" x2="542.3" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="542.3" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">5 min</text>
-<line x1="628.7" y1="122.0" x2="628.7" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="628.7" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">10 min</text>
-<line x1="715.0" y1="122.0" x2="715.0" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="715.0" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">15 min</text>
-<line x1="801.3" y1="122.0" x2="801.3" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="801.3" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
-<line x1="887.7" y1="122.0" x2="887.7" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="887.7" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">25 min</text>
-<line x1="974.0" y1="122.0" x2="974.0" y2="782.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="802.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">30 min</text>
-<line x1="456.0" y1="782.0" x2="974.0" y2="782.0" stroke="#484f58" stroke-width="1"/>
+<rect x="28" y="826.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
+<line x1="456.0" y1="122.0" x2="456.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
+<line x1="542.3" y1="122.0" x2="542.3" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="542.3" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">5 min</text>
+<line x1="628.7" y1="122.0" x2="628.7" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="628.7" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">10 min</text>
+<line x1="715.0" y1="122.0" x2="715.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="715.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">15 min</text>
+<line x1="801.3" y1="122.0" x2="801.3" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="801.3" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
+<line x1="887.7" y1="122.0" x2="887.7" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="887.7" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">25 min</text>
+<line x1="974.0" y1="122.0" x2="974.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">30 min</text>
+<line x1="456.0" y1="870.0" x2="974.0" y2="870.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="141.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="141.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
-<text x="78.0" y="155.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="520.8" y="136.0" width="46.0" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
+<text x="78.0" y="155.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="520.8" y="136.0" width="57.3" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
 <circle cx="528.8" cy="144.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="537.9" cy="139.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="558.8" cy="148.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<line x1="537.9" y1="133.0" x2="537.9" y2="155.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="574.8" y="148.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.2 to 6.0</text>
+<circle cx="530.7" cy="139.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="537.9" cy="148.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="548.0" cy="137.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="549.0" cy="151.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="552.1" cy="141.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="556.7" cy="146.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="558.8" cy="138.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="564.6" cy="149.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="570.0" cy="144.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<line x1="550.6" y1="133.0" x2="550.6" y2="155.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="586.0" y="148.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.2 to 6.6</text>
 <text x="36.0" y="185.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A2</text>
 <text x="78.0" y="185.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, eager, high</text>
-<text x="78.0" y="199.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="562.7" y="180.0" width="71.8" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
-<circle cx="570.7" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="614.0" cy="183.8" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="626.4" cy="192.2" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<line x1="614.0" y1="177.0" x2="614.0" y2="199.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="642.4" y="192.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.6 to 9.9</text>
+<text x="78.0" y="199.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="528.8" y="180.0" width="127.8" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
+<circle cx="536.8" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="558.0" cy="183.8" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="569.4" cy="192.2" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="570.7" cy="181.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="608.6" cy="195.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="614.0" cy="185.9" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="626.0" cy="190.1" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="626.4" cy="182.4" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="642.0" cy="193.6" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="648.6" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<line x1="611.3" y1="177.0" x2="611.3" y2="199.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="664.6" y="192.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 11.2</text>
 <text x="36.0" y="229.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A3</text>
 <text x="78.0" y="229.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, conservative, high</text>
-<text x="78.0" y="243.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="517.9" y="224.0" width="28.9" height="16" rx="8.0" fill="#d1c3fc" fill-opacity="0.34"/>
+<text x="78.0" y="243.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="517.9" y="224.0" width="64.4" height="16" rx="8.0" fill="#d1c3fc" fill-opacity="0.34"/>
 <circle cx="525.9" cy="232.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
 <circle cx="532.8" cy="227.8" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="538.9" cy="236.2" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<line x1="532.8" y1="221.0" x2="532.8" y2="243.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="554.9" y="236.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.1 to 4.8</text>
+<circle cx="534.4" cy="236.2" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="538.9" cy="225.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="540.2" cy="239.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="547.1" cy="229.9" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="550.0" cy="234.1" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="551.3" cy="226.4" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="559.7" cy="237.6" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="574.4" cy="232.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<line x1="543.6" y1="221.0" x2="543.6" y2="243.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="590.4" y="236.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.1 to 6.9</text>
 <text x="36.0" y="273.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A4</text>
 <text x="78.0" y="273.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, eager, high</text>
-<text x="78.0" y="287.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="538.2" y="268.0" width="78.8" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
-<circle cx="546.2" cy="276.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="559.0" cy="271.8" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="608.9" cy="280.2" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<line x1="559.0" y1="265.0" x2="559.0" y2="287.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="624.9" y="280.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.2 to 8.9</text>
+<text x="78.0" y="287.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="534.4" y="268.0" width="87.6" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
+<circle cx="542.4" cy="276.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="546.2" cy="271.8" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="559.0" cy="280.2" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="577.0" cy="269.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="581.3" cy="283.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="589.0" cy="273.9" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="602.5" cy="278.1" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="608.8" cy="270.4" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="608.9" cy="281.6" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="614.0" cy="276.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<line x1="585.2" y1="265.0" x2="585.2" y2="287.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="630.0" y="280.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.0 to 9.1</text>
 <text x="36.0" y="317.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A5</text>
 <text x="78.0" y="317.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, conservative, high</text>
-<text x="78.0" y="331.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
+<text x="78.0" y="331.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
 <rect x="528.5" y="312.0" width="90.4" height="16" rx="8.0" fill="#acd0fc" fill-opacity="0.34"/>
 <circle cx="536.5" cy="320.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="542.7" cy="315.8" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="610.9" cy="324.2" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<line x1="542.7" y1="309.0" x2="542.7" y2="331.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<circle cx="539.0" cy="315.8" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="540.2" cy="324.2" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="542.7" cy="313.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="542.9" cy="327.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="543.0" cy="317.9" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="543.8" cy="322.1" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="544.2" cy="314.4" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="550.2" cy="325.6" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="610.9" cy="320.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<line x1="543.0" y1="309.0" x2="543.0" y2="331.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="626.9" y="324.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 9.0</text>
 <text x="36.0" y="361.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A6</text>
 <text x="78.0" y="361.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, eager, high</text>
-<text x="78.0" y="375.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="587.5" y="356.0" width="94.8" height="16" rx="8.0" fill="#2dd4bf" fill-opacity="0.34"/>
-<circle cx="595.5" cy="364.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="612.1" cy="359.8" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="674.2" cy="368.2" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<line x1="612.1" y1="353.0" x2="612.1" y2="375.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="690.2" y="368.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">8.1 to 12.6</text>
+<text x="78.0" y="375.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="569.1" y="356.0" width="269.2" height="16" rx="8.0" fill="#2dd4bf" fill-opacity="0.34"/>
+<circle cx="577.1" cy="364.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="595.5" cy="359.8" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="605.3" cy="368.2" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="612.1" cy="357.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="617.1" cy="371.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="618.3" cy="361.9" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="624.5" cy="366.1" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="660.4" cy="358.4" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="674.2" cy="369.6" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="830.3" cy="364.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<line x1="617.7" y1="353.0" x2="617.7" y2="375.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="846.3" y="368.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 21.7</text>
 <text x="36.0" y="405.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A7</text>
 <text x="78.0" y="405.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, conservative, high</text>
-<text x="78.0" y="419.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="523.9" y="400.0" width="31.4" height="16" rx="8.0" fill="#92e9de" fill-opacity="0.34"/>
+<text x="78.0" y="419.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="523.9" y="400.0" width="48.8" height="16" rx="8.0" fill="#92e9de" fill-opacity="0.34"/>
 <circle cx="531.9" cy="408.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="536.9" cy="403.8" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="547.2" cy="412.2" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<line x1="536.9" y1="397.0" x2="536.9" y2="419.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="563.2" y="412.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 5.3</text>
+<circle cx="536.6" cy="403.8" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="536.9" cy="412.2" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="539.0" cy="401.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="543.3" cy="415.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="544.2" cy="405.9" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="546.2" cy="410.1" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="547.2" cy="402.4" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="554.8" cy="413.6" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="564.7" cy="408.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<line x1="543.7" y1="397.0" x2="543.7" y2="419.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="580.7" y="412.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 6.3</text>
 <text x="36.0" y="449.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A8</text>
 <text x="78.0" y="449.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, eager, high</text>
-<text x="78.0" y="463.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="722.7" y="444.0" width="183.5" height="16" rx="8.0" fill="#fb923c" fill-opacity="0.34"/>
-<circle cx="730.7" cy="452.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="767.3" cy="447.8" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="898.2" cy="456.2" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<line x1="767.3" y1="441.0" x2="767.3" y2="463.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="914.2" y="456.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">15.9 to 25.6</text>
+<text x="78.0" y="463.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="633.9" y="444.0" width="272.2" height="16" rx="8.0" fill="#fb923c" fill-opacity="0.34"/>
+<circle cx="641.9" cy="452.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="667.5" cy="447.8" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="674.4" cy="456.2" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="730.7" cy="445.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="751.1" cy="459.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="767.3" cy="449.9" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="774.9" cy="454.1" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="775.7" cy="446.4" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="818.1" cy="457.6" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="898.2" cy="452.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<line x1="759.2" y1="441.0" x2="759.2" y2="463.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="914.2" y="456.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.8 to 25.6</text>
 <text x="36.0" y="493.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A9</text>
 <text x="78.0" y="493.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, conservative, high</text>
-<text x="78.0" y="507.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="535.6" y="488.0" width="21.0" height="16" rx="8.0" fill="#fdc69a" fill-opacity="0.34"/>
-<circle cx="543.6" cy="496.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="548.2" cy="491.8" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="548.7" cy="500.2" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<line x1="548.2" y1="485.0" x2="548.2" y2="507.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="564.7" y="500.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.1 to 5.4</text>
+<text x="78.0" y="507.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="526.3" y="488.0" width="40.9" height="16" rx="8.0" fill="#fdc69a" fill-opacity="0.34"/>
+<circle cx="534.3" cy="496.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="535.1" cy="491.8" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="540.3" cy="500.2" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="543.6" cy="489.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="548.2" cy="503.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="548.7" cy="493.9" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="548.9" cy="498.1" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="551.8" cy="490.4" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="553.2" cy="501.6" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="559.2" cy="496.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<line x1="548.4" y1="485.0" x2="548.4" y2="507.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="575.2" y="500.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.5 to 6.0</text>
 <text x="36.0" y="537.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A10</text>
 <text x="78.0" y="537.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5.5, xhigh</text>
-<text x="78.0" y="551.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="585.8" y="532.0" width="42.2" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
-<circle cx="593.8" cy="540.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="600.4" cy="535.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="620.0" cy="544.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<line x1="600.4" y1="529.0" x2="600.4" y2="551.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="636.0" y="544.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">8.0 to 9.5</text>
+<text x="78.0" y="551.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="568.1" y="532.0" width="97.4" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
+<circle cx="576.1" cy="540.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="585.7" cy="535.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="587.1" cy="544.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="587.2" cy="533.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="592.5" cy="547.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="593.5" cy="537.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="593.8" cy="542.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="600.4" cy="534.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="620.0" cy="545.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="657.5" cy="540.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<line x1="593.0" y1="529.0" x2="593.0" y2="551.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="673.5" y="544.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 11.7</text>
 <text x="36.0" y="581.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A11</text>
 <text x="78.0" y="581.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 main, Haiku 5.5 implementer and tester, high</text>
-<text x="78.0" y="595.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="475.3" y="576.0" width="38.7" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
+<text x="78.0" y="595.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="475.3" y="576.0" width="98.8" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
 <circle cx="483.3" cy="584.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="503.9" cy="579.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="506.0" cy="588.2" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<line x1="503.9" y1="573.0" x2="503.9" y2="595.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="522.0" y="588.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">1.6 to 2.9</text>
+<circle cx="498.0" cy="579.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="499.6" cy="588.2" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="500.9" cy="577.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="502.5" cy="591.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="503.9" cy="581.9" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="506.0" cy="586.1" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="511.7" cy="578.4" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="536.1" cy="589.6" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="566.1" cy="584.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<line x1="503.2" y1="573.0" x2="503.2" y2="595.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="582.1" y="588.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">1.6 to 6.4</text>
 <text x="36.0" y="625.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A12</text>
 <text x="78.0" y="625.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5.5, high</text>
-<text x="78.0" y="639.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="499.7" y="620.0" width="121.3" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
-<circle cx="507.7" cy="628.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="513.8" cy="623.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="613.0" cy="632.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<line x1="513.8" y1="617.0" x2="513.8" y2="639.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="629.0" y="632.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">3.0 to 9.1</text>
+<text x="78.0" y="639.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="495.4" y="620.0" width="125.6" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
+<circle cx="503.4" cy="628.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="507.2" cy="623.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="507.7" cy="632.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="508.3" cy="621.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="508.7" cy="635.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="510.6" cy="625.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="510.9" cy="630.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="511.8" cy="622.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="513.8" cy="633.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="613.0" cy="628.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<line x1="509.6" y1="617.0" x2="509.6" y2="639.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="629.0" y="632.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.7 to 9.1</text>
 <text x="36.0" y="669.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A13</text>
 <text x="78.0" y="669.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, medium</text>
-<text x="78.0" y="683.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="496.8" y="664.0" width="50.3" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
+<text x="78.0" y="683.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="496.8" y="664.0" width="53.9" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
 <circle cx="504.8" cy="672.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="528.8" cy="667.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="539.1" cy="676.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<line x1="528.8" y1="661.0" x2="528.8" y2="683.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="555.1" y="676.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.8 to 4.8</text>
+<circle cx="507.2" cy="667.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="510.4" cy="676.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="515.5" cy="665.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="528.8" cy="679.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="533.2" cy="669.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="538.7" cy="674.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="539.1" cy="666.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="539.2" cy="677.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="542.7" cy="672.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<line x1="531.0" y1="661.0" x2="531.0" y2="683.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="558.7" y="676.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.8 to 5.0</text>
 <text x="36.0" y="713.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A14</text>
 <text x="78.0" y="713.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
-<text x="78.0" y="727.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="510.9" y="708.0" width="45.6" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<text x="78.0" y="727.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="510.9" y="708.0" width="99.6" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
 <circle cx="518.9" cy="716.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
 <circle cx="522.2" cy="711.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="548.5" cy="720.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="522.2" y1="705.0" x2="522.2" y2="727.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="564.5" y="720.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">3.6 to 5.4</text>
+<circle cx="526.8" cy="720.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="544.9" cy="709.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="548.5" cy="723.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="550.4" cy="713.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="564.2" cy="718.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="574.1" cy="710.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="593.5" cy="721.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="602.5" cy="716.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="549.5" y1="705.0" x2="549.5" y2="727.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="618.5" y="720.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">3.6 to 8.5</text>
 <text x="36.0" y="757.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A15</text>
 <text x="78.0" y="757.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 medium main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
-<text x="78.0" y="771.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="566.0" y="752.0" width="86.4" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
-<circle cx="574.0" cy="760.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="593.5" cy="755.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="644.5" cy="764.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="593.5" y1="749.0" x2="593.5" y2="771.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="660.5" y="764.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.8 to 10.9</text>
+<text x="78.0" y="771.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="558.2" y="752.0" width="94.3" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<circle cx="566.2" cy="760.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="573.7" cy="755.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="574.0" cy="764.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="575.9" cy="753.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="583.2" cy="767.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="591.8" cy="757.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="593.5" cy="762.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="593.6" cy="754.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="633.4" cy="765.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="644.5" cy="760.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="587.5" y1="749.0" x2="587.5" y2="771.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="660.5" y="764.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.4 to 10.9</text>
+<text x="36.0" y="801.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A16</text>
+<text x="78.0" y="801.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, high</text>
+<text x="78.0" y="815.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="541.0" y="796.0" width="120.6" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
+<circle cx="549.0" cy="804.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="552.0" cy="799.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="556.4" cy="808.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="561.8" cy="797.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="564.3" cy="811.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="566.7" cy="801.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="567.7" cy="806.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="579.4" cy="798.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="620.9" cy="809.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="653.6" cy="804.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<line x1="565.5" y1="793.0" x2="565.5" y2="815.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="669.6" y="808.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.4 to 11.4</text>
+<text x="36.0" y="845.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A17</text>
+<text x="78.0" y="845.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, xhigh</text>
+<text x="78.0" y="859.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="573.2" y="840.0" width="123.1" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
+<circle cx="581.2" cy="848.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="606.3" cy="843.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="615.0" cy="852.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="617.2" cy="841.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="621.8" cy="855.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="627.8" cy="845.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="631.4" cy="850.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="631.8" cy="842.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="632.1" cy="853.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="688.2" cy="848.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<line x1="624.8" y1="837.0" x2="624.8" y2="859.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="704.2" y="852.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.3 to 13.5</text>
 </svg>
