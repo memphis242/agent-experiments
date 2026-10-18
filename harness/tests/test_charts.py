@@ -3,6 +3,7 @@ import unittest
 import xml.etree.ElementTree as ET
 
 import _support  # noqa: F401
+import aggregate
 import charts
 
 
@@ -57,6 +58,22 @@ class FamilyTest(unittest.TestCase):
         self.assertNotEqual(eager, tint)
         self.assertGreater(sum(charts._rgb(tint)), sum(charts._rgb(eager)))
         self.assertEqual(charts.family_style("solo Opus 5.5")[1], charts.FAMILIES[-1][2])
+
+
+class LabelTest(unittest.TestCase):
+    def test_effort_labels(self):
+        cases = {
+            "A1": "solo Opus 5.5, high",
+            "A6": "Sonnet 5 subagents, eager, high",
+            "A10": "solo Sonnet 5.5, xhigh",
+            "A13": "solo Opus 5.5, medium",
+            "A14": "Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered",
+        }
+        for arm, label in cases.items():
+            self.assertEqual(charts.chart_label(arm, aggregate.ARM_DESCRIPTIONS[arm]), label, arm)
+
+    def test_unknown_arm_keeps_description(self):
+        self.assertEqual(charts.chart_label("A99", "something"), "something")
 
 
 class ChartTest(unittest.TestCase):

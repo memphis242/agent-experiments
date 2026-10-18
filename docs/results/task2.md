@@ -31,8 +31,8 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task2 | 10/10 | 1.30 | 1.02 to 2.02 | 1.00 | 7.3 to 20.7 | 1 to 52 | 0 to 1 | 1 | 0 | 118.6 to 169.4 | 140.6 to 154.4 |
 | A12 | solo Sonnet 5.5, high effort | task2 | 10/10 | 1.39 | 1.13 to 1.96 | 0.83 | 7.8 to 21.6 | 37 to 52 | 0 | 1 to 2 | 0 | 124.3 to 169.3 | - |
 | A13 | solo Opus 5.5, medium effort | task2 | 10/10 | 2.91 | 2.22 to 3.47 | 1.26 | 9.8 to 15.4 | 36 to 66 | 0 | 1 | 0 | 121.0 to 159.6 | - |
-| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5 tiered | task2 | 10/10 | 1.45 | 1.19 to 1.78 | 0.58 | 7.5 to 16.7 | 2 to 11 | 2 to 3 | 1 | 0 | 29.1 to 58.2 | 90.7 to 216.1 |
-| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5 tiered | task2 | 10/10 | 2.19 | 1.92 to 2.74 | 0.82 | 9.5 to 20.7 | 4 to 13 | 3 to 4 | 1 | 0 | 78.8 to 102.8 | 136.5 to 186.8 |
+| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task2 | 10/10 | 1.45 | 1.19 to 1.78 | 0.58 | 7.5 to 16.7 | 2 to 11 | 2 to 3 | 1 | 0 | 29.1 to 58.2 | 90.7 to 216.1 |
+| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task2 | 10/10 | 2.19 | 1.92 to 2.74 | 0.82 | 9.5 to 20.7 | 4 to 13 | 3 to 4 | 1 | 0 | 78.8 to 102.8 | 136.5 to 186.8 |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.33, A12 0.35, A14 0.37,
 A15 0.55, A13 0.74, A10 0.79, A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28,

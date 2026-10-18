@@ -18,6 +18,7 @@ from typing import Any, Sequence
 from xml.sax.saxutils import escape
 
 import aggregate
+import arms
 import cost
 
 # ---- Design parameters ------------------------------------------------------------------------
@@ -28,8 +29,10 @@ CARD_RADIUS = 14
 CARD_FILL = "#0d1117"
 CARD_STROKE = "#30363d"
 PAD_X = 28                      # card edge to content
-GUTTER_WIDTH = 340              # arm id / description column
+GUTTER_WIDTH = 420              # arm id / description column
 ARM_ID_WIDTH = 42               # arm id to description text
+DESC_CHAR_WIDTH = 5.8           # approximate glyph width of the description text (measured about 5.5)
+DESC_GAP = 16                   # least space between the description and the plot
 PLOT_WIDTH = 518                # x extent of the plot area (value 0 to the axis limit)
 PLOT_RIGHT_PAD = 120            # room right of the axis end for the range text
 ANNOT_GAP = 14                  # gap between the range-text zone and the annotation column
@@ -92,6 +95,10 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("solo Opus 5.5", "Solo Opus 5.5", "#9ca3af"),
 )
 FALLBACK_FAMILY = ("Other", "#9ca3af")
+MODEL_NAMES = {arms.OPUS_55: "Opus 5.5", arms.SONNET_55: "Sonnet 5.5", arms.SONNET_5: "Sonnet 5",
+               arms.SONNET_46: "Sonnet 4.6", arms.HAIKU_55: "Haiku 5.5"}
+_EFFORTS = "|".join(sorted(arms.EFFORT_LEVELS))
+EFFORT_PHRASE = re.compile(rf",? (?:{_EFFORTS}) effort\b| (?:{_EFFORTS})(?= main\b)")
 TINT_MARKERS = ("conservative", "roles")     # description words that select the lighter tint
 
 # Metric id -> output file name
@@ -133,6 +140,22 @@ def mix(hex_color: str, target: tuple[int, int, int], amount: float) -> str:
     assert 0.0 <= amount <= 1.0
     r, g, b = (round(c + (t - c) * amount) for c, t in zip(_rgb(hex_color), target))
     return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def chart_label(arm_id: str, description: str) -> str:
+    """The arm description with its effort levels: appended when every agent runs at one
+    level, otherwise placed after each model name."""
+    if arm_id not in arms.ARMS:
+        return description
+    efforts = arms.effort_map(arms.get_arm(arm_id))
+    base = EFFORT_PHRASE.sub("", description)
+    if len(set(efforts.values())) == 1:
+        return f"{base}, {next(iter(efforts.values()))}"
+    for model, effort in efforts.items():
+        name = re.compile(re.escape(MODEL_NAMES[model]) + r"(?![\d.])")
+        assert name.search(base), f"{arm_id}: {MODEL_NAMES[model]} missing from {base!r}"
+        base = name.sub(lambda m: f"{m.group(0)} {effort}", base, count=1)
+    return base
 
 
 def family_style(description: str) -> tuple[str, str]:
@@ -210,7 +233,7 @@ def build_rows(runs: Sequence[dict[str, Any]], task: str, metric: str, scenario:
         description = aggregate.ARM_DESCRIPTIONS.get(arm, arm)
         family, fill = family_style(description)
         points = tuple(sorted(by_arm[arm], key=lambda p: (p.value, not p.passed)))
-        rows.append(ArmRow(arm, description, family, fill, points, max_figures(stats[arm])))
+        rows.append(ArmRow(arm, chart_label(arm, description), family, fill, points, max_figures(stats[arm])))
     return rows
 
 
@@ -341,6 +364,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     for i, row in enumerate(rows):
         cy = rows_top + i * ROW_HEIGHT + ROW_HEIGHT / 2
         add(_text(left, cy - 3, row.arm, ARM_ID_SIZE, TEXT_COLOR, "700"))
+        assert ARM_ID_WIDTH + len(row.description) * DESC_CHAR_WIDTH + DESC_GAP <= GUTTER_WIDTH, \
+            f"{row.arm} description overflows the gutter"
         add(_text(left + ARM_ID_WIDTH, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
         add(_text(left + ARM_ID_WIDTH, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
         values = [p.value for p in row.points]
