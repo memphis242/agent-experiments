@@ -1,0 +1,21 @@
+{
+  "s3-hidden-cmdval-lib": {
+    "runner": "hidden",
+    "prefix": "",
+    "base": "The CMDVAL library must implement the S3.2 API exactly as pinned (CMDVAL_LibInit, CMDVAL_Crc16, CMDVAL_Sha256, CMDVAL_HmacSha256, CMDVAL_CheckSource, CMDVAL_CheckAge, CMDVAL_ValidateFrame with the CMDVAL_Config_t and CMDVAL_FrameInfo_t layouts and the CMDVAL_Status_t values) for frames in the S3.1 format.",
+    "cases": {
+      "Library initialization": "CMDVAL_LibInit returns CFE_SUCCESS",
+      "CRC-16/CCITT-FALSE": "CMDVAL_Crc16 is CRC-16/CCITT-FALSE (polynomial 0x1021, not reflected, initial 0xFFFF, final XOR 0) with check value 0x29B1 for \"123456789\"",
+      "SHA-256 vectors": "CMDVAL_Sha256 matches the FIPS 180-4 SHA-256 test vectors, including messages at the padding boundaries and one million 'a'",
+      "HMAC-SHA-256 RFC 4231 cases 1 to 5": "CMDVAL_HmacSha256 matches RFC 4231 HMAC-SHA-256 test cases 1 to 5 (case 5 compared on its first 16 bytes)",
+      "HMAC-SHA-256 keys longer than 64 bytes": "CMDVAL_HmacSha256 hashes keys longer than 64 bytes first (RFC 4231 test cases 6 and 7) and uses a 64-byte key as is",
+      "Age window": "CMDVAL_CheckAge returns OK when the absolute difference of NowSeconds and FrameSeconds, in signed 64-bit arithmetic, is at most MaxAgeSeconds in either direction and CMDVAL_ERR_AGE otherwise, with no wrap-around at the ends of the 32-bit range",
+      "Source allow-list": "CMDVAL_CheckSource returns OK only when SourceId is nonzero and equals a nonzero AllowedSources entry in any slot, else CMDVAL_ERR_SOURCE",
+      "Valid frame and frame information": "CMDVAL_ValidateFrame returns CMDVAL_OK for a valid frame and fills Info (SourceId, TimeSeconds, Sequence, Command pointing into the frame at offset 16, CommandLen) when Info is not NULL, and accepts a NULL Info",
+      "Frame size limits": "frames with CommandLength 8 (58 bytes) and 1024 (1074 bytes) are accepted",
+      "FORMAT rejections": "CMDVAL_ValidateFrame always checks FORMAT, whatever the EnableMask: FrameLen at least 58, Magic 0x4356, Version 1, Flags 0, CommandLength L in 8..1024, FrameLen equal to 50 + L, the embedded CCSDS length consistent with L and the embedded type bit set to command",
+      "CRC, HMAC, SOURCE and AGE rejections": "a wrong CRC is CMDVAL_ERR_CRC, a MAC that does not verify with the configured key is CMDVAL_ERR_HMAC, an unlisted or zero SourceId is CMDVAL_ERR_SOURCE and a timestamp outside MaxAgeSeconds is CMDVAL_ERR_AGE, using the configuration passed in",
+      "Check order and enable mask": "CMDVAL_ValidateFrame returns the first failure in the order FORMAT, then CRC, HMAC, SOURCE, AGE, each only when its EnableMask bit is set (a frame with a bad CRC and a bad MAC is a CRC rejection; with CRC disabled, an HMAC rejection)"
+    }
+  }
+}

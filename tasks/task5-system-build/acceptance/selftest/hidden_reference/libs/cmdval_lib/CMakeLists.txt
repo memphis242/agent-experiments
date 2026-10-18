@@ -1,0 +1,6 @@
+project(CFE_CMDVAL_LIB C)
+add_cfe_app(cmdval_lib fsw/src/cmdval_lib.c)
+target_include_directories(cmdval_lib PUBLIC fsw/public_inc)
+if (ENABLE_UNIT_TESTS)
+  add_cfe_coverage_stubs(cmdval_lib ut-stubs/cmdval_lib_stubs.c)
+endif ()

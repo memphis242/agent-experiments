@@ -1,0 +1,24 @@
+{
+  "s3-hidden-cmdi": {
+    "runner": "hidden",
+    "prefix": "",
+    "base": "CMDI must behave as specified when driven through its entry point CMDI_AppMain with software bus messages, a ValTable image and UDP datagrams on its port, using only the names, structures, message IDs, function codes and event IDs in the specification.",
+    "cases": {
+      "Startup and housekeeping": "at initialization CMDI registers ValTable (56 bytes, with a validation function), subscribes to CMDI_CMD_MID, CMDI_SEND_HK_MID and CMDI_WAKEUP_MID, binds UDP port 1234 + node ID - 1 and emits CMDI_INIT_INF_EID once; SEND_HK sends CMDI_HkTlm_t in the specified field order with EnableMask and MaxAgeSeconds from the table; NOOP emits CMDI_NOOP_INF_EID and increments CommandCounter",
+      "Port per node": "CMDI binds UDP port 1234 + node ID - 1 (1235 on node 2) and executes valid frames received there",
+      "Socket error": "a socket that cannot be bound is reported with CMDI_SOCKET_ERR_EID (ERROR type) and CMDI keeps running, answering housekeeping requests and sending its heartbeat",
+      "Startup error events": "table registration, table load and software bus read failures are reported with CMDI_TBL_REG_ERR_EID, CMDI_TBL_LOAD_ERR_EID and CMDI_PIPE_ERR_EID",
+      "Valid frame": "each datagram is validated with CMDVAL_ValidateFrame using the active configuration and the current onboard seconds; a valid frame's embedded command is sent unchanged with CFE_SB_TransmitMsg(..., false), FramesReceived and FramesAccepted count it, and CMDI_ACCEPT_DBG_EID (DEBUG type) names its MID as 0x%04X",
+      "Rejection reasons": "frames with a bad CRC, a bad MAC, both (a CRC rejection), an unlisted source, a time more than MaxAgeSeconds before or after the onboard time, a malformed header, an unframed packet and a datagram longer than 1074 bytes are rejected: nothing is sent, the reason's counter rises, and one CMDI_REJECT_ERR_EID (ERROR type) names FORMAT, CRC, HMAC, SOURCE or AGE and, except for FORMAT, the source ID in decimal; a frame exactly MaxAgeSeconds old or ahead is accepted",
+      "Rejection statuses": "every CMDVAL_ValidateFrame status (FORMAT, CRC, HMAC, SOURCE, AGE) is counted under its own housekeeping counter and named in CMDI_REJECT_ERR_EID, with the frame's SourceId except for FORMAT",
+      "Reads per wakeup": "every WAKEUP reads up to 16 pending datagrams without blocking, and datagrams beyond 16 wait for the next WAKEUP",
+      "Heartbeat": "every 10th WAKEUP sends one SFI_HeartbeatCmd_t (function code 0) on SFI_HEARTBEAT_MID with AppName CMDI and Sequence 1 for the first heartbeat, +1 per heartbeat",
+      "Set max age": "SET_MAX_AGE accepts 1..86400 (CMDI_SET_PARAM_INF_EID, MaxAgeSeconds in housekeeping, the wider window applied to later frames) and rejects 0 and 86401 with CMDI_SET_PARAM_ERR_EID and a command error, changing nothing",
+      "Set enable mask": "SET_ENABLE_MASK accepts 0..0x0F (CMDI_SET_PARAM_INF_EID) and rejects larger masks with CMDI_SET_PARAM_ERR_EID and a command error, changing nothing; a check whose EnableMask bit is clear is skipped, and with mask 0 only the FORMAT checks remain",
+      "Framed parameter commands": "SET_ENABLE_MASK and SET_MAX_AGE arriving in valid frames take effect from the next frame, while the same commands sent unframed or in a frame with a bad MAC are rejected and change nothing",
+      "Table load overrides": "an update of ValTable replaces the key, the allowed sources, MaxAgeSeconds and EnableMask, overriding values set by SET_MAX_AGE and SET_ENABLE_MASK, and later frames are validated against the new table",
+      "Table validation": "ValTable validation rejects an all-zero key, MaxAgeSeconds 0 or above 86400, EnableMask bits above 0x0F, the SOURCE bit with no nonzero source and duplicate nonzero sources, each with CMDI_TBL_VAL_ERR_EID, and accepts the boundary values",
+      "Commands and counters": "an unknown function code (CMDI_CC_ERR_EID) and a wrong command length (CMDI_CMD_LEN_ERR_EID) are counted in CommandErrorCounter and change nothing else, a message with an unexpected MID emits CMDI_MID_ERR_EID, and RESET_COUNTERS (CMDI_RESET_INF_EID) zeroes the command counters, FramesReceived, FramesAccepted and the five reason counters but not MaxAgeSeconds or EnableMask"
+    }
+  }
+}

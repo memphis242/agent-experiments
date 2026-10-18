@@ -1,0 +1,27 @@
+{
+  "s4-hidden-tlmo": {
+    "runner": "hidden",
+    "prefix": "",
+    "base": "TLMO must behave as specified when driven through its entry point TLMO_AppMain with software bus messages and its PriorityTable, using only the names, structures, message IDs, function codes and event IDs in the specification.",
+    "cases": {
+      "Startup, subscriptions and housekeeping": "at initialization TLMO registers the 516-byte PriorityTable with a validation function, subscribes to TLMO_CMD_MID, TLMO_SEND_HK_MID and TLMO_WAKEUP_MID and to every used stream with a message limit of 32 on a pipe of depth 48, emits TLMO_INIT_INF_EID (1) and no TLMO_TBL_UPDATE_INF_EID, and answers SEND_HK with a TLMO_HkTlm_t in the specified field order (BudgetPacketsPerCycle and QueueCapacity from the table, ActiveStreams the used slots); NOOP increments CommandCounter with event 3",
+      "Output without an enable command": "output is always on: with no enable command, stream packets are sent as one UDP datagram each, bytes unchanged, to 127.0.0.1 port 2234 + node ID - 1 (2235 on node 2)",
+      "Drain order and budget": "on every WAKEUP TLMO sends up to the current budget, each time the oldest packet of the highest-priority non-empty class (class 0 first), budget 0 sends nothing, and SentByClass counts the packets sent",
+      "Eviction and drop counting": "with the queue at QueueCapacity, an arriving packet evicts the oldest packet of the lowest-priority class present when that class is lower than its own (the evicted packet counted as a drop of its class), otherwise the arriving packet is dropped and counted in its own class; PacketsReceived counts every received stream packet",
+      "Oversize packets and socket errors": "a packet longer than TLMO_MAX_PACKET (1024) is dropped as a drop of its class while a 1024-byte packet is forwarded whole; a failed send increments SocketErrors instead of SentByClass, the packet leaves the queue either way, and output continues afterwards",
+      "Drop events": "the first drop in each class after initialization, RESET_COUNTERS or a table load sends one TLMO_DROP_INF_EID (17) naming the class, and further drops in that class send none",
+      "SET_CLASS": "SET_CLASS of a used stream to class 0..3 changes its runtime class for packets enqueued afterwards (TLMO_SET_CLASS_INF_EID, 13); an unused stream or a class above 3 is rejected with TLMO_SET_CLASS_ERR_EID (14) and a command error, changing nothing",
+      "SET_BUDGET": "SET_BUDGET accepts 0..256 (TLMO_SET_BUDGET_INF_EID, 15) and limits the packets sent per WAKEUP; 257 is rejected with TLMO_SET_BUDGET_ERR_EID (16) and a command error; a wrong length gives TLMO_CMD_LEN_ERR_EID (6)",
+      "SEND_CLASS_MAP": "SEND_CLASS_MAP sends one TLMO_ClassTlm_t on TLMO_CLASS_TLM_MID with the runtime budget, StreamCount and all 64 slots of the runtime list in slot order with their runtime classes, unused slots invalid, and emits TLMO_CLASS_MAP_INF_EID (18)",
+      "ADD_STREAM": "ADD_STREAM fills the lowest unused slot of the runtime list, subscribes with a message limit of 32 and emits TLMO_ADD_STREAM_INF_EID (20) with the MID and class; an invalid MID, a stream already used, a class above 3 or a failed subscription is rejected with TLMO_ADD_STREAM_ERR_EID (21) and a command error, changing nothing",
+      "ADD_STREAM with a full runtime list": "a table may use all 64 slots; ADD_STREAM with no unused slot left is rejected with TLMO_ADD_STREAM_ERR_EID (21), and a slot freed by REMOVE_STREAM is the next one filled",
+      "REMOVE_STREAM": "REMOVE_STREAM of a used stream unsubscribes it, empties its slot and discards its queued packets without counting them (TLMO_REMOVE_STREAM_INF_EID, 22); an unused stream is rejected with TLMO_REMOVE_STREAM_ERR_EID (23) and a command error",
+      "Table validation": "the table validation function rejects a budget above 256, a capacity outside 1..64, a class above 3 in a used entry and duplicate used MIDs with TLMO_TBL_VAL_ERR_EID (10), and accepts the boundary values, unused entries and a table of 64 used streams",
+      "Table update": "a table update replaces the runtime list with the table's (streams added by command are dropped), subscriptions follow the new list, runtime classes and budget reset to the table, queued packets of streams no longer listed are discarded without counting, other queued packets keep their class, TLMO_TBL_UPDATE_INF_EID (19) is sent, and a rejected table leaves the previous one active",
+      "Heartbeat": "every 10th WAKEUP sends one SFI_HeartbeatCmd_t (code 0) on SFI_HEARTBEAT_MID naming TLMO, with Sequence 1 for the first heartbeat and one more for each next",
+      "Reset counters": "RESET_COUNTERS zeroes the command counters, PacketsReceived, SentByClass, DroppedByClass and SocketErrors with TLMO_RESET_INF_EID (4), and leaves the queue, budget, capacity and streams",
+      "Command errors": "an invalid function code gives TLMO_CC_ERR_EID (2) and a wrong command length TLMO_CMD_LEN_ERR_EID (6), each counted as a command error, and an unexpected message ID gives TLMO_MID_ERR_EID (5)",
+      "Startup error events": "initialization failures are reported with TLMO_TBL_REG_ERR_EID (8), TLMO_TBL_LOAD_ERR_EID (9), TLMO_SUB_ERR_EID (11) for a stream subscription, TLMO_SOCKET_ERR_EID (12) and TLMO_PIPE_ERR_EID (7) for a pipe read failure"
+    }
+  }
+}

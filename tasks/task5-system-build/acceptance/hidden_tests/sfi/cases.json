@@ -1,0 +1,25 @@
+{
+  "s6-hidden-sfi": {
+    "runner": "hidden",
+    "prefix": "",
+    "base": "SFI must behave as specified when driven through its entry point SFI_AppMain with heartbeats, watched packets, wakeups and commands on the software bus, using only the names, structures, message IDs, function codes and event IDs of the specification.",
+    "cases": {
+      "Startup and housekeeping": "at startup SFI registers SfiTable (520 bytes) with a validation function, subscribes to its command, SEND_HK and WAKEUP message IDs, to SFI_HEARTBEAT_MID with a message limit of 32 and to each distinct watch MID with a message limit of 8, emits event 1, reports the table's HbMissLimit and ClusterWindowSec in SFI_HkTlm_t, lists the table apps as UNARMED and the used watches as BASELINE_PENDING in SFI_StatusTlm_t, and NOOP increments CommandCounter with event 3",
+      "Startup error events": "initialization failures are reported with events 7 (pipe), 8 (table registration), 9 (table load) and 11 (subscription)",
+      "Table validation": "SfiTable validation rejects HbMissLimit outside 1..60, ClusterWindowSec outside 1..600, HistorySec outside 1..3600, unterminated or duplicate app names, and a used watch with Width not 1, 2 or 4, Limit 0 or ByteOffset + Width above 1024 (event 10), and accepts the boundary values and unused entries",
+      "Heartbeat arming and miss": "the first heartbeat of a table app arms it (OK); each 1 Hz wakeup without a heartbeat increments MissedCycles; reaching HbMissLimit makes the app MISSING once, with the onset taken from CFE_TIME_GetTime at that wakeup (seconds and subseconds), TotalMisses, HbMissEvents and AppsMissing incremented, the onset appended to the miss history with the app's index, and one SFI_HB_MISS_ERR_EID naming the app and the onset seconds; apps never heard stay UNARMED and are not evaluated",
+      "Heartbeat restore": "a heartbeat from a MISSING app makes it OK at once with SFI_HB_RESTORED_INF_EID, the next wakeup resets MissedCycles to 0, and a later silence is a new miss",
+      "Unknown heartbeats": "a heartbeat naming no table app counts in UnknownHeartbeats (not TotalHeartbeats) with the DEBUG event SFI_HB_UNKNOWN_DBG_EID and is otherwise ignored",
+      "Parameter commands": "SET_MISS_LIMIT accepts 1..60 and SET_CLUSTER_WINDOW 1..600 with SFI_SET_PARAM_INF_EID, reject other values with SFI_SET_PARAM_ERR_EID and a command error, and the new miss limit takes effect at the next wakeups",
+      "Clustered misses": "recent misses (no older than HistorySec) are grouped into clusters of onsets at most ClusterWindowSec apart; equal onsets are 0 apart; ClusterCount, LargestClusterSize, RecentMisses and Correlation CLUSTERED are reported in housekeeping and status, and SFI_CLUSTER_ERR_EID (naming the cluster size and W) is sent when Correlation becomes CLUSTERED and again only when LargestClusterSize grows",
+      "Uncorrelated misses and history clear": "misses more than ClusterWindowSec apart, subseconds included, are separate clusters (Correlation UNCORRELATED) while misses exactly W apart form one cluster; CLEAR_HISTORY empties the history and the cluster metrics with SFI_HISTORY_CLEAR_INF_EID",
+      "Miss history ring": "the miss history keeps the latest SFI_HISTORY_LEN (16) onsets, oldest first, the oldest overwritten, and TotalMisses keeps counting",
+      "Recent miss window": "a miss counts as recent while it is no older than HistorySec and is then left out of RecentMisses, the clusters and Correlation, while staying in the history",
+      "STALL watch": "a STALL watch takes its baseline from the first packet, counts unchanged values and enters FAULT when the count reaches Limit (StallFaults, WatchesInFault, SFI_STALL_ERR_EID naming MID and offset, no repeat while in FAULT), returns to OK on a changed value with SFI_WATCH_CLEAR_INF_EID, and ignores packets too short for ByteOffset + Width",
+      "RATE watch": "a RATE watch compares each value (host byte order, Width bytes at ByteOffset) with the previous one, takes the new value itself as the delta when it is smaller (counter reset), enters FAULT when the delta is above Limit (RateFaults, SFI_RATE_ERR_EID naming MID, offset and delta, no repeat while in FAULT), and returns to OK on a delta at most Limit with SFI_WATCH_CLEAR_INF_EID, for verification packets and housekeeping telemetry alike",
+      "Reset counters": "RESET_COUNTERS zeroes the command counters, TotalHeartbeats, UnknownHeartbeats, HbMissEvents, StallFaults and RateFaults with event 4, without changing app or watch states, the history or the cluster metrics",
+      "Command errors": "an invalid function code gives event 2, a wrong command length event 6 (and the command is not executed), an unexpected message ID event 5, each rejected command counting only in CommandErrorCounter",
+      "Table update": "a table update that passes validation returns all apps to UNARMED and all watches to BASELINE_PENDING, keeps the miss history, overrides the values set by SET_MISS_LIMIT and SET_CLUSTER_WINDOW, and subscribes to new watch MIDs; a rejected update leaves the active table in force"
+    }
+  }
+}

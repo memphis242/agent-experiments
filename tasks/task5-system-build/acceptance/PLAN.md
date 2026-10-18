@@ -123,3 +123,39 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
 - TLMO pipe depth against 48 default streams.
 - CFE_TBL_Share when GW starts before CMDI registers, and across a CMDI restart.
 - Node clocks within the age window for GW-to-GW frames.
+
+## As built (pack implementation notes)
+
+Layout: `run.sh` (entry point) runs `check.py` (check table `CHECKS`, `RUN_ORDER` per lane, retry policy,
+result file and summary). Live plumbing is `node.py` (scratch node copies started with the agent's
+`tools/run_cfs.sh`, `Ground` receiver on the TLMO port, framed commands, housekeeping requests, table loads
+through cFE TBL LOAD/VALIDATE/ACTIVATE), with the independent codec in `frames.py`, pinned identifiers and
+layouts in `spec.py`, table images in `tables.py`. Checks live in `static_checks.py` (C.2, C.6, N, default
+tables), `harness_checks.py` + `harness_probe.py` (S3.5), `live_stor.py` (S1, S2), `live_cmdi.py` (S3),
+`live_tlmo.py` (S4), `live_gw.py` (S5), `live_sfi.py` (S6), `live_nodes.py` (C.1 probes), `ctf_checks.py`
+(S7) and `hidden_glue.py` (component behaviour tests in `hidden_tests/`, sharing the model `t5_model.h`).
+
+Deviations from the plan above, and why:
+- Result file: the contract (enforced by harness/acceptance.py) allows exactly `passed` and `checks` at the
+  top level, so the per-subsystem summary (checks, run, passed, failed, fraction, passed_all, overall,
+  `preliminary: true`) is written next to it as `<out-stem>.subsystems.json` and printed to stdout.
+- Parallelism: under `ACCEPT_NO_NAMESPACE` the pack may not create namespaces, and the node ports are fixed,
+  so every check that binds them runs in one ordered "ports" lane; the build, a "cpu" lane (unit tests,
+  coverage, behaviour tests) and a "misc" lane (static checks, fresh CTF set-up, plugin listing, CCDD probe)
+  run alongside it.
+- S1 tables: nodes boot STOR with an entry-less StorageTable and each scenario table is then loaded through
+  cFE Table Services, so no default-entry packet files distort the arithmetic Task 4 relied on.
+- Events are read from TLMO's event telemetry; only the start-up INIT events are read from the node's console
+  log, because they precede TLMO's subscriptions.
+- CMDI and GW behaviour tests carry a reference cmdval_lib (in `t5_model.h`) that takes precedence over the
+  component's stub library (`-Wl,--allow-multiple-definition`), which isolates them from the agent's library
+  as "linked against the cmdval_lib stubs" intends without depending on how the agent wrote its stubs.
+- Pilot items are named checks that fail loudly: `n-ram-disks-distinct`, `n-node-clocks`,
+  `s4-pipe-depth-probe` (SB PipeOverflowErrorCounter/MsgLimitErrorCounter), `s5-pty-idle-probe`,
+  `s5-restart-serial-probe`, `s5-valtable-share-probe` (GW moved before CMDI in the scratch startup script,
+  then ES RESTART_APP of CMDI) and `s7-listener-probe` (a review-owned CTF script while command-type and short
+  datagrams arrive on UDP 2234).
+- Time budget: `check.py` starts no new work after 44 minutes; `run.sh` stops at 2700 s. Runs of this task
+  need `harness/run.py --acceptance-timeout 2760` (the default is 2400).
+- Checks that pass on the unmodified template by design: `n-build-werror`, `n-unit-tests` (the template has
+  no CI_LAB/TO_LAB unit tests), `n-change-scope` and `s7-setup-fresh`.
