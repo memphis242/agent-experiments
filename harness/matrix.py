@@ -46,7 +46,7 @@ def is_completed(attempts: Sequence[dict], arm: str, task: str, rep: int, config
     return any(
         a.get("arm") == arm and a.get("task") == task and a.get("rep") == rep and a.get("status") == "completed"
         and a.get("config_sha256") == config_sha
-        and provenance.recorded_run_code(a, resolve) == run_code
+        and provenance.same_run_code(provenance.recorded_run_code(a, resolve), run_code)
         for a in attempts)
 
 

@@ -20,6 +20,22 @@ RUN_CODE_PATHS: tuple[str, ...] = (
 assert "harness/provenance.py" not in RUN_CODE_PATHS, "the hash must not depend on its own definition"
 
 
+# Run-code hashes of earlier commits whose differences from the current run pipeline were
+# reviewed as behaviour-preserving, so runs recorded under them stay reusable and comparable.
+EQUIVALENT_RUN_CODES: frozenset[str] = frozenset({
+    # 43e08d18cc5c (Task 1 wave): post-run analysis was later moved out of run.py.
+    "9e55e24b8e88f87aa9b33708ee6126b141d9d3d8d7e9d358327e9175647e7a3e",
+    # 68ce5b2 (Tasks 2 to 4 waves): the current change parameterises the main model per arm;
+    # for the arms that existed then it yields the same model, effort and records.
+    "36554411e09c7994e2238f6ac7f095e084f894be058043c9110211bd92da03db",
+})
+
+
+def same_run_code(recorded: str | None, current: str) -> bool:
+    """True when a recorded run-code hash is the current one or a reviewed equivalent."""
+    return recorded is not None and (recorded == current or recorded in EQUIVALENT_RUN_CODES)
+
+
 @functools.cache
 def run_code_sha(commit: str) -> str | None:
     """Hash of the run-relevant harness files at `commit` (a sha or 'HEAD'), or None when

@@ -61,7 +61,7 @@ HIDDEN_PATHS: tuple[tuple[str, str], ...] = (
     ("/tmp", "scratch space of other sessions, which may hold packs or solutions"),
 )
 EXIT_USAGE_LIMIT = 3
-USAGE_LIMIT_RE = re.compile(r"usage limit|rate limit|exceeded|\b429\b", re.IGNORECASE)
+USAGE_LIMIT_RE = re.compile(r"usage limit|rate limit|exceeded|\b429\b|hit your\b[^.\n]*\blimit", re.IGNORECASE)
 SCHEMA_VERSION = 2
 STATUSES = ("running", "completed", "usage_limit", "infra_error", "cli_error", "error")
 
@@ -300,7 +300,7 @@ def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: 
     if session_id is not None:
         cmd += ["--resume", session_id]
     cmd += [message,
-            "--model", arms.MAIN_MODEL,
+            "--model", arm.main_model,
             "--permission-mode", "bypassPermissions",
             "--permission-prompts", "none",
             "--output-format", "json",
@@ -411,7 +411,7 @@ class Runner:
             "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir,
             "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
-            "models": {"main": arms.MAIN_MODEL, "subagent": arm.subagent_model},
+            "models": {"main": arm.main_model, "subagent": arm.subagent_model},
             "delegation": arm.delegation,
             "settings": settings, "config_sha256": config_hash,
             "provenance": provenance(self.cfg, task_root / "spec.md", task_root / "acceptance"),

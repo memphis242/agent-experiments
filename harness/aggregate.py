@@ -47,6 +47,7 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A4": "Sonnet 5.5 subagents, eager", "A5": "Sonnet 5.5 subagents, conservative",
     "A6": "Sonnet 5 subagents, eager", "A7": "Sonnet 5 subagents, conservative",
     "A8": "Sonnet 4.6 subagents, eager", "A9": "Sonnet 4.6 subagents, conservative",
+    "A10": "solo Sonnet 5.5, xhigh effort", "A11": "Sonnet 5.5 main, Haiku 5.5 implementer and tester",
 }
 
 
@@ -72,7 +73,10 @@ def hash_warnings(runs: Sequence[dict[str, Any]],
         for r in group:
             if r.get("config_sha256") != majority:
                 warnings.append(f"run {r['_dir']} ({arm}): config_sha256 differs from the arm's majority")
+    current = provenance.run_code_sha("HEAD") or ""
     codes = {r["_dir"]: provenance.recorded_run_code(r, resolve) for r in runs}
+    # Reviewed-equivalent run code counts as the current one.
+    codes = {d: (current if provenance.same_run_code(c, current) else c) for d, c in codes.items()}
     if codes:
         majority = Counter(codes.values()).most_common(1)[0][0]
         for r in runs:
