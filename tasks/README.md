@@ -16,3 +16,4 @@ Each task directory holds:
 | 2 | task2-sample-app-status | extend small app | 45-90 min |
 | 3 | task3-hk-staleness | extend flight app | 1.5-3 h |
 | 4 | task4-stor-app | new app from spec | 3-6 h |
+| 5 | task5-system-build | multi-app two-node system from spec | 10-20 h |
