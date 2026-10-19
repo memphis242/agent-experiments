@@ -66,7 +66,10 @@ effort, and at which task tier it stops passing. These four arms advance task by
 of its Task N repetitions are done and it qualified on them: it is
 disqualified if any run failed all five acceptance rounds, or if more than
 a third of its repetitions needed the fifth round to pass (at most three of
-ten, or one of three).
+ten, or one of three). Both solo Sonnet 5 arms failed this gate on Task 1, on a check whose
+spec wording is ambiguous (see the Task 1 report); as a deliberate exception,
+A19 gets a one-repetition Task 2 trial, and all ten Task 2 repetitions only
+if that trial passes.
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
