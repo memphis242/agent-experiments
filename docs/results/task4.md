@@ -37,10 +37,13 @@ Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A14 0.36, A11 0.41, A15 0.
 
 Notes:
 
-- Task 4 is the first task on which arms fail runs: four runs used all five acceptance
-  rounds without passing, A12 rep 3, A16 reps 2 and 3, and A17 rep 3. Under the task gate
-  (no run may fail all five rounds) A12, A16 and A17 cannot advance to Task 5, whatever
-  their remaining repetitions do. A12 rep 1 and A16 rep 1 passed, in two and three rounds.
+- Task 4 is the first task on which arms fail runs: five runs used all five acceptance
+  rounds without passing, A11 rep 2, A12 rep 3, A16 reps 2 and 3, and A17 rep 3. Under the
+  task gate (no run may fail all five rounds) A12, A16 and A17 cannot advance to Task 5,
+  whatever their remaining repetitions do. A11 rep 2\* failed on a defect in the hidden
+  test, which rejects existing storage directories that real OSAL accepts (defect T4-1 in
+  [rerun-ledger.md](rerun-ledger.md)), so it is exempt from the gate and scheduled for a
+  rerun. A12 rep 1 and A16 rep 1 passed, in two and three rounds.
 - Every A1 run needed a second round, and so did every completed run of the delegating
   arms except one A11 run: Task 4 is the first task where a single round is the
   exception. The most common round-one misses were the hidden coverage test (unit tests
