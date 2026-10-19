@@ -77,7 +77,7 @@ HIDDEN_PATHS: tuple[tuple[str, str], ...] = (
 EXIT_USAGE_LIMIT = 3
 USAGE_LIMIT_RE = re.compile(r"usage limit|rate limit|exceeded|\b429\b|hit your\b[^.\n]*\blimit", re.IGNORECASE)
 SCHEMA_VERSION = 2
-STATUSES = ("running", "completed", "usage_limit", "infra_error", "cli_error", "error")
+STATUSES = ("running", "completed", "usage_limit", "codex_error", "infra_error", "cli_error", "interrupted", "error")
 
 
 class RunError(Exception):
@@ -90,6 +90,14 @@ class UsageLimit(RunError):
 
 class InfraError(RunError):
     """A fault in the run environment (for example the CTF setup script), not in the agent."""
+
+
+class Interrupted(RunError):
+    """run.py received SIGTERM or SIGHUP; raised so that cleanup (the Codex login copy) still runs."""
+
+
+def raise_interrupted(signum: int, _frame: object) -> None:
+    raise Interrupted(f"interrupted by {signal.Signals(signum).name}")
 
 
 def resolve_task(tasks_dir: Path, name: str) -> tuple[str, str]:
@@ -292,6 +300,9 @@ def check_netns(runs_dir: Path, claude_bin: str = "claude", extra_bins: Sequence
                   f'&& test -f {run}/repo/marker && test -w {run}/repo && test -w {run}/config '
                   f'&& test ! -e {run}/hidden-sibling && command -v {shlex.quote(claude_bin)} >/dev/null'
                   + "".join(f" && command -v {shlex.quote(b)} >/dev/null" for b in extra_bins))
+        script += f" && test ! -e {shlex.quote(str(codex.USER_AUTH))}"  # ~/.codex is hidden
+        script += "".join(f" && test -d {shlex.quote(str(p))} && test ! -w {shlex.quote(str(p))}"
+                          for p in host_visible)  # bound back read-only
         if dns_forward:  # the forwarded resolver must answer a plain DNS query
             script += (f" && grep -qx 'nameserver {DNS_FORWARD_ADDR}' /etc/resolv.conf"
                        f" && python3 -c {shlex.quote(DNS_PROBE)}")
@@ -618,6 +629,8 @@ class Runner:
                 text = f"claude reported an error in round {round_no} (exit {result['_exit_code']}): {result.get('result')}"
                 self.record.update(status="usage_limit" if result.get("_usage_limit") else "cli_error", error=text)
                 return
+            if self.codex_invalidated(round_no):
+                return
             # The next resume's first request is the one after those seen so far.
             mains, _ = self.transcripts()
             next_index = cost.main_request_count(mains)
@@ -653,6 +666,17 @@ class Runner:
             self.save()
         raise AssertionError("loop exits through a return")
 
+    def codex_invalidated(self, round_no: int) -> bool:
+        """Stop the run (before acceptance) when a Codex subagent hit its usage limit or failed."""
+        summary = (self.record.get("behavior") or {}).get("codex")
+        if self.codex_home is None or summary is None:
+            return False
+        outcome = codex.run_outcome(summary)
+        if outcome is None:
+            return False
+        self.record.update(status=outcome[0], error=f"round {round_no}: {outcome[1]}")
+        return True
+
     def analyze_if_possible(self, round_no: int) -> None:
         if self.session_ids:
             self.analyze(round_no)
@@ -680,10 +704,17 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
            + " ".join(f"{k}={v}" for k, v in ENV_FIXED.items())
            + f" CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>")
 
+    codex_arm = arms.get_arm(cfg.arm).codex
+    if codex_arm:
+        env += (f" CODEX_HOME={shlex.quote(str(codex.home_for(run_dir)))}"
+                f" PATH={shlex.quote(str(run_dir / 'config' / arms.CODEX_DIR / 'bin'))}:<PATH>")
+
     def claude_line(message: str, session: str | None) -> str:
         cmd = build_claude_command(cfg, run_id, message, session)
         if cfg.netns:
-            cmd = wrap_netns(cmd, hide_run_dir=run_dir)
+            cmd = wrap_netns(cmd, hide_run_dir=run_dir,
+                             visible=VISIBLE_RUN_DIRS + ((codex.HOME_DIR,) if codex_arm else ()),
+                             host_visible=codex.HOST_VISIBLE if codex_arm else (), dns_forward=codex_arm)
         return f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(cmd)
 
     print(claude_line(prompt, None))
@@ -796,13 +827,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         run_dir.mkdir()
         append_index(cfg.runs_dir, [run_id, cfg.arm, cfg.task, cfg.rep, "start", _iso(now), "running"])
         runner = Runner(cfg, run_id, run_dir)
+        for signum in (signal.SIGTERM, signal.SIGHUP):
+            signal.signal(signum, raise_interrupted)
         try:
             runner.init_record(now)
             prepare_repo(cfg, run_dir)
             runner.prepare_codex()
             runner.run(prompt)
         except RunError as exc:
-            runner.record.update(status="infra_error" if isinstance(exc, InfraError) else "error", error=str(exc))
+            status = "infra_error" if isinstance(exc, InfraError) else "interrupted" if isinstance(exc, Interrupted) \
+                else "error"
+            runner.record.update(status=status, error=str(exc))
             raise
         finally:
             runner.release_codex()

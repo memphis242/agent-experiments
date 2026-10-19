@@ -101,9 +101,17 @@ refuses to run inside a subagent. The two arms run Task 1 to Task 3 with ten
 repetitions; Task 4 follows if their Task 3 spend per pass is on par with the
 Task 4 finalists.
 
+A Codex arm's run is void, stopped before acceptance and rerun, when a subagent
+call hits the ChatGPT plan's Codex usage limit (status `usage_limit`) or fails
+for any other reason (`codex_error`): the main agent would then be measured
+working around a missing subagent. A call the main agent (or the CLI) stops
+with a signal is not a failure. The launcher holds every Codex cell after such
+a run until it has been looked into.
+
 Codex usage is priced at OpenAI's standard API rates for GPT-6.1 Sol (USD per
 million tokens: input 2.00, cached input 0.10, cache write 2.50, output 10.00;
-above 272K input tokens 4.00, 0.20, 5.00 and 15.00), one request per model
+above 272K input tokens 4.00, 0.20, 5.00 and 15.00, applied per request, since
+the pricing page states the threshold only as input tokens), one request per model
 response from Codex's session log, with reasoning tokens billed as output. The
 Claude side is priced as in every other arm. Both run on subscriptions (Claude
 and ChatGPT), so the figures are API-equivalent, as everywhere else.
@@ -225,12 +233,19 @@ and pauses the matrix.
   `~/.codex/auth.json` only if Codex refreshed it). Every `codex-agent` call is a
   new Codex session, so no conversation, history, memory or cache state carries
   between subagents, runs or the user's own sessions; `~/.codex` is hidden in
-  the namespace except its installed binaries (bound back read-only), and the
+  the agent's namespace except its installed binaries (bound back read-only;
+  the acceptance namespace keeps the host view, as in every arm), and the
   run is pinned to the Codex binary resolved at its start. Before the first
   round the harness renders Codex's model-visible prompt
   (`codex-prompt-input.json` in the run dir) and refuses to start if it carries
   skills, multi-agent, app or plugin sections or lacks the working agreement,
-  or if `codex features list` shows a configured feature in the wrong state.
+  or if `codex features list` shows a configured feature in the wrong state,
+  and loads the final config with `--strict-config` as every call does. The
+  login's refresh token is single-use, so two runs refreshing it at once would
+  race: no Codex run starts within 12 hours of the login's refresh point (8
+  days after its last refresh, or its access token's expiry if sooner), and a
+  login copy left by a killed run is written back if newer and removed when
+  the next Codex run starts.
   Codex's resolver is statically linked and sends plain DNS to the host's stub
   resolver, which the namespace cannot reach, so these runs add pasta's
   `--dns-forward` and a private `/etc/resolv.conf` naming its address.

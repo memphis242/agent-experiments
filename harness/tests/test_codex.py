@@ -4,8 +4,13 @@ import subprocess
 import sys
 import tempfile
 import textwrap
+import base64
+import signal
+import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from unittest import mock
 
 import _support  # noqa: F401
 import arms
@@ -22,6 +27,8 @@ FAKE_CODEX = textwrap.dedent('''\
     task = sys.stdin.read()
     home = Path(os.environ["CODEX_HOME"])
     (home / "fake-invocation.json").write_text(json.dumps({"argv": argv, "task": task, "env": dict(os.environ)}))
+    if "SLEEP" in task:
+        import time; time.sleep(30)
     if "FAIL" in task:
         print(json.dumps({"type": "turn.failed", "error": {"message": "You've hit your usage limit."}}))
         sys.exit(1)
@@ -117,6 +124,33 @@ class CodexAgentLauncherTest(unittest.TestCase):
         self.assertEqual(kinds, ["codex_call_failed"])
 
 
+    def test_signal_stop_is_not_a_failure(self):
+        proc = subprocess.Popen([sys.executable, str(self.launcher), "tester"], stdin=subprocess.PIPE, text=True,
+                                stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env, cwd=self.tmp.name)
+        proc.stdin.write("SLEEP please")
+        proc.stdin.close()
+        deadline = time.time() + 20
+        while not (self.home / "fake-invocation.json").exists() and time.time() < deadline:
+            time.sleep(0.1)
+        proc.send_signal(signal.SIGTERM)
+        proc.wait(timeout=30)
+        summary = codex.summarize(self.home)
+        [call] = summary["per_call"]
+        self.assertEqual(call["stopped_by_signal"], "SIGTERM")
+        self.assertFalse(call["failed"])
+        self.assertIsNone(codex.run_outcome(summary))
+
+    def test_outcome_of_a_usage_limit_and_a_failure(self):
+        self.launch("tester", task="FAIL now")
+        status, error = codex.run_outcome(codex.summarize(self.home))
+        self.assertEqual(status, "usage_limit")
+        self.assertIn("Codex usage limit", error)
+        call = next((self.home / "agent-calls").iterdir()) / "call.json"
+        record = json.loads(call.read_text())
+        call.write_text(json.dumps({**record, "usage_limit": False}))
+        self.assertEqual(codex.run_outcome(codex.summarize(self.home))[0], "codex_error")
+
+
 class CodexLogTest(unittest.TestCase):
     def write_home(self, lines):
         tmp = tempfile.TemporaryDirectory()
@@ -159,6 +193,88 @@ class CodexLogTest(unittest.TestCase):
         home = self.write_home(rollout_lines(model="gpt-6.1-astra", effort="medium"))
         kinds = sorted(v["kind"] for v in codex.validate(home, codex.summarize(home), "gpt-6.1-sol", "high"))
         self.assertEqual(kinds, ["effort", "model"])
+
+
+    def test_truncated_last_line_is_tolerated_but_not_elsewhere(self):
+        home = self.write_home(rollout_lines())
+        [path] = codex.rollout_files(home)
+        path.write_text(path.read_text() + '{"timestamp": "2026-10-19T13:49:30Z", "type": "tok')
+        summary = codex.summarize(home)
+        self.assertEqual(summary["truncated_logs"], [path.name])
+        self.assertEqual(len(codex.load_requests(home)), 2)
+        path.write_text('{"cut\n' + path.read_text())
+        with self.assertRaises(codex.TranscriptError):
+            codex.load_requests(home)
+
+    def test_session_without_a_call_and_compaction_count(self):
+        home = self.write_home(rollout_lines() + [{"type": "compacted", "payload": {}},
+                                                  {"type": "event_msg", "payload": {"type": "context_compacted"}}])
+        (home / "agent-calls" / "c1-implementer" / "call.json").unlink()
+        (home / "agent-calls" / "c1-implementer").rmdir()
+        summary = codex.summarize(home)
+        self.assertEqual(summary["compaction_events"], 1)
+        kinds = [v["kind"] for v in codex.validate(home, summary, "gpt-6.1-sol", "high")]
+        self.assertEqual(kinds, ["codex_session_without_call"])
+
+
+def fake_auth(last_refresh, exp):
+    claims = base64.urlsafe_b64encode(json.dumps({"exp": exp.timestamp()}).encode()).decode().rstrip("=")
+    return json.dumps({"auth_mode": "chatgpt", "last_refresh": last_refresh,
+                       "tokens": {"access_token": f"h.{claims}.s", "refresh_token": "r"}})
+
+
+class CodexLoginTest(unittest.TestCase):
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.base = Path(tmp.name)
+        self.user_auth = self.base / "user" / "auth.json"
+        self.user_auth.parent.mkdir()
+        for name, value in (("USER_AUTH", self.user_auth), ("AUTH_LOCK", self.base / "user" / ".lock")):
+            patcher = mock.patch.object(codex, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        self.now = datetime.now(timezone.utc)
+
+    def run_copy(self, name, auth, owner=None):
+        home = self.base / "runs" / name / codex.HOME_DIR
+        home.mkdir(parents=True)
+        (home / codex.AUTH_FILE).write_text(auth)
+        if owner is not None:
+            (home / codex.OWNER_FILE).write_text(json.dumps(owner))
+        return home / codex.AUTH_FILE
+
+    def test_refresh_point_is_the_earlier_of_age_and_expiry(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T17:00:48.869140414Z", datetime(2026, 10, 25, 17, tzinfo=timezone.utc)))
+        self.assertEqual(codex.login_refresh_point(), datetime(2026, 10, 23, 17, 0, 48, 869140, tzinfo=timezone.utc))
+        self.user_auth.write_text(fake_auth("", datetime(2026, 10, 20, tzinfo=timezone.utc)))
+        self.assertEqual(codex.login_refresh_point(), datetime(2026, 10, 20, tzinfo=timezone.utc))
+        self.user_auth.write_text("[]")
+        self.assertIsNone(codex.login_refresh_point())
+
+    def test_release_writes_back_a_newer_login_and_always_removes_the_copy(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T00:00:00Z", self.now))
+        copy = self.run_copy("r1", fake_auth("2026-10-19T00:00:00Z", self.now))
+        info = codex.release_home(copy.parent.parent, "installed-sha")
+        self.assertEqual((info["auth_refreshed"], info["auth_written_back"]), (True, True))
+        self.assertFalse(copy.exists())
+        self.assertIn("2026-10-19", self.user_auth.read_text())
+        copy = self.run_copy("r2", fake_auth("2026-10-20T00:00:00Z", self.now))
+        with mock.patch.object(codex.shutil, "copyfile", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                codex.release_home(copy.parent.parent, "installed-sha")
+        self.assertFalse(copy.exists())
+
+    def test_sweep_removes_only_copies_of_dead_runs(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T00:00:00Z", self.now))
+        dead = self.run_copy("dead", fake_auth("2026-10-19T00:00:00Z", self.now), {"pid": 2 ** 22 + 7, "start": "1"})
+        live = self.run_copy("live", fake_auth("2026-10-15T00:00:00Z", self.now),
+                             {"pid": os.getpid(), "start": codex._proc_start(os.getpid())})
+        swept = codex.sweep_stale_logins(self.base / "runs")
+        self.assertEqual(swept, [str(dead.parent.parent)])
+        self.assertFalse(dead.exists())
+        self.assertTrue(live.exists())
+        self.assertIn("2026-10-19", self.user_auth.read_text())
 
 
 class CodexRunWiringTest(unittest.TestCase):

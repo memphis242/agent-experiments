@@ -9,6 +9,7 @@ logs (sessions/**/rollout-*.jsonl), one token_usage_record per model response.
 """
 from __future__ import annotations
 
+import base64
 import fcntl
 import hashlib
 import json
@@ -17,11 +18,13 @@ import shutil
 import subprocess
 import tomllib
 from collections import Counter
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 
 import cost
-from transcript import TranscriptError, iter_entries, parse_timestamp
+from transcript import TranscriptError, parse_timestamp
 
 HOME_DIR = "codex-home"          # under the run dir; CODEX_HOME while the agent runs
 CALLS_DIR = "agent-calls"        # written by codex-agent
@@ -37,6 +40,15 @@ PROMPT_INPUT_FILE = "codex-prompt-input.json"
 FORBIDDEN_PROMPT_MARKERS: tuple[str, ...] = ("<skills_instructions>", "<multi_agent_role>", "<multi_agent_mode>",
                                              "<apps_instructions>", "<plugins_instructions>")
 SETUP_TIMEOUT_S = 120
+OWNER_FILE = "owner.json"        # in CODEX_HOME: the run.py process holding this home's login copy
+AUTH_LOCK = USER_AUTH.parent / ".experiment-auth.lock"
+# Codex refreshes a ChatGPT login once it is this old (or once its access token expires). Two
+# runs refreshing the same login at once would race on its single-use refresh token, so no run
+# starts when the refresh point falls within RUN_MARGIN (well above the longest run so far, 2.3 h).
+LOGIN_REFRESH_AGE = timedelta(days=8)
+RUN_MARGIN = timedelta(hours=12)
+# What `codex exec - </dev/null` prints once its configuration has loaded (no network involved).
+NO_PROMPT_MARKER = "No prompt provided"
 
 
 class CodexError(Exception):
@@ -94,15 +106,95 @@ def resolve_codex_bin(name: str = "codex") -> Path:
     return resolved
 
 
+def _proc_start(pid: int) -> str | None:
+    """A process's start time in clock ticks since boot, or None when it no longer exists."""
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return None
+    return stat.rsplit(")", 1)[1].split()[19]
+
+
+def _auth_fields(path: Path) -> dict[str, Any]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _last_refresh(path: Path) -> str:
+    return str(_auth_fields(path).get("last_refresh") or "")
+
+
+def _jwt_exp(token: object) -> datetime | None:
+    """The expiry of a JWT (decoded locally, never logged)."""
+    if not isinstance(token, str) or token.count(".") != 2:
+        return None
+    body = token.split(".")[1]
+    try:
+        claims = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    except (ValueError, json.JSONDecodeError):
+        return None
+    exp = claims.get("exp") if isinstance(claims, dict) else None
+    return datetime.fromtimestamp(exp, timezone.utc) if isinstance(exp, (int, float)) else None
+
+
+def login_refresh_point(path: Path | None = None) -> datetime | None:
+    """When Codex will next refresh this login: LOGIN_REFRESH_AGE after its last refresh or
+    its access token's expiry, whichever comes first (None when neither is readable)."""
+    data = _auth_fields(USER_AUTH if path is None else path)
+    points = []
+    stamp = data.get("last_refresh")
+    if isinstance(stamp, str) and stamp:
+        try:
+            points.append(datetime.fromisoformat(stamp[:26].rstrip("Z") + "+00:00") + LOGIN_REFRESH_AGE)
+        except ValueError:
+            pass
+    exp = _jwt_exp((data.get("tokens") or {}).get("access_token") if isinstance(data.get("tokens"), dict) else None)
+    if exp is not None:
+        points.append(exp)
+    return min(points) if points else None
+
+
+def _write_back(copy: Path) -> bool:
+    """Replace ~/.codex/auth.json with a run's copy when the copy was refreshed later. Caller holds AUTH_LOCK."""
+    if _last_refresh(copy) <= _last_refresh(USER_AUTH):
+        return False
+    tmp = USER_AUTH.with_name(USER_AUTH.name + ".experiment-tmp")
+    shutil.copyfile(copy, tmp)
+    tmp.chmod(0o600)
+    os.replace(tmp, USER_AUTH)
+    return True
+
+
+def sweep_stale_logins(runs_dir: Path) -> list[str]:
+    """Login copies left by runs that died without cleanup (SIGKILL, power loss): write back
+    a refreshed one and remove them all. Caller holds AUTH_LOCK. Returns the run dirs swept."""
+    swept = []
+    for copy in sorted(runs_dir.glob(f"*/{HOME_DIR}/{AUTH_FILE}")):
+        owner = _auth_fields(copy.parent / OWNER_FILE)
+        pid = owner.get("pid")
+        if isinstance(pid, int) and _proc_start(pid) == owner.get("start"):
+            continue  # a live run
+        try:
+            _write_back(copy)
+        finally:
+            copy.unlink(missing_ok=True)
+        swept.append(str(copy.parent.parent))
+    return swept
+
+
 def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[str, str]) -> dict[str, Any]:
-    """Create <run>/codex-home from the arm's codex/ dir, pin the Codex binary, validate the
-    config strictly, disable Codex's bundled skills, check the model-visible prompt, and
-    install a copy of the user's Codex login.
+    """Create <run>/codex-home from the arm's codex/ dir, pin the Codex binary, check the
+    feature states, disable Codex's bundled skills, check the model-visible prompt, validate
+    the final config strictly, and install a copy of the user's Codex login.
 
     The prompt check renders exactly what a subagent's first request carries apart from
     its role and task, saves it as codex-prompt-input.json in the run dir, and fails
     unless the working agreement is present and no skills, multi-agent, app, or plugin
-    section is. Returns provenance for run.json."""
+    section is. The login is copied last, and not at all when Codex would refresh it
+    within RUN_MARGIN. Returns provenance for run.json."""
     home = home_for(run_dir)
     home.mkdir()
     codex_bin = str(resolve_codex_bin())
@@ -133,45 +225,62 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
         raise CodexError(f"the Codex subagent prompt lacks the working agreement; see {run_dir / PROMPT_INPUT_FILE}")
     if f"<cwd>{repo.resolve()}</cwd>" not in joined:
         raise CodexError(f"the Codex subagent prompt does not place it in {repo}; see {run_dir / PROMPT_INPUT_FILE}")
+    check_strict_config(codex_bin, repo, env)
+    version = _capture([codex_bin, "--version"], repo, base_env).strip()
     if not USER_AUTH.is_file():
         raise CodexError(f"no Codex login at {USER_AUTH}; run `codex login`")
     target = home / AUTH_FILE
-    shutil.copyfile(USER_AUTH, target)
-    target.chmod(0o600)
-    version = _capture([codex_bin, "--version"], repo, base_env).strip()
+    with AUTH_LOCK.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        swept = sweep_stale_logins(run_dir.parent)
+        point = login_refresh_point()
+        if point is None or point <= datetime.now(timezone.utc) + RUN_MARGIN:
+            raise CodexError(
+                f"the Codex login in {USER_AUTH} is due for a refresh at {point.isoformat() if point else 'an unknown time'}, "
+                f"within the {RUN_MARGIN} a run may take; parallel runs would race on its single-use refresh "
+                "token. Let one Codex session refresh it while no Codex run is live, then relaunch")
+        (home / OWNER_FILE).write_text(json.dumps({"pid": os.getpid(), "start": _proc_start(os.getpid())}) + "\n",
+                                       encoding="utf-8")
+        shutil.copyfile(USER_AUTH, target)
+        target.chmod(0o600)
+        installed = hashlib.sha256(target.read_bytes()).hexdigest()
     enabled = sorted(name for name, on in states.items() if on)
     return {"codex_version": version, "codex_bin": codex_bin, "features_enabled": enabled,
             "skills_disabled": len(skills),
             "prompt_input_sha256": hashlib.sha256(rendered.encode()).hexdigest(),
-            "auth_sha256": hashlib.sha256(USER_AUTH.read_bytes()).hexdigest()}
+            "auth_sha256": installed, "login_refresh_point": point.isoformat(), "stale_logins_swept": swept}
 
 
-def _last_refresh(path: Path) -> str:
+def check_strict_config(codex_bin: str, repo: Path, env: dict[str, str]) -> None:
+    """Load the final config the way every codex-agent call does (--strict-config), with an
+    empty prompt so that Codex stops right after loading it, before any network use."""
     try:
-        return str(json.loads(path.read_text(encoding="utf-8")).get("last_refresh") or "")
-    except (OSError, json.JSONDecodeError):
-        return ""
+        done = subprocess.run([codex_bin, "exec", "--strict-config", "-C", str(repo), "-"], cwd=repo, env=env,
+                              stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=SETUP_TIMEOUT_S)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise CodexError(f"codex exec --strict-config failed: {exc}") from exc
+    output = done.stdout + done.stderr
+    if NO_PROMPT_MARKER not in output:
+        raise CodexError(f"codex exec --strict-config rejected the run's config: {output.strip()[-600:]}")
 
 
 def release_home(run_dir: Path, installed_sha256: str | None) -> dict[str, Any]:
     """Remove the run's copy of the Codex login. When Codex refreshed it during the run,
     write it back to ~/.codex/auth.json (under a lock, and only when its last_refresh is
-    newer) so that the user's login stays valid after a token rotation."""
+    newer) so that the user's login stays valid after a token rotation. The copy is removed
+    even when the write-back fails."""
     target = home_for(run_dir) / AUTH_FILE
     if not target.is_file():
         return {"auth_present": False, "auth_refreshed": False, "auth_written_back": False}
-    refreshed = hashlib.sha256(target.read_bytes()).hexdigest() != installed_sha256
     written_back = False
-    if refreshed:
-        with (USER_AUTH.parent / ".experiment-auth.lock").open("w") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
-            if _last_refresh(target) > _last_refresh(USER_AUTH):
-                tmp = USER_AUTH.with_name(USER_AUTH.name + ".experiment-tmp")
-                shutil.copyfile(target, tmp)
-                tmp.chmod(0o600)
-                os.replace(tmp, USER_AUTH)
-                written_back = True
-    target.unlink()
+    try:
+        refreshed = hashlib.sha256(target.read_bytes()).hexdigest() != installed_sha256
+        if refreshed:
+            with AUTH_LOCK.open("w") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                written_back = _write_back(target)
+    finally:
+        target.unlink(missing_ok=True)
     return {"auth_present": True, "auth_refreshed": refreshed, "auth_written_back": written_back}
 
 
@@ -180,14 +289,100 @@ def rollout_files(home: Path) -> tuple[Path, ...]:
     return tuple(sorted((home / "sessions").rglob("rollout-*.jsonl"))) if (home / "sessions").is_dir() else ()
 
 
+def _rollout_entries(path: Path) -> Iterator[tuple[dict, bool]]:
+    """(entry, False) per JSON line of a rollout, then (_, True) once if its last line is cut off
+    (a Codex process killed mid-write). Invalid JSON anywhere else is an error."""
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise TranscriptError(f"cannot read Codex session log {path}: {exc}") from exc
+    while lines and not lines[-1].strip():
+        lines.pop()
+    for number, line in enumerate(lines, 1):
+        if not line.strip():
+            continue
+        try:
+            entry = json.loads(line)
+        except json.JSONDecodeError as exc:
+            if number == len(lines):
+                yield {}, True
+                return
+            raise TranscriptError(f"{path}:{number}: invalid JSON: {exc}") from exc
+        if isinstance(entry, dict):
+            yield entry, False
+
+
+@dataclass
+class Rollout:
+    """What one Codex session log records."""
+    path: Path
+    thread: str = ""
+    usage: list[tuple[str, str, float, dict]] = field(default_factory=list)  # response id, model, epoch, usage
+    unkeyed_usage: int = 0           # token_usage_record entries without a response id (not priced)
+    turn_contexts: list[tuple[str, str]] = field(default_factory=list)  # model, effort
+    tools: Counter = field(default_factory=Counter)
+    compacted_items: int = 0
+    compacted_events: int = 0
+    rate_limit_used: list[float] = field(default_factory=list)
+    truncated: bool = False
+
+
+def read_rollout(path: Path) -> Rollout:
+    out = Rollout(path)
+    model = ""
+    for entry, cut in _rollout_entries(path):
+        if cut:
+            out.truncated = True
+            break
+        kind = entry.get("type")
+        payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
+        if kind == "session_meta" and not out.thread and payload.get("id"):
+            out.thread = str(payload["id"])
+        elif kind == "turn_context":
+            model = str(payload.get("model") or model)
+            out.turn_contexts.append((str(payload.get("model")), str(payload.get("effort"))))
+        elif kind == "compacted":
+            out.compacted_items += 1
+        elif kind == "event_msg" and payload.get("type") == "context_compacted":
+            out.compacted_events += 1
+        elif kind == "response_item" and payload.get("type") in ("function_call", "custom_tool_call"):
+            out.tools[str(payload.get("name"))] += 1
+        elif kind == "token_usage_record" and isinstance(payload.get("usage"), dict):
+            key = str(payload.get("response_id") or "")
+            if not key:
+                out.unkeyed_usage += 1
+                continue
+            stamp = entry.get("timestamp")
+            out.usage.append((key, model, parse_timestamp(stamp) if isinstance(stamp, str) else 0.0,
+                              payload["usage"]))
+        elif kind == "event_msg" and payload.get("type") == "token_count":
+            primary = ((payload.get("rate_limits") or {}).get("primary") or {})
+            if isinstance(primary.get("used_percent"), (int, float)):
+                out.rate_limit_used.append(float(primary["used_percent"]))
+    if not out.thread:  # else the UUID ending the file name
+        out.thread = "-".join(path.stem.rsplit("-", 5)[-5:])
+    return out
+
+
+def read_rollouts(home: Path) -> tuple[Rollout, ...]:
+    """Every session log, each response counted once (the first log that records it keeps it)."""
+    seen: set[str] = set()
+    rollouts = []
+    for path in rollout_files(home):
+        rollout = read_rollout(path)
+        kept = []
+        for usage in rollout.usage:
+            if usage[0] not in seen:
+                seen.add(usage[0])
+                kept.append(usage)
+        rollout.usage = kept
+        rollouts.append(rollout)
+    return tuple(rollouts)
+
+
 def thread_id(path: Path) -> str:
     """The session id of a rollout file: its session_meta id, else the UUID ending its name."""
-    for entry in iter_entries(path):
-        payload = entry.get("payload")
-        if entry.get("type") == "session_meta" and isinstance(payload, dict) and payload.get("id"):
-            return str(payload["id"])
-        break
-    return "-".join(path.stem.rsplit("-", 5)[-5:])
+    return read_rollout(path).thread
 
 
 def call_records(home: Path) -> list[dict[str, Any]]:
@@ -216,88 +411,81 @@ def load_requests(home: Path) -> tuple[cost.Request, ...]:
     uncached remainder is billed at the input price, cached tokens at the cache-read
     price, and cache writes at the cache-write price (both TTL slots carry it)."""
     requests: list[cost.Request] = []
-    seen: set[str] = set()
-    for path in rollout_files(home):
-        model = ""
-        thread = thread_id(path)
-        for entry in iter_entries(path):
-            payload = entry.get("payload")
-            if not isinstance(payload, dict):
-                continue
-            if entry.get("type") == "turn_context":
-                model = str(payload.get("model") or model)
-                continue
-            if entry.get("type") != "token_usage_record":
-                continue
-            usage = payload.get("usage")
-            key = str(payload.get("response_id") or "")
-            if not isinstance(usage, dict) or not key or key in seen:
-                continue
-            seen.add(key)
+    for rollout in read_rollouts(home):
+        for key, model, stamp, usage in rollout.usage:
             total = _usage_int(usage, "input_tokens")
             cached = _usage_int(usage, "cached_input_tokens")
             written = _usage_int(usage, "cache_write_input_tokens")
             if cached + written > total:
-                raise TranscriptError(f"{path}: response {key} reports more cached and written tokens than input")
-            stamp = entry.get("timestamp")
+                raise TranscriptError(f"{rollout.path}: response {key} reports more cached and written tokens than input")
             requests.append(cost.Request(
-                message_id=key, model=model, source="subagent", main_index=None,
-                timestamp=parse_timestamp(stamp) if isinstance(stamp, str) else 0.0,
+                message_id=key, model=model, source="subagent", main_index=None, timestamp=stamp,
                 input_tokens=total - cached - written, output_tokens=_usage_int(usage, "output_tokens"),
                 cache_read_tokens=cached, cache_write_5m_tokens=written, cache_write_1h_tokens=0,
-                thread=f"codex-{thread}", ttl_split_known=False))
+                thread=f"codex-{rollout.thread}", ttl_split_known=False))
     return tuple(requests)
+
+
+def call_failed(call: dict[str, Any]) -> bool:
+    """A call that ended without a report, other than one stopped by a signal (the main agent
+    or the CLI stopping it). Calls with no end record are counted as unfinished instead."""
+    return call.get("ended_epoch") is not None and bool(call.get("failed")) and not call.get("stopped_by_signal")
 
 
 def summarize(home: Path) -> dict[str, Any]:
     """Calls by agent, tool use, compactions, models and efforts, and per-call timing."""
     calls = call_records(home)
+    rollouts = read_rollouts(home)
     tools: Counter[str] = Counter()
     models: Counter[str] = Counter()
     efforts: Counter[str] = Counter()
-    compactions = 0
-    reasoning_tokens = 0
-    rate_limit_used: list[float] = []
     threads: dict[str, dict[str, Any]] = {}
-    for path in rollout_files(home):
-        info = threads.setdefault(thread_id(path), {"requests": 0, "first_input_tokens": None, "max_input_tokens": 0})
-        for entry in iter_entries(path):
-            kind = entry.get("type")
-            payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
-            if kind == "turn_context":
-                models[str(payload.get("model"))] += 1
-                efforts[str(payload.get("effort"))] += 1
-            elif kind == "compacted" or (kind == "event_msg" and payload.get("type") == "context_compacted"):
-                compactions += 1
-            elif kind == "response_item" and payload.get("type") in ("function_call", "custom_tool_call"):
-                tools[str(payload.get("name"))] += 1
-            elif kind == "token_usage_record" and isinstance(payload.get("usage"), dict):
-                usage = payload["usage"]
-                info["requests"] += 1
-                tokens = _usage_int(usage, "input_tokens")
-                if info["first_input_tokens"] is None:
-                    info["first_input_tokens"] = tokens
-                info["max_input_tokens"] = max(info["max_input_tokens"], tokens)
-                reasoning_tokens += _usage_int(usage, "reasoning_output_tokens")
-            elif kind == "event_msg" and payload.get("type") == "token_count":
-                primary = ((payload.get("rate_limits") or {}).get("primary") or {})
-                if isinstance(primary.get("used_percent"), (int, float)):
-                    rate_limit_used.append(float(primary["used_percent"]))
+    for rollout in rollouts:
+        tools.update(rollout.tools)
+        models.update(m for m, _ in rollout.turn_contexts)
+        efforts.update(e for _, e in rollout.turn_contexts)
+        inputs = [_usage_int(u, "input_tokens") for _, _, _, u in rollout.usage]
+        threads[rollout.thread] = {"requests": len(inputs), "first_input_tokens": inputs[0] if inputs else None,
+                                   "max_input_tokens": max(inputs, default=0)}
+    rate_limit_used = [v for r in rollouts for v in r.rate_limit_used]
     per_call = []
     for call in calls:
         start, end = call.get("started_epoch"), call.get("ended_epoch")
         thread = threads.get(str(call.get("thread_id")), {})
         per_call.append({"call_id": call["call_id"], "agent": call.get("agent"), "thread_id": call.get("thread_id"),
                          "started_epoch": start, "wall_s": round(end - start, 3) if start and end else None,
-                         "exit_code": call.get("exit_code"), "failed": call.get("failed", end is None),
-                         "usage_limit": bool(call.get("usage_limit")), "requests": thread.get("requests"),
-                         "first_input_tokens": thread.get("first_input_tokens"),
+                         "exit_code": call.get("exit_code"), "failed": call_failed(call),
+                         "unfinished": end is None, "stopped_by_signal": call.get("stopped_by_signal"),
+                         "usage_limit": bool(call.get("usage_limit")), "errors": call.get("errors") or [],
+                         "requests": thread.get("requests"), "first_input_tokens": thread.get("first_input_tokens"),
                          "max_input_tokens": thread.get("max_input_tokens")})
     return {"calls": len(calls), "calls_by_agent": dict(sorted(Counter(str(c.get("agent")) for c in calls).items())),
-            "tool_calls": dict(sorted(tools.items())), "compaction_events": compactions,
-            "models": dict(models), "efforts": dict(efforts), "reasoning_output_tokens": reasoning_tokens,
+            "tool_calls": dict(sorted(tools.items())),
+            # Codex may log one compaction both as an item and as an event; count the larger.
+            "compaction_events": sum(max(r.compacted_items, r.compacted_events) for r in rollouts),
+            "models": dict(models), "efforts": dict(efforts),
+            "reasoning_output_tokens": sum(_usage_int(u, "reasoning_output_tokens")
+                                           for r in rollouts for _, _, _, u in r.usage),
             "rate_limit_used_percent_max": max(rate_limit_used) if rate_limit_used else None,
-            "usage_limit": any(c["usage_limit"] for c in per_call), "per_call": per_call}
+            "usage_limit": any(c["usage_limit"] for c in per_call),
+            "unpriced_usage_records": sum(r.unkeyed_usage for r in rollouts),
+            "truncated_logs": [str(r.path.name) for r in rollouts if r.truncated], "per_call": per_call}
+
+
+def run_outcome(summary: dict[str, Any]) -> tuple[str, str] | None:
+    """(status, error) when the run's Codex subagents make it invalid: a Codex usage limit
+    ("usage_limit"), or a call that failed ("codex_error"); None otherwise. Such a run measured
+    the main agent working around a missing subagent, so it is rerun rather than reported."""
+    def detail(call: dict[str, Any]) -> str:
+        errors = "; ".join(str(e) for e in call["errors"][-2:])
+        return f"{call['call_id']} (exit {call['exit_code']}){': ' + errors if errors else ''}"
+    limited = [c for c in summary["per_call"] if c["usage_limit"]]
+    if limited:
+        return "usage_limit", "Codex usage limit reached in a subagent call: " + detail(limited[0])
+    failed = [c for c in summary["per_call"] if c["failed"]]
+    if failed:
+        return "codex_error", f"{len(failed)} Codex subagent call(s) failed: " + "; ".join(map(detail, failed[:3]))
+    return None
 
 
 def spawn_calls(summary: dict[str, Any]) -> list[dict[str, Any]]:
@@ -307,24 +495,27 @@ def spawn_calls(summary: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def validate(home: Path, summary: dict[str, Any], model: str, effort: str) -> list[dict[str, Any]]:
-    """Violations: a Codex turn on another model or effort, a failed or unfinished call, or a
-    call whose session log is missing (reported, never acted on)."""
+    """Violations: a Codex turn on another model or effort, a failed or unfinished call, a call
+    whose session log is missing, or a session no codex-agent call started (reported, never acted on)."""
     found: Counter[tuple[str, str, str]] = Counter()
-    for path in rollout_files(home):
-        for entry in iter_entries(path):
-            if entry.get("type") != "turn_context" or not isinstance(entry.get("payload"), dict):
-                continue
-            payload = entry["payload"]
-            if payload.get("model") != model:
-                found[("model", model, str(payload.get("model")))] += 1
-            if payload.get("effort") != effort:
-                found[("effort", effort, str(payload.get("effort")))] += 1
-    logged = {thread_id(p) for p in rollout_files(home)}
+    rollouts = read_rollouts(home)
+    for rollout in rollouts:
+        for got_model, got_effort in rollout.turn_contexts:
+            if got_model != model:
+                found[("model", model, got_model)] += 1
+            if got_effort != effort:
+                found[("effort", effort, got_effort)] += 1
+    logged = {r.thread for r in rollouts}
     for call in summary["per_call"]:
         if call["failed"]:
             found[("codex_call_failed", "exit 0 with a report", f"{call['call_id']} exit {call['exit_code']}")] += 1
+        elif call["unfinished"]:
+            found[("codex_call_unfinished", "an end record", str(call["call_id"]))] += 1
         elif call["thread_id"] not in logged:
             found[("codex_session_log_missing", "rollout file", str(call["call_id"]))] += 1
+    claimed = {str(c["thread_id"]) for c in summary["per_call"]}
+    for thread in sorted(logged - claimed):
+        found[("codex_session_without_call", "a codex-agent call", thread)] += 1
     return [{"kind": k[0], "source": "codex", "file": "-", "expected": k[1], "observed": k[2], "count": n}
             for k, n in sorted(found.items())]
 

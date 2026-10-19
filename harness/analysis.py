@@ -147,6 +147,11 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             assert arm.codex and arm.subagent_model is not None
             summary = codex.summarize(codex_home)
             behavior["codex"] = summary
+            if summary["unpriced_usage_records"]:
+                warnings.append(f"{summary['unpriced_usage_records']} Codex usage record(s) without a response id "
+                                "left unpriced")
+            if summary["truncated_logs"]:
+                warnings.append(f"Codex session log(s) cut off mid-line, last line ignored: {summary['truncated_logs']}")
             behavior["subagent_spawn_calls"] = behavior["subagent_spawn_calls"] + codex.spawn_calls(summary)
             behavior["subagent_spawns"] += summary["calls"]
             by_type = dict(behavior["subagent_spawns_by_type"])

@@ -125,14 +125,20 @@ def main(argv: list[str]) -> int:
         except OSError as exc:
             return fail(f"cannot start {codex_bin}: {exc}")
 
+        stopped: list[int] = []
+
         def forward(signum: int, _frame: object) -> None:
+            stopped.append(signum)
             child.send_signal(signum)
 
         for signum in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
             signal.signal(signum, forward)
         assert child.stdin is not None
-        child.stdin.write(task.encode("utf-8"))
-        child.stdin.close()
+        try:
+            child.stdin.write(task.encode("utf-8"))
+            child.stdin.close()
+        except BrokenPipeError:  # codex exited before reading its task; its stderr says why
+            pass
         code = child.wait()
 
     thread_id, messages = scan_events(call_dir / "events.jsonl")
@@ -141,7 +147,8 @@ def main(argv: list[str]) -> int:
     # Warnings about configuration arrive as error items; only a failed run counts as a failure.
     failed = code != 0 or not report.strip()
     record.update(ended_epoch=time.time(), exit_code=code, thread_id=thread_id, errors=messages,
-                  usage_limit=usage_limit and failed, failed=failed)
+                  usage_limit=usage_limit and failed, failed=failed,
+                  stopped_by_signal=signal.Signals(stopped[0]).name if stopped else None)
     (call_dir / "call.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     if failed:
         detail = "; ".join(messages[-3:]) or (call_dir / "stderr.txt").read_text(errors="replace")[-600:]

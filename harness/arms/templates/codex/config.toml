@@ -9,6 +9,8 @@ sandbox_mode = "danger-full-access"
 # Claude Code subagent definitions grant no web tools.
 web_search = "disabled"
 check_for_update_on_startup = false
+# The login stays in the run's CODEX_HOME file, never in the desktop keyring.
+cli_auth_credentials_store = "file"
 
 # Subagents cannot start subagents of their own.
 [agents]
