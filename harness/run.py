@@ -44,7 +44,12 @@ TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
 # the token, the config dir, and fixed values below. Nothing else is inherited,
 # so launching-session variables cannot override an arm's settings.
 ENV_ALLOWLIST = ("PATH", "HOME", "USER", "LOGNAME", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "SHELL")
-ENV_FIXED = {"DISABLE_AUTOUPDATER": "1"}
+# In print mode the CLI stops background subagents still running ten minutes after the
+# main agent's last turn, ending the round with their work unfinished. The ceiling is raised
+# to two hours so a round ends only once its subagents report; --cli-timeout still bounds
+# the whole invocation.
+BG_WAIT_CEILING_MS = 2 * 60 * 60 * 1000
+ENV_FIXED = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS": str(BG_WAIT_CEILING_MS)}
 # Loopback port forwarding is disabled in all four directions so that the
 # namespace's traffic can never reach another session's cFS on the host.
 PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "-t", "none", "-u", "none", "-T", "none", "-U", "none", "--")

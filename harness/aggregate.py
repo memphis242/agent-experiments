@@ -34,6 +34,24 @@ def load_runs(runs_dir: Path) -> list[dict[str, Any]]:
     return runs
 
 
+def load_superseded(path: Path) -> dict[str, str]:
+    """Run id -> reason, from a JSON object naming completed runs replaced by a rerun."""
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not all(isinstance(k, str) and isinstance(v, str) and v for k, v in data.items()):
+        raise ValueError(f"{path}: expected an object mapping run ids to non-empty reasons")
+    return data
+
+
+def drop_superseded(runs: list[dict[str, Any]], path: Path | None, tool: str) -> list[dict[str, Any]]:
+    """Runs without the ones `path` lists as superseded; the count dropped is reported on stderr."""
+    if path is None:
+        return runs
+    superseded = load_superseded(path)
+    kept = [r for r in runs if r["_dir"] not in superseded]
+    print(f"{tool}: dropped {len(runs) - len(kept)} superseded run(s) listed in {path}", file=sys.stderr)
+    return kept
+
+
 def scenario_cost(run: dict[str, Any], scenario: str) -> float | None:
     report = run.get("cost")
     if not report:
@@ -56,6 +74,7 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A17": "solo Haiku 5.5, xhigh effort",
     "A18": "solo Sonnet 5, medium effort",
     "A19": "solo Sonnet 5, high effort",
+    "A20": "solo Sonnet 4.6, high effort",
 }
 
 
@@ -151,11 +170,16 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--drop-status", nargs="+", default=(), metavar="STATUS",
                    help="exclude attempts with these run statuses (for example cli_error for runs cut off "
                         "by a subscription limit and rerun from scratch); the count dropped is reported")
+    p.add_argument("--superseded", type=Path, help="JSON object of run ids replaced by reruns, to exclude")
     a = p.parse_args(argv)
     if not a.runs_dir.is_dir():
         print(f"aggregate: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
         return 1
-    runs = load_runs(a.runs_dir)
+    try:
+        runs = drop_superseded(load_runs(a.runs_dir), a.superseded, "aggregate")
+    except (OSError, ValueError) as exc:
+        print(f"aggregate: error: {exc}", file=sys.stderr)
+        return 1
     dropped = [r for r in runs if r.get("status") in set(a.drop_status)]
     if dropped:
         runs = [r for r in runs if r not in dropped]

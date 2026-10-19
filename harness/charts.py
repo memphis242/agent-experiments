@@ -105,6 +105,7 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("Haiku 5.5", "Haiku 5.5", "#4ade80"),
     ("solo Sonnet 5.5", "Solo Sonnet 5.5", "#f472b6"),
     ("solo Sonnet 5,", "Solo Sonnet 5", "#22d3ee"),
+    ("solo Sonnet 4.6", "Solo Sonnet 4.6", "#ea580c"),
     ("solo Opus 5.5", "Solo Opus 5.5", "#9ca3af"),
 )
 FALLBACK_FAMILY = ("Other", "#9ca3af")
@@ -506,12 +507,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--drop-status", nargs="+", default=(), metavar="STATUS",
                    help="exclude attempts with these statuses (only completed runs are charted anyway)")
     p.add_argument("--notes", type=Path, help="JSON notes file naming failed arms and their footnote per task")
+    p.add_argument("--superseded", type=Path, help="JSON object of run ids replaced by reruns, to exclude")
     a = p.parse_args(argv)
     if not a.runs_dir.is_dir():
         print(f"charts: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
         return 1
     task = aggregate.short_task(a.task)
-    runs = aggregate.load_runs(a.runs_dir)
+    try:
+        runs = aggregate.drop_superseded(aggregate.load_runs(a.runs_dir), a.superseded, "charts")
+    except (OSError, ValueError) as exc:
+        print(f"charts: error: {exc}", file=sys.stderr)
+        return 1
     try:
         a.out_dir.mkdir(parents=True, exist_ok=True)
     except OSError as exc:

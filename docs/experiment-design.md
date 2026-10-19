@@ -19,7 +19,7 @@ against a baseline. Started 2026-10-17.
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (19 arms)
+## Experiment A: model tiering (20 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -42,6 +42,7 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A17 | Haiku 5.5 (xhigh effort) | none (Agent tool disallowed) | n/a |
 | A18 | Sonnet 5 (medium effort) | none (Agent tool disallowed) | n/a |
 | A19 | Sonnet 5 (high effort) | none (Agent tool disallowed) | n/a |
+| A20 | Sonnet 4.6 (high effort) | none (Agent tool disallowed) | n/a |
 
 A10 asks whether a cheaper frontier model at maximum effort matches solo
 Opus. A12 is the same model at high effort, the owner's everyday choice for
@@ -69,7 +70,9 @@ a third of its repetitions needed the fifth round to pass (at most three of
 ten, or one of three). Both solo Sonnet 5 arms failed this gate on Task 1, on a check whose
 spec wording is ambiguous (see the Task 1 report); as a deliberate exception,
 A19 gets a one-repetition Task 2 trial, and all ten Task 2 repetitions only
-if that trial passes.
+if that trial passes. A20 (solo Sonnet 4.6 at high effort) runs Tasks 1 and 2
+only, all ten repetitions of each whatever its Task 1 gate result, as a
+reference point for solo Sonnet 5.
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
@@ -93,7 +96,17 @@ counts per run are recorded as the manipulation check.
 
 Runs: 10 repetitions per arm on Tasks 1 to 3 and 3 on Task 4, so 33 runs per arm:
 495 for A1 to A15, plus up to 132 for A16 to A19 (fewer if one stops advancing),
-plus repair rounds.
+plus 20 for A20, plus repair rounds.
+
+In print mode the CLI stops background subagents that are still running ten
+minutes after the main agent's last turn, which ends the round with their work
+unfinished. Runs from 2026-10-19 raise that ceiling to two hours
+(`CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS`). Earlier completed runs in which the CLI
+stopped a subagent this way (27, all in delegating arms) are rerun with the same
+arm, task and repetition, and the originals are listed in
+`docs/results/superseded.json` and excluded from the results. A run in which the
+ceiling never fired would have behaved identically under the new setting, so the
+other runs stand.
 
 Task 5 takes the three arms with the lowest Task 4 spend per pass. An arm qualifies only if it also passes
 the task gate above on Task 4: no run failing all five rounds, and at most one of

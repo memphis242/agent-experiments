@@ -19,12 +19,12 @@ EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": 
             "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6", "A10": None,
             "A11": "claude-haiku-5-5", "A12": None, "A13": None, "A14": "claude-sonnet-5-5",
             "A15": "claude-sonnet-5-5", "A16": None, "A17": None,
-            "A18": None, "A19": None}
+            "A18": None, "A19": None, "A20": None}
 MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high"),
         "A13": ("claude-opus-5-5", "medium"), "A14": ("claude-opus-5-5", "low"),
         "A15": ("claude-opus-5-5", "medium"), "A16": ("claude-haiku-5-5", "high"),
         "A17": ("claude-haiku-5-5", "xhigh"), "A18": ("claude-sonnet-5", "medium"),
-        "A19": ("claude-sonnet-5", "high")}
+        "A19": ("claude-sonnet-5", "high"), "A20": ("claude-sonnet-4-6", "high")}
 ROLES = ("Delegate selectively. Do exploration, planning, design decisions, debugging, review, and "
          "integration yourself.")
 TIERED = "Delegate implementation, not thinking."

@@ -213,7 +213,8 @@ class NetnsTest(unittest.TestCase):
                 "CLAUDE_CODE_SUBAGENT_MODEL": "x", "CLAUDE_CODE_EFFORT_LEVEL": "low", "PATH": "/bin", "HOME": "/h"}
         env = run.child_env(Path("/cfg"), base)
         self.assertEqual(set(env), {"PATH", "HOME", "CLAUDE_CODE_OAUTH_TOKEN", "CLAUDE_CONFIG_DIR",
-                                    "DISABLE_AUTOUPDATER"})
+                                    "DISABLE_AUTOUPDATER", "CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"})
+        self.assertEqual(env["CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS"], "7200000")
         self.assertEqual((env["CLAUDE_CODE_OAUTH_TOKEN"], env["CLAUDE_CONFIG_DIR"]), ("o", "/cfg"))
         self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", run.child_env(Path("/cfg"), base, include_token=False))
         self.assertIn("ANTHROPIC_API_KEY", base)  # input is not mutated
