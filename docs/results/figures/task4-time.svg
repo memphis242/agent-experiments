@@ -1,25 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="586.0" viewBox="0 0 1130 586.0" role="img" aria-label="Task 4: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="649.0" viewBox="0 0 1130 649.0" role="img" aria-label="Task 4: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 4: wall time per run</title>
-<rect x="8" y="8" width="1114" height="570.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1114" height="633.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 4: wall time per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">17 runs across 9 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">23 runs across 9 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
 <text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="117.4" cy="96.0" r="5" fill="#a78bfa"/>
 <text x="128.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5</text>
 <circle cx="206.6" cy="96.0" r="5" fill="#60a5fa"/>
 <text x="217.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5</text>
-<circle cx="308.6" cy="96.0" r="5" fill="#f87171"/>
-<text x="319.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Haiku 5.5</text>
-<circle cx="436.2" cy="96.0" r="5" fill="#4ade80"/>
-<text x="447.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
-<circle cx="531.8" cy="96.0" r="5" fill="#f472b6"/>
-<text x="542.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
-<circle cx="665.8" cy="96.0" r="5" fill="#9ca3af"/>
-<text x="676.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
-<circle cx="787.0" cy="96.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
-<text x="798.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
+<circle cx="308.6" cy="96.0" r="5" fill="#4ade80"/>
+<text x="319.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
+<circle cx="404.2" cy="96.0" r="5" fill="#9ca3af"/>
+<text x="415.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
+<circle cx="525.4" cy="96.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
+<text x="536.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
 <rect x="28" y="122.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="210.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="298.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
@@ -27,88 +23,84 @@
 <rect x="28" y="474.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <line x1="456.0" y1="122.0" x2="456.0" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
 <text x="456.0" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
-<line x1="542.3" y1="122.0" x2="542.3" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="542.3" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
-<line x1="628.7" y1="122.0" x2="628.7" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="628.7" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">40 min</text>
-<line x1="715.0" y1="122.0" x2="715.0" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="715.0" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">60 min</text>
-<line x1="801.3" y1="122.0" x2="801.3" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="801.3" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">80 min</text>
-<line x1="887.7" y1="122.0" x2="887.7" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="887.7" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">100 min</text>
+<line x1="559.6" y1="122.0" x2="559.6" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="559.6" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
+<line x1="663.2" y1="122.0" x2="663.2" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="663.2" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">40 min</text>
+<line x1="766.8" y1="122.0" x2="766.8" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="766.8" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">60 min</text>
+<line x1="870.4" y1="122.0" x2="870.4" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="870.4" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">80 min</text>
 <line x1="974.0" y1="122.0" x2="974.0" y2="518.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">120 min</text>
+<text x="974.0" y="538.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">100 min</text>
 <line x1="456.0" y1="518.0" x2="974.0" y2="518.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="141.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="141.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="155.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
-<rect x="705.8" y="136.0" width="61.5" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
-<circle cx="713.8" cy="144.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="746.4" cy="139.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="759.3" cy="148.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<line x1="746.4" y1="133.0" x2="746.4" y2="155.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="775.3" y="148.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">59.7 to 70.3</text>
+<rect x="757.4" y="136.0" width="70.6" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
+<circle cx="765.4" cy="144.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="804.5" cy="139.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="819.9" cy="148.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<line x1="804.5" y1="133.0" x2="804.5" y2="155.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="835.9" y="148.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">59.7 to 70.3</text>
 <text x="36.0" y="185.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A2</text>
 <text x="78.0" y="185.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, eager, high</text>
-<text x="78.0" y="199.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=1</text>
-<rect x="834.5" y="180.0" width="16.0" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
-<circle cx="842.5" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<line x1="842.5" y1="177.0" x2="842.5" y2="199.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="858.5" y="192.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">89.5</text>
+<text x="78.0" y="199.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
+<rect x="796.4" y="180.0" width="131.4" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
+<circle cx="804.4" cy="188.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="919.8" cy="183.8" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<line x1="862.1" y1="177.0" x2="862.1" y2="199.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="935.8" y="192.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">67.3 to 89.5</text>
 <text x="36.0" y="229.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A4</text>
 <text x="78.0" y="229.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, eager, high</text>
-<text x="78.0" y="243.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=1</text>
-<rect x="741.3" y="224.0" width="16.0" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
-<circle cx="749.3" cy="232.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<line x1="749.3" y1="221.0" x2="749.3" y2="243.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="765.3" y="236.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">67.9</text>
+<text x="78.0" y="243.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
+<rect x="735.7" y="224.0" width="80.3" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
+<circle cx="743.7" cy="232.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="808.0" cy="227.8" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<line x1="775.8" y1="221.0" x2="775.8" y2="243.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="824.0" y="236.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">55.5 to 67.9</text>
 <text x="36.0" y="273.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A11</text>
 <text x="78.0" y="273.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 main, Haiku 5.5 implementer and tester, high</text>
 <text x="78.0" y="287.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="608.4" y="268.0" width="26.1" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
-<circle cx="616.4" cy="276.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="626.6" cy="271.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<line x1="621.5" y1="265.0" x2="621.5" y2="287.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="642.6" y="280.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">37.2 to 39.5</text>
+<rect x="640.5" y="268.0" width="28.2" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
+<circle cx="648.5" cy="276.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="660.7" cy="271.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<line x1="654.6" y1="265.0" x2="654.6" y2="287.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="676.7" y="280.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">37.2 to 39.5</text>
 <text x="36.0" y="317.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A12</text>
 <text x="78.0" y="317.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5.5, high</text>
-<text x="78.0" y="331.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="655.4" y="312.0" width="261.5" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
-<circle cx="663.4" cy="320.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="908.9" cy="315.8" r="4.6" fill="#0d1117" stroke="#f472b6" stroke-width="1.8"/>
-<line x1="786.1" y1="309.0" x2="786.1" y2="331.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="924.9" y="324.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">48.0 to 104.9</text>
+<text x="78.0" y="331.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
+<rect x="456.0" y="312.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="324.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
 <text x="36.0" y="361.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A14</text>
 <text x="78.0" y="361.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
-<text x="78.0" y="375.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="687.2" y="356.0" width="33.3" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
-<circle cx="695.2" cy="364.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="712.5" cy="359.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="703.9" y1="353.0" x2="703.9" y2="375.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="728.5" y="368.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">55.4 to 59.4</text>
+<text x="78.0" y="375.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
+<rect x="735.0" y="356.0" width="40.0" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<circle cx="743.0" cy="364.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="763.8" cy="359.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="767.0" cy="368.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="763.8" y1="353.0" x2="763.8" y2="375.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="783.0" y="368.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">55.4 to 60.0</text>
 <text x="36.0" y="405.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A15</text>
 <text x="78.0" y="405.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 medium main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
-<text x="78.0" y="419.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="658.6" y="400.0" width="56.1" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
-<circle cx="666.6" cy="408.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="706.7" cy="403.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="686.6" y1="397.0" x2="686.6" y2="419.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="722.7" y="412.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">48.8 to 58.1</text>
+<text x="78.0" y="419.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
+<rect x="700.7" y="400.0" width="100.9" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<circle cx="708.7" cy="408.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="756.8" cy="403.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="793.6" cy="412.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="756.8" y1="397.0" x2="756.8" y2="419.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="809.6" y="412.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">48.8 to 65.2</text>
 <text x="36.0" y="449.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A16</text>
 <text x="78.0" y="449.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, high</text>
-<text x="78.0" y="463.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="876.2" y="444.0" width="20.9" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
-<circle cx="884.2" cy="452.0" r="4.6" fill="#0d1117" stroke="#f87171" stroke-width="1.8"/>
-<circle cx="889.1" cy="447.8" r="4.6" fill="#0d1117" stroke="#f87171" stroke-width="1.8"/>
-<line x1="886.6" y1="441.0" x2="886.6" y2="463.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="905.1" y="456.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">99.2 to 100.3</text>
+<text x="78.0" y="463.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=3</text>
+<rect x="456.0" y="444.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="456.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
 <text x="36.0" y="493.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A17</text>
 <text x="78.0" y="493.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, xhigh</text>
 <text x="78.0" y="507.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=2</text>
-<rect x="858.9" y="488.0" width="72.4" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
-<circle cx="866.9" cy="496.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="923.3" cy="491.8" r="4.6" fill="#0d1117" stroke="#f87171" stroke-width="1.8"/>
-<line x1="895.1" y1="485.0" x2="895.1" y2="507.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="939.3" y="500.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">95.2 to 108.2</text>
+<rect x="456.0" y="488.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="500.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="36.0" y="574.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">* Preliminary. Solo Sonnet 5.5 at high effort (A12) and solo Haiku 5.5 (A16 at high, A17 at xhigh effort) each have at least one run that used all five acceptance rounds</text>
+<text x="36.0" y="591.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">without passing, so none of them advances to Task 5 whatever their remaining repetitions do. A12 rep 3 subscribed every table entry twice; the solo Haiku failures kept</text>
+<text x="36.0" y="608.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">missing packet-file roll-over assertions in the hidden coverage test.</text>
 </svg>

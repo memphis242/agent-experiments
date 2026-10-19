@@ -2,5 +2,9 @@
   "task1": {
     "failed": ["A18", "A19"],
     "footnote": "Solo Sonnet 5 (A18 at medium, A19 at high effort): 3 of 10 runs in each arm failed all five acceptance rounds on the same check, the MIR count. One hidden test log has an MIR line with neither FILE:LINE nor the ' - ' separator; the spec says FILE:LINE may be absent on MIR lines but is silent on the separator, which real ut_assert always prints. All six failed runs parsed the separator as required, reported one MIR too few, and kept that parser through four rounds of identical feedback naming the MIR requirement. Every run of the other 17 arms (170 runs) passed this check."
+  },
+  "task4": {
+    "failed": ["A12", "A16", "A17"],
+    "footnote": "Preliminary. Solo Sonnet 5.5 at high effort (A12) and solo Haiku 5.5 (A16 at high, A17 at xhigh effort) each have at least one run that used all five acceptance rounds without passing, so none of them advances to Task 5 whatever their remaining repetitions do. A12 rep 3 subscribed every table entry twice; the solo Haiku failures kept missing packet-file roll-over assertions in the hidden coverage test."
   }
 }
