@@ -122,3 +122,9 @@ message id, counted from 0 across the session transcripts in order).
     python harness/reanalyze.py <runs-dir> [--run ID]
 
 Recomputes `cost`, `behavior`, `validation`, and `totals` of existing `run.json` files from `transcripts/` and `cli-round*.stdout.json`, leaves everything else intact, rewrites atomically, sets `reanalyzed_with` (harness SHA), and prints billed before and after per run.
+
+## Re-grade
+
+    python harness/regrade.py --runs-dir DIR --task task3 --pack tasks/task3-hk-staleness/acceptance --out OUT [--run ID ID:ROUND ...] [--parallel 8] [--scratch /workspace/tmp-regrade] [--timeout S]
+
+Re-runs a (fixed) pack on the graded commit of every round with an acceptance result (HEAD at the round's `ended_epoch`, from the HEAD reflog), in scratch clones and inside the same wrapper and environment as `run.py`; the run repositories are only read. Writes `OUT/regrade.json` and `OUT/regrade.tsv` (old and new verdict per round and check) and prints every verdict change. The pack graded the working tree, so uncommitted changes at grading time are not reproduced; the final round's are flagged as `dirty_final`.

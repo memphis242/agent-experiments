@@ -20,6 +20,10 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
   during which that entry's input data was not present. It resets to 0 when
   a packet for the entry's input MID arrives.
 - An entry is "stale" when missed cycles >= `StaleCycles`.
+- An entry becomes stale only during a combined send of its output packet.
+  It becomes fresh again either when its input packet arrives (handled at
+  arrival, in HK's incoming-data path) or, after the threshold was raised,
+  during the next combined send.
 
 ## Functional requirements
 
@@ -42,14 +46,17 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
   check.
   Value 0: unchanged, `CommandErrorCounter`++, event
   `HK_STALE_CYCLES_ERR_EID` (39, ERROR).
-- Changing the threshold re-evaluates staleness at the next combined send,
-  not immediately. Staleness is recomputed at every combined send from the
-  entry's missed cycles and the current threshold, so raising the threshold
-  can make an entry fresh again at the next send (with the fresh event), and
-  lowering it can make an entry stale (with the stale event).
+- Changing the threshold takes effect at the next combined send of an
+  entry's output packet, not immediately. That send compares each entry's
+  missed cycles with the current threshold, so raising the threshold can
+  make a stale entry fresh at that send (with the fresh event), and lowering
+  it can make an entry stale (with the stale event).
+- The arrival of an entry's input packet is handled when it arrives, not at
+  the next send: missed cycles reset to 0 at once and, if the entry was
+  stale, it becomes fresh at that moment (see Transitions and events).
 - "Present" follows HK's existing data-present flag: a combined send counts
   an entry as present when its input arrived since the previous send, and
-  the send consumes the flag.
+  the send consumes the flag. A present entry's missed cycles stay 0.
 
 ### New command: REPORT_STALE
 
@@ -72,8 +79,8 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
   as `HK_StaleReportTlm_t { CFE_MSG_TelemetryHeader_t TelemetryHeader;
   HK_StaleReport_Payload_t Payload; }`, entries listed in copy-table order,
   unused slots set to `CFE_SB_INVALID_MSG_ID`. The command type is
-  `HK_SetStaleCyclesCmd_t { CFE_MSG_CommandHeader_t CommandHeader;
-  HK_SetStaleCycles_Payload_t Payload; }`. Topic `CFE_MISSION_HK_STALE_RPT_TLM_TOPICID`
+  `HK_ReportStaleCmd_t { CFE_MSG_CommandHeader_t CommandHeader; }`, with no
+  payload. Topic `CFE_MISSION_HK_STALE_RPT_TLM_TOPICID`
   default 0xA2 in `fsw/inc/hk_topicids.h`; `HK_STALE_RPT_TLM_MID` via
   `CFE_PLATFORM_HK_TLM_MIDVAL` in `config/default_hk_msgids.h`. Add it to
   `sample_defs/tables/to_lab_sub.c`.
@@ -84,8 +91,11 @@ HK conventions (config headers, dispatch, events, `unit-test/*_tests.c`).
   combined send): `StaleTransitionCtr`++ and one event `HK_INPUT_STALE_EID`
   (40, INFORMATION) naming the input and output MIDs as `0x` followed by
   hex digits. No repeat while it stays stale.
-- When a stale entry's input arrives: one event `HK_INPUT_FRESH_EID`
-  (41, INFORMATION) naming both MIDs.
+- When a stale entry's input packet arrives, the entry becomes fresh at
+  that moment, in HK's incoming-data path, not at the next combined send:
+  `StaleInputCount` drops right away and one event `HK_INPUT_FRESH_EID`
+  (41, INFORMATION) naming both MIDs is sent on that arrival. Arrivals of an
+  input whose entry is not stale send no event.
 - Loading a new copy table resets all missed-cycle counts and stale states
   without events.
 
@@ -125,8 +135,9 @@ as payload); nothing schedules it automatically.
   `ctf/tests/hk_staleness.json` that sets `StaleCycles` to 2, requests
   combined packet 2 three times in quick succession, and checks that
   `StaleInputCount` becomes 1 and the stale event fires; then waits for the
-  next SAMPLE_APP housekeeping packet, requests combined packet 2 again, and
-  checks the fresh event. Run it with `ctf/run_ctf.sh` and make it pass.
+  next SAMPLE_APP housekeeping packet and checks the fresh event, which HK
+  sends as soon as that packet arrives; after that it requests combined
+  packet 2 again. Run it with `ctf/run_ctf.sh` and make it pass.
 - Report at `docs/reports/hk_staleness.md`: what changed, unit test counts,
   HK coverage figures, CTF results, open issues.
 - Commit the work.
