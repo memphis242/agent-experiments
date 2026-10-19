@@ -58,9 +58,10 @@ Notes:
 - Solo Haiku (A16, A17) reached the edge of the 1M context window: every run but one
   peaked at 964K to 966K tokens and auto-compacted once, the first main-agent compactions
   in Experiment A. The exception, A16 rep 1, peaked at 885K, did not compact, and passed
-  in round three at 9.92 USD in 73 minutes. Its three failed runs kept failing packet-file roll-over assertions in
-  the hidden coverage test (A16 rep 3 also the file listing check). Solo Haiku runs took
-  95 to 108 minutes when they compacted, the slowest of the task. A17 rep 2 passed in round two at 10.61 USD.
+  in round three at 9.92 USD in 73 minutes. The three failed solo Haiku runs kept failing
+  packet-file roll-over assertions in the hidden coverage test (A16 rep 3 also the file
+  listing check). The runs that compacted took 95 to 108 minutes, the slowest of the
+  task. A17 rep 2 passed in round two at 10.61 USD.
 - Ending the round while subagents are still working (see the Task 3 notes) cost a round
   in eight of the twelve completed runs of delegating arms: A2 reps 1 and 3, A4 reps 1 and
   2, A14 reps 2 and 3, and A15 reps 2 and 3. All eight ran before the print-mode
