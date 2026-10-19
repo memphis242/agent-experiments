@@ -19,7 +19,8 @@ EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": 
             "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6", "A10": None,
             "A11": "claude-haiku-5-5", "A12": None, "A13": None, "A14": "claude-sonnet-5-5",
             "A15": "claude-sonnet-5-5", "A16": None, "A17": None,
-            "A18": None, "A19": None, "A20": None}
+            "A18": None, "A19": None, "A20": None, "A21": "gpt-6.1-sol", "A22": "gpt-6.1-sol"}
+CODEX_AGENTS = {"A21": sorted(arms.SUBAGENT_NAMES), "A22": ["debugger", "implementer", "tester"]}
 MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high"),
         "A13": ("claude-opus-5-5", "medium"), "A14": ("claude-opus-5-5", "low"),
         "A15": ("claude-opus-5-5", "medium"), "A16": ("claude-haiku-5-5", "high"),
@@ -57,6 +58,9 @@ class ArmsTest(unittest.TestCase):
             if arm in ("A14", "A15"):
                 self.assert_tiered(root, s)
                 continue
+            if arm in CODEX_AGENTS:
+                self.assert_codex(arm, root, s)
+                continue
             deny = s["permissions"]["deny"]
             for tool in arms.DENIED_TOOLS:
                 self.assertIn(tool, deny)
@@ -75,6 +79,32 @@ class ArmsTest(unittest.TestCase):
                 expected_names = ["implementer", "tester"] if arm == "A11" else sorted(arms.SUBAGENT_NAMES)
                 self.assertEqual(names, expected_names)
                 self.assertEqual(set(arms.agent_models(root).values()), {sub_model})
+
+    def assert_codex(self, arm, root, s):
+        self.assertIn("Agent", s["permissions"]["deny"])
+        self.assertEqual(s["env"], {"BASH_MAX_TIMEOUT_MS": "7200000"})
+        self.assertEqual(s["modelSettings"], {"claude-opus-5-5": {"effortLevel": "high"}})
+        self.assertFalse((root / "agents").exists())
+        codex = root / "codex"
+        self.assertEqual(sorted(p.stem for p in (codex / "roles").glob("*.md")), CODEX_AGENTS[arm])
+        roster = json.loads((codex / "agent.json").read_text())
+        self.assertEqual((roster["model"], roster["effort"]), ("gpt-6.1-sol", "high"))
+        self.assertEqual({n for n, a in roster["agents"].items() if a["read_only"]},
+                         {"explorer", "reviewer"} & set(CODEX_AGENTS[arm]))
+        config = (codex / "config.toml").read_text()
+        for line in ('model = "gpt-6.1-sol"', 'model_reasoning_effort = "high"', 'web_search = "disabled"',
+                     "multi_agent = false", "[agents]\nenabled = false"):
+            self.assertIn(line, config)
+        self.assertNotIn("{{", config)
+        self.assertNotIn("Delegation", (codex / "AGENTS.md").read_text())
+        launcher = codex / "bin" / "codex-agent"
+        self.assertTrue(launcher.stat().st_mode & 0o111)
+        self.assertEqual(launcher.read_bytes(), arms.CODEX_AGENT_SCRIPT.read_bytes())
+        text = (root / "CLAUDE.md").read_text()
+        self.assertIn("## Subagents", text)
+        self.assertIn("GPT-6.1 Sol at high reasoning effort", text)
+        for name in CODEX_AGENTS[arm]:
+            self.assertIn(f"- {name}: ", text)
 
     def assert_tiered(self, root, s):
         deny = s["permissions"]["deny"]
@@ -97,7 +127,8 @@ class ArmsTest(unittest.TestCase):
             spec = arms.ARMS[arm]
             self.assertEqual(EAGER in text, spec.delegation == "eager")
             self.assertEqual(CONSERVATIVE in text, spec.delegation == "conservative")
-            self.assertEqual(ROLES in text, spec.delegation == "roles")
+            self.assertEqual(ROLES in text, spec.delegation in ("roles", "roles-debugger"))
+            self.assertEqual("## Subagents" in text, spec.codex)
             self.assertEqual(TIERED in text, spec.delegation == "tiered")
 
     def test_readonly_agents_have_no_write_tools(self):
@@ -106,6 +137,14 @@ class ArmsTest(unittest.TestCase):
             tools = [l for l in text.splitlines() if l.startswith("tools:")][0]
             for banned in ("Edit", "Write", "Bash"):
                 self.assertNotIn(banned, tools)
+
+    def test_codex_arm_spec(self):
+        self.assertEqual(dict(arms.effort_map(arms.ARMS["A21"])), {"claude-opus-5-5": "high"})
+        self.assertEqual(arms.ARMS["A21"].claude_subagent_models, frozenset())
+        with self.assertRaises(AssertionError):  # a Codex arm runs a Codex model
+            arms.ArmSpec("X", arms.SONNET_55, "eager", subagent_harness="codex")
+        with self.assertRaises(AssertionError):  # and a Claude arm a Claude model
+            arms.ArmSpec("X", arms.GPT_61_SOL, "eager")
 
     def test_unknown_arm(self):
         with self.assertRaises(arms.ArmError):

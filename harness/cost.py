@@ -92,6 +92,11 @@ PRICING: Mapping[str, ModelPricing] = MappingProxyType({
     "claude-sonnet-4-6": ModelPricing(ModelPrice(3.00, 0.30, 3.75, 6.00, 15.00)),
     "claude-haiku-5-5": ModelPricing(ModelPrice(0.10, 0.01, 0.125, 0.20, 0.50),
                                      100_000, ModelPrice(0.50, 0.05, 0.625, 1.00, 2.50)),
+    # OpenAI standard tier (developers.openai.com/api/docs/pricing, 2026-10-19): input, cached
+    # input, cache write (one price, so both write slots carry it), output; above 272K input
+    # tokens the request is priced at 2x for input and 1.5x for output. Reasoning tokens are output.
+    "gpt-6.1-sol": ModelPricing(ModelPrice(2.00, 0.10, 2.50, 2.50, 10.00),
+                                272_000, ModelPrice(4.00, 0.20, 5.00, 5.00, 15.00)),
 })
 
 

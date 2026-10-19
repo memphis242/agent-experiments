@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import arms
+import codex
 import cost
 import transcript
 
@@ -99,8 +100,11 @@ def cache_ttl_report(requests: Sequence[cost.Request], expected_main: str,
 
 def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Sequence[Path],
                   resume_indices: Sequence[int], gaps_path: Path, seed: int,
-                  definition_models: dict[str, str]) -> None:
-    """Recompute cost, behavior, validation, and totals in place; failures go to analysis_error."""
+                  definition_models: dict[str, str], codex_home: Path | None = None) -> None:
+    """Recompute cost, behavior, validation, and totals in place; failures go to analysis_error.
+
+    With codex_home (a Codex arm), the headless Codex subagents' requests join the
+    Claude requests as subagent requests, and their calls count as spawns."""
     try:
         gaps: tuple[float, ...] | None = None
         warnings: list[str] = []
@@ -109,11 +113,12 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                 gaps = cost.load_gaps(gaps_path)
             else:
                 warnings.append(f"pause samples {gaps_path} missing; scenarios computed without pauses")
-        requests = cost.load_requests(list(mains), list(sub_dirs))
+        claude_requests = cost.load_requests(list(mains), list(sub_dirs))
+        requests = claude_requests + (codex.load_requests(codex_home) if codex_home is not None else ())
         pauses = cost.sample_pauses(resume_indices, gaps, seed) if resume_indices and gaps else {}
         report = cost.compute_cost(requests, pauses)
         data = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO, "seed": seed,
-                "scenarios_note": HYPOTHETICAL_NOTE, "reconciliation": reconcile(record, requests)}
+                "scenarios_note": HYPOTHETICAL_NOTE, "reconciliation": reconcile(record, claude_requests)}
         transcript_billed = data["scenarios"]["billed"]["total_usd"]
         data["billed_transcript_usd"] = transcript_billed
         usage = session_model_usage(record)
@@ -133,17 +138,30 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         peaks = cost.context_peaks(requests)
         behavior["max_context_main"] = peaks["main"]
         behavior["max_context_subagent"] = peaks["subagent"]
-        ttl, ttl_violations = cache_ttl_report(requests, arms.PROMPT_CACHE_TTL, arms.SUBAGENT_PROMPT_CACHE_TTL)
+        ttl, ttl_violations = cache_ttl_report(claude_requests, arms.PROMPT_CACHE_TTL, arms.SUBAGENT_PROMPT_CACHE_TTL)
         behavior["cache_ttl"] = ttl
         behavior["cache_ttl_drop"] = ttl["main"]["mismatched_requests"] > 0
+        arm = arms.get_arm(record["arm"])
+        codex_violations: list[dict[str, Any]] = []
+        if codex_home is not None:
+            assert arm.codex and arm.subagent_model is not None
+            summary = codex.summarize(codex_home)
+            behavior["codex"] = summary
+            behavior["subagent_spawn_calls"] = behavior["subagent_spawn_calls"] + codex.spawn_calls(summary)
+            behavior["subagent_spawns"] += summary["calls"]
+            by_type = dict(behavior["subagent_spawns_by_type"])
+            for agent, n in summary["calls_by_agent"].items():
+                by_type[agent] = by_type.get(agent, 0) + n
+            behavior["subagent_spawns_by_type"] = dict(sorted(by_type.items()))
+            behavior["compaction_events"] += summary["compaction_events"]
+            codex_violations = codex.validate(codex_home, summary, arm.subagent_model, arm.subagent_effort)
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
-        arm = arms.get_arm(record["arm"])
-        forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None else [])
+        forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None or arm.codex else [])
         violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model,
-                                                arm.subagent_models, arms.effort_map(arm), forbidden,
+                                                arm.claude_subagent_models, arms.effort_map(arm), forbidden,
                                                 {a: arm.model_for(a) for a in arm.agents} if arm.multi_model else None)
-        violations += ttl_violations
+        violations += ttl_violations + codex_violations
         inventory = [{**{k: v for k, v in i.items() if k != "path"},
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]

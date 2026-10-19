@@ -1,0 +1,198 @@
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import textwrap
+import unittest
+from pathlib import Path
+
+import _support  # noqa: F401
+import arms
+import codex
+import cost
+import run
+
+THREAD = "01a1546c-748c-73f2-9d3d-f5bc46873fd0"
+FAKE_CODEX = textwrap.dedent('''\
+    #!/usr/bin/env python3
+    import json, os, sys
+    from pathlib import Path
+    argv = sys.argv[1:]
+    task = sys.stdin.read()
+    home = Path(os.environ["CODEX_HOME"])
+    (home / "fake-invocation.json").write_text(json.dumps({"argv": argv, "task": task, "env": dict(os.environ)}))
+    if "FAIL" in task:
+        print(json.dumps({"type": "turn.failed", "error": {"message": "You've hit your usage limit."}}))
+        sys.exit(1)
+    print(json.dumps({"type": "thread.started", "thread_id": "%s"}))
+    Path(argv[argv.index("-o") + 1]).write_text("REPORT for " + task.strip())
+    ''' % THREAD)
+
+
+def rollout_lines(model="gpt-6.1-sol", effort="high"):
+    def usage(inp, cached, out):
+        return {"input_tokens": inp, "cached_input_tokens": cached, "cache_write_input_tokens": 0,
+                "output_tokens": out, "reasoning_output_tokens": 3, "total_tokens": inp + out}
+    return [
+        {"timestamp": "2026-10-19T13:49:16.832Z", "type": "session_meta", "payload": {"id": THREAD}},
+        {"timestamp": "2026-10-19T13:49:18.823Z", "type": "turn_context", "payload": {"model": model, "effort": effort}},
+        {"timestamp": "2026-10-19T13:49:21.000Z", "type": "response_item",
+         "payload": {"type": "custom_tool_call", "name": "exec"}},
+        {"timestamp": "2026-10-19T13:49:22.113Z", "type": "token_usage_record",
+         "payload": {"response_id": "resp_1", "usage": usage(7452, 0, 110)}},
+        {"timestamp": "2026-10-19T13:49:22.114Z", "type": "token_usage_record",
+         "payload": {"response_id": "resp_1", "usage": usage(7452, 0, 110)}},  # duplicate record
+        {"timestamp": "2026-10-19T13:49:22.129Z", "type": "event_msg",
+         "payload": {"type": "token_count", "rate_limits": {"primary": {"used_percent": 8.0}}}},
+        {"timestamp": "2026-10-19T13:49:23.898Z", "type": "token_usage_record",
+         "payload": {"response_id": "resp_2", "usage": usage(300_000, 7296, 14)}},
+    ]
+
+
+class CodexAgentLauncherTest(unittest.TestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        base = Path(self.tmp.name)
+        arms.generate_arm("A21", base / "arms")
+        self.launcher = base / "arms" / "A21" / "codex" / "bin" / "codex-agent"
+        self.home = base / "home"
+        self.home.mkdir()
+        (self.home / "config.toml").write_text("")
+        fake_bin = base / "bin"
+        fake_bin.mkdir()
+        (fake_bin / "codex").write_text(FAKE_CODEX)
+        (fake_bin / "codex").chmod(0o755)
+        (self.home / "agent-runtime.json").write_text(json.dumps({"codex_bin": str(fake_bin / "codex")}))
+        self.env = {"PATH": f"{fake_bin}:{os.environ['PATH']}", "CODEX_HOME": str(self.home),
+                    "CLAUDE_CODE_OAUTH_TOKEN": "secret", "CLAUDECODE": "1", "HOME": os.environ.get("HOME", "/")}
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def launch(self, *args, task="build it", env=None):
+        return subprocess.run([sys.executable, str(self.launcher), *args], input=task, text=True,
+                              capture_output=True, env=env or self.env, cwd=self.tmp.name, timeout=60)
+
+    def invocation(self):
+        return json.loads((self.home / "fake-invocation.json").read_text())
+
+    def test_report_and_call_record(self):
+        done = self.launch("implementer")
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(done.stdout, "REPORT for build it\n")
+        seen = self.invocation()
+        self.assertEqual(seen["task"], "build it")
+        self.assertNotIn("--sandbox", seen["argv"])
+        self.assertEqual(seen["argv"][:3], ["exec", "--json", "--strict-config"])
+        role = (self.launcher.parent.parent / "roles" / "implementer.md").read_text()
+        self.assertIn(f"developer_instructions={json.dumps(role)}", seen["argv"])
+        self.assertNotIn("CLAUDE_CODE_OAUTH_TOKEN", seen["env"])
+        self.assertNotIn("CLAUDECODE", seen["env"])
+        self.assertEqual(seen["env"]["CODEX_AGENT_DEPTH"], "1")
+        [call] = codex.call_records(self.home)
+        self.assertEqual((call["agent"], call["exit_code"], call["thread_id"], call["failed"]),
+                         ("implementer", 0, THREAD, False))
+
+    def test_read_only_agents_get_the_read_only_sandbox(self):
+        self.assertEqual(self.launch("reviewer").returncode, 0)
+        argv = self.invocation()["argv"]
+        self.assertEqual(argv[argv.index("--sandbox") + 1], "read-only")
+
+    def test_refusals(self):
+        self.assertEqual(self.launch("planner").returncode, 2)
+        self.assertEqual(self.launch("implementer", task="  \n").returncode, 2)
+        self.assertEqual(self.launch("implementer", env={**self.env, "CODEX_AGENT_DEPTH": "1"}).returncode, 2)
+        self.assertFalse((self.home / "fake-invocation.json").exists())
+
+    def test_usage_limit_failure(self):
+        done = self.launch("tester", task="FAIL now")
+        self.assertEqual(done.returncode, 1)
+        self.assertIn("usage limit", done.stderr)
+        [call] = codex.call_records(self.home)
+        self.assertTrue(call["failed"] and call["usage_limit"])
+        summary = codex.summarize(self.home)
+        self.assertTrue(summary["usage_limit"])
+        kinds = [v["kind"] for v in codex.validate(self.home, summary, "gpt-6.1-sol", "high")]
+        self.assertEqual(kinds, ["codex_call_failed"])
+
+
+class CodexLogTest(unittest.TestCase):
+    def write_home(self, lines):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        home = Path(tmp.name)
+        path = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{THREAD}.jsonl"
+        path.parent.mkdir(parents=True)
+        path.write_text("".join(json.dumps(l) + "\n" for l in lines))
+        call = home / "agent-calls" / "c1-implementer"
+        call.mkdir(parents=True)
+        (call / "call.json").write_text(json.dumps({"agent": "implementer", "started_epoch": 100.0,
+                                                    "ended_epoch": 160.0, "exit_code": 0, "failed": False,
+                                                    "thread_id": THREAD, "usage_limit": False}))
+        return home
+
+    def test_requests_are_deduplicated_and_priced(self):
+        home = self.write_home(rollout_lines())
+        first, second = codex.load_requests(home)
+        self.assertEqual((first.input_tokens, first.cache_read_tokens, first.output_tokens), (7452, 0, 110))
+        self.assertEqual((second.input_tokens, second.cache_read_tokens), (300_000 - 7296, 7296))
+        self.assertEqual((first.source, first.model, first.thread), ("subagent", "gpt-6.1-sol", f"codex-{THREAD}"))
+        self.assertAlmostEqual(cost.request_cost(first, "billed"), (7452 * 2.00 + 110 * 10.00) / 1e6)
+        long_price = cost.price_for("gpt-6.1-sol", 300_000)  # above 272K: the long-context card
+        self.assertEqual((long_price.input, long_price.output), (4.00, 15.00))
+        self.assertEqual(cost.context_peaks([first, second])["subagent"], 300_000)
+
+    def test_summary_and_validation(self):
+        home = self.write_home(rollout_lines())
+        summary = codex.summarize(home)
+        self.assertEqual((summary["calls"], summary["calls_by_agent"]), (1, {"implementer": 1}))
+        self.assertEqual(summary["tool_calls"], {"exec": 1})
+        self.assertEqual(summary["per_call"][0]["wall_s"], 60.0)
+        self.assertEqual(summary["per_call"][0]["first_input_tokens"], 7452)
+        self.assertEqual(summary["rate_limit_used_percent_max"], 8.0)
+        self.assertEqual(codex.validate(home, summary, "gpt-6.1-sol", "high"), [])
+        [spawn] = codex.spawn_calls(summary)
+        self.assertEqual((spawn["subagent_type"], spawn["timestamp"]), ("implementer", 100.0))
+
+    def test_wrong_model_or_effort_is_a_violation(self):
+        home = self.write_home(rollout_lines(model="gpt-6.1-astra", effort="medium"))
+        kinds = sorted(v["kind"] for v in codex.validate(home, codex.summarize(home), "gpt-6.1-sol", "high"))
+        self.assertEqual(kinds, ["effort", "model"])
+
+
+class CodexRunWiringTest(unittest.TestCase):
+    def test_child_env_for_a_codex_arm(self):
+        env = run.child_env(Path("/run/config"), {"PATH": "/bin", "CLAUDE_CODE_OAUTH_TOKEN": "o"},
+                            codex_home=Path("/run/codex-home"))
+        self.assertEqual(env["CODEX_HOME"], "/run/codex-home")
+        self.assertEqual(env["PATH"], "/run/config/codex/bin:/bin")
+        self.assertNotIn("CODEX_HOME", run.child_env(Path("/run/config"), {"PATH": "/bin"}, include_token=False))
+
+    def test_codex_home_is_bound_back_and_user_codex_hidden(self):
+        steps = "\n".join(run.hiding_steps(Path("/runs/x"), run.VISIBLE_RUN_DIRS + (codex.HOME_DIR,)))
+        self.assertIn("mount --bind /dev/shm/.stage/codex-home /runs/x/codex-home", steps)
+        self.assertIn(os.path.expanduser("~/.codex"), steps)
+        self.assertNotIn("codex-home", "\n".join(run.hiding_steps(Path("/runs/x"))))
+        packages = codex.HOST_VISIBLE[0]
+        with_host = run.hiding_steps(Path("/runs/x"), run.VISIBLE_RUN_DIRS, codex.HOST_VISIBLE)
+        hide = next(i for i, step in enumerate(with_host) if "/.codex;" in step)
+        self.assertLess(with_host.index(f"mount --bind {packages} /dev/shm/.stage/host0"), hide)
+        self.assertGreater(with_host.index(f"mount -o remount,bind,ro {packages}"), hide)
+
+    def test_dns_forwarding_only_when_asked(self):
+        plain = run.wrap_netns(["true"])
+        self.assertNotIn("--dns-forward", plain)
+        forwarded = run.wrap_netns(["true"], dns_forward=True)
+        self.assertEqual(forwarded[forwarded.index("--dns-forward") + 1], run.DNS_FORWARD_ADDR)
+        self.assertLess(forwarded.index("--dns-forward"), forwarded.index("--"))
+        self.assertIn("mount --bind /dev/shm/.resolv.conf /etc/resolv.conf", forwarded[-1])
+
+    def test_codex_arm_disallows_the_agent_tool(self):
+        cfg = run.RunConfig("A21", "task1", 1, None, Path("/t"), Path("/r"), Path("/a"), Path("/k"), Path("/g"),
+                            5, 60.0, None, 0, "claude")
+        self.assertEqual(run.build_claude_command(cfg, "id", "go", None)[-2:], ["--disallowedTools", "Agent"])
+
+
+if __name__ == "__main__":
+    unittest.main()

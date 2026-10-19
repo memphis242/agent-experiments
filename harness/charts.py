@@ -97,6 +97,7 @@ FOOTNOTE_TOP = 12               # tick labels to the first footnote baseline
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     # (marker substring of the description, family label, saturated colour)
     ("tiered", "Tiered", "#fbbf24"),
+    ("Codex GPT-6.1 Sol", "Codex GPT-6.1 Sol", "#10b981"),
     ("Opus 5.5 subagents", "Opus 5.5", "#a78bfa"),
     ("Sonnet 5.5 subagents", "Sonnet 5.5", "#60a5fa"),
     ("Sonnet 5 subagents", "Sonnet 5", "#2dd4bf"),
@@ -110,10 +111,10 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
 )
 FALLBACK_FAMILY = ("Other", "#9ca3af")
 MODEL_NAMES = {arms.OPUS_55: "Opus 5.5", arms.SONNET_55: "Sonnet 5.5", arms.SONNET_5: "Sonnet 5",
-               arms.SONNET_46: "Sonnet 4.6", arms.HAIKU_55: "Haiku 5.5"}
+               arms.SONNET_46: "Sonnet 4.6", arms.HAIKU_55: "Haiku 5.5", **arms.CODEX_MODELS}
 _EFFORTS = "|".join(sorted(arms.EFFORT_LEVELS))
 EFFORT_PHRASE = re.compile(rf",? (?:{_EFFORTS}) effort\b| (?:{_EFFORTS})(?= main\b)")
-TINT_MARKERS = ("conservative", "roles")     # description words that select the lighter tint
+TINT_MARKERS = ("conservative", "roles", "secondary debugger")  # description words that select the lighter tint
 
 # Metric id -> output file name
 CHART_FILES = {"cost": "{task}-cost.svg", "time": "{task}-time.svg"}
@@ -167,8 +168,8 @@ def mix(hex_color: str, target: tuple[int, int, int], amount: float) -> str:
 def chart_label(arm_id: str, description: str) -> str:
     """The arm description with its effort levels: appended when every agent runs at one
     level, otherwise placed after each model name."""
-    if arm_id not in arms.ARMS:
-        return description
+    if arm_id not in arms.ARMS or arms.get_arm(arm_id).codex:
+        return description  # a Codex arm's description names both harnesses' effort levels itself
     efforts = arms.effort_map(arms.get_arm(arm_id))
     base = EFFORT_PHRASE.sub("", description)
     if len(set(efforts.values())) == 1:

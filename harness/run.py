@@ -30,6 +30,7 @@ from typing import Any, Sequence
 import acceptance
 import analysis
 import arms
+import codex
 import cost
 import proc
 import transcript
@@ -53,15 +54,23 @@ ENV_FIXED = {"DISABLE_AUTOUPDATER": "1", "CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS":
 # Loopback port forwarding is disabled in all four directions so that the
 # namespace's traffic can never reach another session's cFS on the host.
 PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "-t", "none", "-u", "none", "-T", "none", "-U", "none", "--")
+# A statically linked resolver (musl, as in the Codex CLI) sends plain DNS to the host's
+# stub resolver on 127.0.0.53, which the namespace cannot reach since loopback forwarding is
+# off; glibc programs reach systemd-resolved over its unix socket instead. With dns_forward,
+# pasta forwards queries sent to this address to the host's resolver, and the namespace's
+# /etc/resolv.conf names it.
+DNS_FORWARD_ADDR = "169.254.1.1"
 STRAY_PROCESS_NAMES = frozenset({"core-cpu1"})
 
 # Paths covered by an empty tmpfs while claude runs (not during acceptance runs).
-# "~" is the harness user's home. Only this run's repo/ and config/ are bound
-# back afterwards, so nothing else under these paths is visible to the agent.
+# "~" is the harness user's home. Only this run's repo/ and config/ (and, for a
+# Codex arm, codex-home/) are bound back afterwards, so nothing else under these
+# paths is visible to the agent.
 HIDDEN_PATHS: tuple[tuple[str, str], ...] = (
     ("/workspace", "the runs dir holds other runs' solved repos; agent-experiments-scout holds reference "
                    "solutions; the worktree holds the acceptance packs; the arms dir holds every arm's config"),
     ("~/.claude", "the user's own Claude Code transcripts and settings"),
+    ("~/.codex", "the user's own Codex sessions, settings, and login (a Codex arm gets its own CODEX_HOME)"),
     ("~/projects/agent-experiments", "the primary checkout holds the acceptance packs"),
     ("/tmp", "scratch space of other sessions, which may hold packs or solutions"),
 )
@@ -97,13 +106,15 @@ def resolve_task(tasks_dir: Path, name: str) -> tuple[str, str]:
     return (found.group(0) if found else directory), directory
 
 
-ARM_ROOT_ENTRIES = ("settings.json", "CLAUDE.md", "agents")
+ARM_ROOT_ENTRIES = ("settings.json", "CLAUDE.md", "agents", arms.CODEX_DIR)
+VISIBLE_RUN_DIRS = ("repo", "config")
 
 
 def hash_config_root(root: Path) -> str:
-    """SHA-256 over the relative paths and bytes of settings.json, CLAUDE.md, and agents/."""
+    """SHA-256 over the relative paths and bytes of settings.json, CLAUDE.md, agents/, and codex/."""
     digest = hashlib.sha256()
-    paths = [root / "settings.json", root / "CLAUDE.md", *sorted((root / "agents").glob("*"))]
+    paths = [root / "settings.json", root / "CLAUDE.md", *sorted((root / "agents").glob("*")),
+             *sorted((root / arms.CODEX_DIR).rglob("*"))]
     for path in paths:
         if path.is_file():
             digest.update(str(path.relative_to(root)).encode() + b"\0" + path.read_bytes() + b"\0")
@@ -119,7 +130,7 @@ def hash_tree(root: Path) -> str:
 
 
 def copy_arm_root(source: Path, dest: Path) -> None:
-    """Copy exactly settings.json, CLAUDE.md, and agents/; refuse any other content."""
+    """Copy exactly settings.json, CLAUDE.md, agents/, and codex/; refuse any other content."""
     extras = sorted(p.name for p in source.iterdir() if p.name not in ARM_ROOT_ENTRIES)
     if extras:
         raise RunError(f"arm root {source} holds unexpected entries {extras}; remove them or regenerate the arm")
@@ -131,6 +142,8 @@ def copy_arm_root(source: Path, dest: Path) -> None:
     shutil.copyfile(source / "CLAUDE.md", dest / "CLAUDE.md")
     if (source / "agents").exists():
         shutil.copytree(source / "agents", dest / "agents")
+    if (source / arms.CODEX_DIR).exists():
+        shutil.copytree(source / arms.CODEX_DIR, dest / arms.CODEX_DIR)
 
 
 def _capture(cmd: Sequence[str], cwd: Path | None = None, env: dict[str, str] | None = None) -> str:
@@ -193,26 +206,36 @@ class RunConfig:
         arms.get_arm(self.arm)
 
 
-def hiding_steps(run_dir: Path) -> list[str]:
+def hiding_steps(run_dir: Path, visible: Sequence[str] = VISIBLE_RUN_DIRS,
+                 host_visible: Sequence[Path] = ()) -> list[str]:
     """Shell steps (run as root in the mount namespace) that hide HIDDEN_PATHS and
-    bind this run's repo/ and config/ back at their original paths."""
+    bind this run's `visible` subdirectories back at their original paths, plus the
+    host_visible directories (absolute paths under hidden ones) read-only."""
+    assert visible and all(re.fullmatch(r"[a-z][a-z-]*", name) for name in visible)
+    assert all(p.is_absolute() for p in host_visible)
     run = run_dir.resolve()
     stage = "/dev/shm/.stage"
-    steps = [f"mkdir -p {stage}/repo {stage}/config",
-             f"mount --bind {shlex.quote(str(run / 'repo'))} {stage}/repo",
-             f"mount --bind {shlex.quote(str(run / 'config'))} {stage}/config"]
+    # (staging dir, original path, read-only) for every directory bound back after hiding
+    binds = [(f"{stage}/{name}", shlex.quote(str(run / name)), False) for name in visible]
+    binds += [(f"{stage}/host{i}", shlex.quote(str(p)), True) for i, p in enumerate(host_visible)]
+    staged = " ".join(s for s, _, _ in binds)
+    steps = [f"mkdir -p {staged}"]
+    steps += [f"mount --bind {original} {staging}" for staging, original, _ in binds]
     for template, _reason in HIDDEN_PATHS:
         path = shlex.quote(os.path.expanduser(template))
         steps.append(f"{{ [ ! -d {path} ] || mount -t tmpfs tmpfs {path}; }}")
-    steps += [f"mkdir -p {shlex.quote(str(run / 'repo'))} {shlex.quote(str(run / 'config'))}",
-              f"mount --bind {stage}/repo {shlex.quote(str(run / 'repo'))}",
-              f"mount --bind {stage}/config {shlex.quote(str(run / 'config'))}",
-              f"umount {stage}/repo {stage}/config",
-              f"rmdir {stage}/repo {stage}/config {stage}"]
+    steps.append(f"mkdir -p {' '.join(original for _, original, _ in binds)}")
+    for staging, original, read_only in binds:
+        steps.append(f"mount --bind {staging} {original}")
+        if read_only:
+            steps.append(f"mount -o remount,bind,ro {original}")
+    steps += [f"umount {staged}", f"rmdir {staged} {stage}"]
     return steps
 
 
-def wrap_netns(cmd: Sequence[str], hide_run_dir: Path | None = None) -> list[str]:
+def wrap_netns(cmd: Sequence[str], hide_run_dir: Path | None = None,
+               visible: Sequence[str] = VISIBLE_RUN_DIRS, host_visible: Sequence[Path] = (),
+               dns_forward: bool = False) -> list[str]:
     """Run cmd isolated in network, mount, IPC, PID, and user namespaces.
 
     Layers, outermost first: pasta (user + network namespace, root inside);
@@ -223,24 +246,39 @@ def wrap_netns(cmd: Sequence[str], hide_run_dir: Path | None = None) -> list[str
     `unshare -U` mapping the harness uid/gid back so the command is not fake
     root (OSAL skips its message-queue depth adaptation for uid 0 and cFS then
     fails to boot). pasta cannot exec the program directly, hence `sh -c` at
-    each layer. With hide_run_dir the command starts in <hide_run_dir>/repo.
+    each layer. With hide_run_dir the command starts in <hide_run_dir>/repo, and of
+    the run dir only the `visible` subdirectories, and of the hidden host paths only
+    host_visible (read-only), can be seen. With dns_forward, DNS sent to DNS_FORWARD_ADDR
+    reaches the host's resolver and a private /etc/resolv.conf names that address.
     """
     mapped = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
               f"sh -c {shlex.quote(shlex.join(cmd))}")
     steps = ["mount -t tmpfs tmpfs /dev/shm"]
+    if dns_forward:
+        steps += [f"printf 'nameserver {DNS_FORWARD_ADDR}\\n' > /dev/shm/.resolv.conf",
+                  "mount --bind /dev/shm/.resolv.conf /etc/resolv.conf", "rm /dev/shm/.resolv.conf"]
     if hide_run_dir is not None:
-        steps += hiding_steps(hide_run_dir)
+        steps += hiding_steps(hide_run_dir, visible, host_visible)
         steps.append(f"cd {shlex.quote(str(hide_run_dir.resolve() / 'repo'))}")
     steps.append(mapped)
     namespaced = ("unshare -m -i -p -f --mount-proc --kill-child sh -c "
                   + shlex.quote(" && ".join(steps)))
-    return [*PASTA_PREFIX, "sh", "-c", namespaced]
+    prefix = [*PASTA_PREFIX[:-1], "--dns-forward", DNS_FORWARD_ADDR, "--"] if dns_forward else list(PASTA_PREFIX)
+    return [*prefix, "sh", "-c", namespaced]
 
 
-def check_netns(runs_dir: Path, claude_bin: str = "claude") -> None:
+# A raw UDP DNS query for api.openai.com's A record to the forwarded resolver; exits 0 on any answer.
+DNS_PROBE = ("import socket,struct,sys; s=socket.socket(socket.AF_INET,socket.SOCK_DGRAM); s.settimeout(5); "
+             "q=struct.pack('>HHHHHH',0x1234,0x0100,1,0,0,0)+b''.join(bytes([len(p)])+p.encode() "
+             "for p in 'api.openai.com'.split('.'))+b'\\0'+struct.pack('>HH',1,1); "
+             f"s.sendto(q,('{DNS_FORWARD_ADDR}',53)); d=s.recv(512); sys.exit(0 if d[:2]==q[:2] else 1)")
+
+
+def check_netns(runs_dir: Path, claude_bin: str = "claude", extra_bins: Sequence[str] = (),
+                host_visible: Sequence[Path] = (), dns_forward: bool = False) -> None:
     """Fail clearly unless the full wrapper (with hiding) isolates as intended: harness uid,
     empty private /dev/shm, own PID namespace, only this run's repo/config visible,
-    and the claude binary still reachable."""
+    and the claude binary (and any extra_bins) still reachable."""
     runs_dir.mkdir(parents=True, exist_ok=True)
     probe_dir = Path(tempfile.mkdtemp(prefix=".selfcheck-", dir=runs_dir))
     try:
@@ -252,8 +290,13 @@ def check_netns(runs_dir: Path, claude_bin: str = "claude") -> None:
         script = (f'test "$(id -u)" = {os.getuid()} && test -z "$(ls -A /dev/shm)" '
                   f'&& case "$(cat /proc/1/comm)" in sh|bash|dash) ;; *) exit 1;; esac '
                   f'&& test -f {run}/repo/marker && test -w {run}/repo && test -w {run}/config '
-                  f'&& test ! -e {run}/hidden-sibling && command -v {shlex.quote(claude_bin)} >/dev/null')
-        cmd = wrap_netns(["sh", "-c", script], hide_run_dir=probe_dir)
+                  f'&& test ! -e {run}/hidden-sibling && command -v {shlex.quote(claude_bin)} >/dev/null'
+                  + "".join(f" && command -v {shlex.quote(b)} >/dev/null" for b in extra_bins))
+        if dns_forward:  # the forwarded resolver must answer a plain DNS query
+            script += (f" && grep -qx 'nameserver {DNS_FORWARD_ADDR}' /etc/resolv.conf"
+                       f" && python3 -c {shlex.quote(DNS_PROBE)}")
+        cmd = wrap_netns(["sh", "-c", script], hide_run_dir=probe_dir, host_visible=host_visible,
+                         dns_forward=dns_forward)
         try:
             done = proc.run_group(cmd, cwd=None, env=None, timeout=60)
         except (OSError, subprocess.TimeoutExpired) as exc:
@@ -266,14 +309,22 @@ def check_netns(runs_dir: Path, claude_bin: str = "claude") -> None:
         shutil.rmtree(probe_dir, ignore_errors=True)
 
 
-def child_env(config_dir: Path, base: dict[str, str] | None = None, include_token: bool = True) -> dict[str, str]:
-    """Allowlisted environment for claude (token included) and acceptance packs (token excluded)."""
+def child_env(config_dir: Path, base: dict[str, str] | None = None, include_token: bool = True,
+              codex_home: Path | None = None) -> dict[str, str]:
+    """Allowlisted environment for claude (token included) and acceptance packs (token excluded).
+    With codex_home (a Codex arm's claude), CODEX_HOME is set and the codex-agent command
+    is put first on PATH."""
     source = os.environ if base is None else base
     env = {k: source[k] for k in ENV_ALLOWLIST if k in source}
     if include_token and TOKEN_ENV in source:
         env[TOKEN_ENV] = source[TOKEN_ENV]
     env.update(ENV_FIXED)
     env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+    if codex_home is not None:
+        assert include_token, "acceptance packs never get Codex"
+        env["CODEX_HOME"] = str(codex_home)
+        bin_dir = config_dir / arms.CODEX_DIR / "bin"
+        env["PATH"] = f"{bin_dir}:{env['PATH']}" if env.get("PATH") else str(bin_dir)
     return env
 
 
@@ -312,7 +363,7 @@ def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: 
             "--append-system-prompt", f"Run ID: {run_id}"]
     if cfg.autocompact is not None:
         cmd += ["--autocompact", str(cfg.autocompact)]
-    if arm.subagent_model is None:
+    if arm.subagent_model is None or arm.codex:
         cmd += ["--disallowedTools", "Agent"]
     return cmd
 
@@ -396,6 +447,7 @@ class Runner:
         self.leak_hits: list[dict[str, object]] = []
         self.leak_offsets: dict[str, int] = {}
         self.record: dict[str, Any] = {}
+        self.codex_home: Path | None = codex.home_for(run_dir) if arms.get_arm(cfg.arm).codex else None
 
     def init_record(self, started: datetime) -> None:
         arm = arms.get_arm(self.cfg.arm)
@@ -422,6 +474,7 @@ class Runner:
             "delegation": arm.delegation,
             "settings": settings, "config_sha256": config_hash,
             "provenance": provenance(self.cfg, task_root / "spec.md", task_root / "acceptance"),
+            "subagent_harness": arm.subagent_harness,
             "autocompact": self.cfg.autocompact,
             "max_rounds": self.cfg.max_rounds,
             "session_ids": [], "resume_request_indices": [],
@@ -432,6 +485,28 @@ class Runner:
         }
         self.save()
 
+    def prepare_codex(self) -> None:
+        """For a Codex arm, build and check this run's CODEX_HOME (after the repo exists)."""
+        if self.codex_home is None:
+            return
+        try:
+            info = codex.prepare_home(self.run_dir, self.arm_root / arms.CODEX_DIR, self.repo,
+                                      child_env(self.arm_root, include_token=False))
+        except (codex.CodexError, OSError) as exc:
+            raise InfraError(f"cannot prepare the Codex home: {exc}") from exc
+        self.record["codex"] = info
+        self.save()
+
+    def release_codex(self) -> None:
+        """Remove this run's copy of the Codex login (writing back a refreshed one)."""
+        if self.codex_home is None or not self.record:
+            return
+        info = self.record.setdefault("codex", {})
+        try:
+            info.update(codex.release_home(self.run_dir, info.get("auth_sha256")))
+        except OSError as exc:
+            info["release_error"] = str(exc)
+
     def save(self) -> None:
         self.record["session_ids"] = list(self.session_ids)
         self.record["resume_request_indices"] = list(self.resume_indices)
@@ -440,9 +515,12 @@ class Runner:
     # -- claude invocation -------------------------------------------------
     def invoke(self, message: str, session_id: str | None, round_no: int) -> dict[str, Any]:
         cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
-        env = child_env(self.arm_root)
+        env = child_env(self.arm_root, codex_home=self.codex_home)
         if self.cfg.netns:
-            cmd = wrap_netns(cmd, hide_run_dir=self.run_dir)
+            codex_arm = self.codex_home is not None
+            cmd = wrap_netns(cmd, hide_run_dir=self.run_dir,
+                             visible=VISIBLE_RUN_DIRS + ((codex.HOME_DIR,) if codex_arm else ()),
+                             host_visible=codex.HOST_VISIBLE if codex_arm else (), dns_forward=codex_arm)
         try:
             done = proc.run_group(cmd, cwd=self.repo, env=env, timeout=self.cfg.cli_timeout_s)
         except subprocess.TimeoutExpired:
@@ -484,6 +562,8 @@ class Runner:
     def scan_leaks(self, mains: list[Path], sub_dirs: list[Path], round_no: int) -> None:
         """Report-only: strings that point at the answer key in transcript entries new this round."""
         files = list(mains) + [p for d in sub_dirs for p in transcript.subagent_files(d)]
+        if self.codex_home is not None:
+            files += codex.leak_scan_files(self.codex_home)
         for path in files:
             hits, total = transcript.scan_new_lines(path, self.leak_offsets.get(str(path), 0))
             self.leak_offsets[str(path)] = total
@@ -500,7 +580,7 @@ class Runner:
             self.record["analysis_error"] = str(exc)
             return
         analysis.update_record(self.record, mains, sub_dirs, self.resume_indices, self.cfg.gaps_path,
-                               self.cfg.seed, arms.agent_models(self.arm_root))
+                               self.cfg.seed, arms.agent_models(self.arm_root), self.codex_home)
 
     # -- main loop ---------------------------------------------------------
     def run(self, prompt: str) -> None:
@@ -587,9 +667,12 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
         ["git", "-C", str(repo), "add", "TASK.md"],
         ["git", "-C", str(repo), "commit", "-m", "Add TASK.md"],
         ["bash", str(repo / "ctf" / "setup_ctf.sh")],
-        ["cp", "settings.json, CLAUDE.md, agents/ from", str(arms.arm_root(cfg.arm, cfg.arms_dir)),
+        ["cp", "settings.json, CLAUDE.md, agents/, codex/ from", str(arms.arm_root(cfg.arm, cfg.arms_dir)),
          "to", str(run_dir / "config")],
     ]
+    if arms.get_arm(cfg.arm).codex:
+        steps.append(["# build", str(codex.home_for(run_dir)), "from config/codex/, disable bundled skills, check "
+                      "the subagent prompt, copy", str(codex.USER_AUTH), "(removed when the run ends)"])
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
@@ -701,7 +784,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if not os.environ.get(TOKEN_ENV):
             raise RunError(f"{TOKEN_ENV} is not set; create one with `claude setup-token`")
         if cfg.netns:
-            check_netns(cfg.runs_dir, cfg.claude_bin)
+            if arms.get_arm(cfg.arm).codex:
+                check_netns(cfg.runs_dir, cfg.claude_bin, ("codex", "python3"), codex.HOST_VISIBLE, dns_forward=True)
+            else:
+                check_netns(cfg.runs_dir, cfg.claude_bin)
         if not cfg.template.is_dir():
             raise RunError(f"mission template not found: {cfg.template}; run fixture/build-template.sh")
         cfg.runs_dir.mkdir(parents=True, exist_ok=True)
@@ -713,11 +799,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         try:
             runner.init_record(now)
             prepare_repo(cfg, run_dir)
+            runner.prepare_codex()
             runner.run(prompt)
         except RunError as exc:
             runner.record.update(status="infra_error" if isinstance(exc, InfraError) else "error", error=str(exc))
             raise
         finally:
+            runner.release_codex()
             if runner.record:
                 runner.record["finished_at"] = _iso(_utc_now())
                 runner.save()

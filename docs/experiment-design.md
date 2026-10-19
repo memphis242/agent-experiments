@@ -19,7 +19,7 @@ against a baseline. Started 2026-10-17.
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (20 arms)
+## Experiment A: model tiering (22 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -43,6 +43,8 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A18 | Sonnet 5 (medium effort) | none (Agent tool disallowed) | n/a |
 | A19 | Sonnet 5 (high effort) | none (Agent tool disallowed) | n/a |
 | A20 | Sonnet 4.6 (high effort) | none (Agent tool disallowed) | n/a |
+| A21 | Opus 5.5 (Claude Code) | GPT-6.1 Sol, high effort, as headless Codex CLI sessions (all five agents) | eager |
+| A22 | Opus 5.5 (Claude Code) | GPT-6.1 Sol, high effort, as headless Codex CLI sessions (implementer, tester, debugger) | roles, with a secondary debugger |
 
 A10 asks whether a cheaper frontier model at maximum effort matches solo
 Opus. A12 is the same model at high effort, the owner's everyday choice for
@@ -74,6 +76,38 @@ if that trial passes. A20 (solo Sonnet 4.6 at high effort) runs Tasks 1 and 2
 only, all ten repetitions of each whatever its Task 1 gate result, as a
 reference point for solo Sonnet 5.
 
+A21 and A22 ("Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high") ask
+whether another vendor's coding harness works as the subagent tier. The main
+agent is the same Claude Code Opus 5.5 at high effort as A2; its subagents are
+OpenAI's GPT-6.1 Sol at high reasoning effort, each one a fresh `codex exec`
+session started through the Bash tool with the arm's `codex-agent` command
+(`harness/codex_agent.py`). The Agent tool is denied, so no Claude subagent can
+run. A21 uses A2's eager delegation text and the full roster; A22 uses A11's
+selective text with the main agent planning, debugging, reviewing and
+integrating, and Sol as implementer, tester and a secondary debugger for a
+failure the main agent has already investigated. The delegation paragraph is
+followed by a fixed section that explains `codex-agent`, lists the agents with
+their Claude Code descriptions, and says to run long subagents with the Bash
+tool's `run_in_background` (the main agent is notified on completion, and the
+print-mode wait covers background commands as it does background subagents).
+Each agent's Claude Code definition body is passed to Codex as developer
+instructions, and the working agreement (CLAUDE.md without its delegation
+section) as Codex's global AGENTS.md, matching what a Claude Code subagent
+receives. Explorer and reviewer, whose Claude Code definitions grant no editing
+tool, run in Codex's read-only sandbox; the others run without Codex's sandbox,
+as the main agent runs with bypassPermissions. Codex sub-agents, bundled skills,
+web search, apps, plugins, memories and fast mode are disabled; `codex-agent`
+refuses to run inside a subagent. The two arms run Task 1 to Task 3 with ten
+repetitions; Task 4 follows if their Task 3 spend per pass is on par with the
+Task 4 finalists.
+
+Codex usage is priced at OpenAI's standard API rates for GPT-6.1 Sol (USD per
+million tokens: input 2.00, cached input 0.10, cache write 2.50, output 10.00;
+above 272K input tokens 4.00, 0.20, 5.00 and 15.00), one request per model
+response from Codex's session log, with reasoning tokens billed as output. The
+Claude side is priced as in every other arm. Both run on subscriptions (Claude
+and ChatGPT), so the figures are API-equivalent, as everywhere else.
+
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
 `claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
 main agent and every subagent (except A10's `xhigh`, A13, A15 and A18's `medium`, A14's `low` and A17's `xhigh` main agent), default auto-compaction window,
@@ -96,7 +130,7 @@ counts per run are recorded as the manipulation check.
 
 Runs: 10 repetitions per arm on Tasks 1 to 3 and 3 on Task 4, so 33 runs per arm:
 495 for A1 to A15, plus up to 132 for A16 to A19 (fewer if one stops advancing),
-plus 20 for A20, plus repair rounds.
+plus 20 for A20, plus up to 66 for A21 and A22, plus repair rounds.
 
 In print mode the CLI stops background subagents that are still running ten
 minutes after the main agent's last turn, which ends the round with their work
@@ -185,6 +219,21 @@ and pauses the matrix.
   root, OSAL fails to create message queues) and pasta's loopback port
   forwarding is off (it would divert traffic to host ports). Outbound API
   access still works.
+- A Codex arm (A21, A22) also gets its own `CODEX_HOME` under the run dir,
+  built from the arm's `codex/` config, with the bundled skills disabled and a
+  copy of the user's Codex login, removed when the run ends (written back to
+  `~/.codex/auth.json` only if Codex refreshed it). Every `codex-agent` call is a
+  new Codex session, so no conversation, history, memory or cache state carries
+  between subagents, runs or the user's own sessions; `~/.codex` is hidden in
+  the namespace except its installed binaries (bound back read-only), and the
+  run is pinned to the Codex binary resolved at its start. Before the first
+  round the harness renders Codex's model-visible prompt
+  (`codex-prompt-input.json` in the run dir) and refuses to start if it carries
+  skills, multi-agent, app or plugin sections or lacks the working agreement,
+  or if `codex features list` shows a configured feature in the wrong state.
+  Codex's resolver is statically linked and sends plain DNS to the host's stub
+  resolver, which the namespace cannot reach, so these runs add pasta's
+  `--dns-forward` and a private `/etc/resolv.conf` naming its address.
 - Up to 3 runs in parallel. Rate-limit retries are logged; throttled runs are
   rerun.
 

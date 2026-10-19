@@ -1,0 +1,43 @@
+# Codex configuration for headless subagents (codex-agent). Each run copies this
+# into its own CODEX_HOME and appends entries disabling Codex's bundled skills.
+model = "{{MODEL}}"
+model_reasoning_effort = "{{EFFORT}}"
+# The run already sits in its own namespaces, as the Claude Code main agent does
+# with bypassPermissions; read-only agents get Codex's read-only sandbox instead.
+approval_policy = "never"
+sandbox_mode = "danger-full-access"
+# Claude Code subagent definitions grant no web tools.
+web_search = "disabled"
+check_for_update_on_startup = false
+
+# Subagents cannot start subagents of their own.
+[agents]
+enabled = false
+
+[features]
+multi_agent = false
+apps = false
+browser_use = false
+browser_use_external = false
+computer_use = false
+image_generation = false
+plugins = false
+remote_plugin = false
+memories = false
+goals = false
+guardian_approval = false
+fast_mode = false
+tool_suggest = false
+realtime_conversation = false
+skill_mcp_dependency_install = false
+in_app_updates = false
+daemon_auto_start = false
+
+[analytics]
+enabled = false
+
+[feedback]
+enabled = false
+
+[history]
+persistence = "none"
