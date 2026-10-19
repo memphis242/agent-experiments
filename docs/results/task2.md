@@ -26,7 +26,7 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A6 | Sonnet 5 subagents, eager | task2 | 10/10 | 6.83 | 5.27 to 10.94 | 5.67 | 15.6 to 44.8 | 6 to 29 | 2 to 4 | 1 to 2 | 0 | 81.0 to 138.4 | 135.7 to 274.6 |
 | A7 | Sonnet 5 subagents, conservative | task2 | 10/10 | 3.68 | 3.18 to 4.29 | 1.11 | 12.3 to 17.9 | 52 to 74 | 0 | 1 | 0 | 154.2 to 186.9 | - |
 | A8 | Sonnet 4.6 subagents, eager | task2 | 10/10 | 5.56 | 4.59 to 7.18 | 2.59 | 14.7 to 25.6 | 2 to 17 | 2 to 4 | 1 | 0 | 97.2 to 169.9 | 77.2 to 129.5 |
-| A9 | Sonnet 4.6 subagents, conservative | task2 | 10/10 | 3.81 | 3.18 to 4.89 | 1.71 | 10.3 to 17.8 | 3 to 75 | 0 | 1 to 2 | 0 | 150.7 to 203.3 | - |
+| A9 | Sonnet 4.6 subagents, conservative | task2 | 10/10 | 3.81 | 3.18 to 4.89 | 1.71 | 10.3 to 17.8 | 3 to 75 | 0 | 1 to 2* | 0 | 150.7 to 203.3 | - |
 | A10 | solo Sonnet 5.5, xhigh effort | task2 | 10/10 | 3.13 | 2.61 to 4.09 | 1.48 | 17.3 to 25.1 | 66 to 99 | 0 | 1 | 0 | 218.1 to 290.6 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task2 | 10/10 | 1.30 | 1.02 to 2.02 | 1.00 | 7.3 to 20.7 | 1 to 52 | 0 to 1 | 1 | 0 | 118.6 to 169.4 | 140.6 to 154.4 |
 | A12 | solo Sonnet 5.5, high effort | task2 | 10/10 | 1.39 | 1.13 to 1.96 | 0.83 | 7.8 to 21.6 | 37 to 52 | 0 | 1 to 2 | 0 | 124.3 to 169.3 | - |
@@ -110,3 +110,7 @@ Notes:
   at the end of the queue behind Task 4. Reps 1 to 4 all passed on the first round, at
   1.65 times A1's spend per pass, the most expensive solo arm on the task; this row will be
   completed when reps 5 to 10 finish.
+- \* A9 rep 6 lost round 1 to a race between OSAL's own functional tests (a shared `./test`
+  mount point under the parallel mission test run), not to its code; it passed round 2
+  unchanged. It is listed in [rerun-ledger.md](rerun-ledger.md) for a rerun once the race is
+  fixed.
