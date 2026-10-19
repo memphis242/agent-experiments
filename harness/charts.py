@@ -2,16 +2,19 @@
 """Render per-arm spread charts (billed cost and wall time per run) as standalone SVG files.
 
 One chart per metric, one row per arm: a range bar from the arm's minimum to maximum, one dot per
-run (hollow when the run did not pass), and a tick at the median. Standard library only; the
-output is deterministic for a given input.
+run (hollow when the run did not pass), and a tick at the median. Arms named as failed in the
+notes file (`--notes`) are drawn as a full red bar labelled "failed to complete task*", with the
+task's footnote under the axis. Standard library only; the output is deterministic for a given input.
 """
 from __future__ import annotations
 
 import argparse
+import json
 import math
 import re
 import statistics
 import sys
+import textwrap
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Sequence
@@ -80,6 +83,13 @@ MEDIAN_WIDTH = 2.6
 TINT = 0.48                     # mix toward white for conservative arms
 TARGET_TICKS = 6
 AXIS_HEADROOM = 1.04            # the axis extends at least this far past the maximum value
+FAILED_COLOR = "#dc2626"        # bar of an arm that failed the task
+FAILED_LABEL = "failed to complete task*"
+FAILED_TEXT_SIZE = 12
+FOOTNOTE_SIZE = 12
+FOOTNOTE_CHAR_WIDTH = 6.2       # approximate glyph width used to wrap the footnote
+FOOTNOTE_LINE = 17              # footnote line spacing
+FOOTNOTE_TOP = 12               # tick labels to the first footnote baseline
 
 # Subagent model family -> saturated colour. Order matters: first matching marker wins.
 FAMILIES: tuple[tuple[str, str, str], ...] = (
@@ -130,6 +140,14 @@ class ArmRow:
     color: str          # fill colour for bar and dots
     points: tuple[Point, ...] = field(default_factory=tuple)
     maxima: "Maxima" = field(default_factory=lambda: Maxima())
+    failed: bool = False  # drawn as a full red bar instead of its runs
+
+
+@dataclass(frozen=True)
+class TaskNotes:
+    """Arms that failed a task (as judged by the experiment's task gate) and the footnote that explains it."""
+    failed: frozenset[str] = frozenset()
+    footnote: str = ""
 
 
 # ---- Colour helpers ---------------------------------------------------------------------------
@@ -215,7 +233,7 @@ def humanize(value: float | None) -> str:
 
 
 def build_rows(runs: Sequence[dict[str, Any]], task: str, metric: str, scenario: str,
-               drop_status: Sequence[str] = ()) -> list[ArmRow]:
+               drop_status: Sequence[str] = (), failed: frozenset[str] = frozenset()) -> list[ArmRow]:
     """One ArmRow per arm with at least one completed run carrying the metric."""
     assert metric in CHART_FILES
     dropped = set(drop_status)
@@ -234,8 +252,35 @@ def build_rows(runs: Sequence[dict[str, Any]], task: str, metric: str, scenario:
         description = aggregate.ARM_DESCRIPTIONS.get(arm, arm)
         family, fill = family_style(description)
         points = tuple(sorted(by_arm[arm], key=lambda p: (p.value, not p.passed)))
-        rows.append(ArmRow(arm, chart_label(arm, description), family, fill, points, max_figures(stats[arm])))
+        rows.append(ArmRow(arm, chart_label(arm, description), family, fill, points, max_figures(stats[arm]),
+                           arm in failed))
     return rows
+
+
+def gate_failures(runs: Sequence[dict[str, Any]], task: str) -> set[str]:
+    """Arms failing the task gate on their completed runs of `task`: any run that did not pass after
+    all its rounds, or more than a third of runs needing the final round."""
+    by_arm: dict[str, list[dict[str, Any]]] = {}
+    for run in runs:
+        if run.get("task") == task and run.get("status") == "completed":
+            by_arm.setdefault(run.get("arm", "?"), []).append(run)
+    out = set()
+    for arm, mine in by_arm.items():
+        final = sum(1 for r in mine if int(r.get("rounds_used") or 0) >= int(r.get("max_rounds") or 10**9))
+        if any(not r.get("passed") for r in mine) or 3 * final > len(mine):
+            out.add(arm)
+    return out
+
+
+def load_notes(path: Path, task: str) -> TaskNotes:
+    """The task's entry of the notes file: {"taskN": {"failed": [arm, ...], "footnote": text}}."""
+    entry = json.loads(path.read_text(encoding="utf-8")).get(task) or {}
+    failed, footnote = entry.get("failed") or [], entry.get("footnote") or ""
+    if not isinstance(failed, list) or not all(isinstance(a, str) for a in failed) or not isinstance(footnote, str):
+        raise ValueError(f"{path}: {task} needs a list of arm ids under 'failed' and a string 'footnote'")
+    if failed and not footnote:
+        raise ValueError(f"{path}: {task} lists failed arms but no footnote")
+    return TaskNotes(frozenset(failed), footnote)
 
 
 # ---- Axis -------------------------------------------------------------------------------------
@@ -278,17 +323,18 @@ def _text(x: float, y: float, content: str, size: int, fill: str, weight: str = 
 
 
 def legend_entries(rows: Sequence[ArmRow]) -> list[tuple[str, str]]:
-    """(family label, saturated colour) for each family present, in FAMILIES order."""
-    present = {row.family for row in rows}
+    """(family label, saturated colour) for each family with a drawn (not failed) arm, in FAMILIES order."""
+    present = {row.family for row in rows if not row.failed}
     known = [(f, c) for _, f, c in FAMILIES if f in present]
     return known + ([FALLBACK_FAMILY] if FALLBACK_FAMILY[0] in present else [])
 
 
-def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
+def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = "") -> str:
     """The SVG text of one chart. `unit` is 'cost' (dollar prefix) or 'time' (min suffix)."""
     assert unit in ("cost", "time")
+    assert footnote or not any(r.failed for r in rows), "failed arms need a footnote"
     prefix, suffix = ("$", "") if unit == "cost" else ("", " min")
-    max_value = max((p.value for r in rows for p in r.points), default=0.0)
+    max_value = max((p.value for r in rows if not r.failed for p in r.points), default=0.0)
     ticks = axis_ticks(max_value)
     limit = ticks[-1]
     step = ticks[1] - ticks[0] if len(ticks) > 1 else 1.0
@@ -306,7 +352,9 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
     scale = (plot_right - plot_left) / limit
     rows_top = card_y + HEADER_TOP + SUBTITLE_GAP + LEGEND_GAP + LEGEND_TO_ROWS
     rows_bottom = rows_top + ROW_HEIGHT * len(rows)
-    card_h = rows_bottom - card_y + AXIS_HEIGHT + CARD_BOTTOM_PAD
+    note_lines = textwrap.wrap("* " + footnote, int((card_w - 2 * PAD_X) / FOOTNOTE_CHAR_WIDTH)) if footnote else []
+    card_h = (rows_bottom - card_y + AXIS_HEIGHT + CARD_BOTTOM_PAD
+              + (FOOTNOTE_TOP + FOOTNOTE_LINE * len(note_lines) if note_lines else 0))
     height = card_h + 2 * CARD_MARGIN
 
     def x_of(v: float) -> float:
@@ -362,13 +410,8 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
         f'stroke="{AXIS_COLOR}" stroke-width="1"/>')
 
     fmt = "{:.2f}" if unit == "cost" else "{:.1f}"
-    for i, row in enumerate(rows):
-        cy = rows_top + i * ROW_HEIGHT + ROW_HEIGHT / 2
-        add(_text(left, cy - 3, row.arm, ARM_ID_SIZE, TEXT_COLOR, "700"))
-        assert ARM_ID_WIDTH + len(row.description) * DESC_CHAR_WIDTH + DESC_GAP <= GUTTER_WIDTH, \
-            f"{row.arm} description overflows the gutter"
-        add(_text(left + ARM_ID_WIDTH, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
-        add(_text(left + ARM_ID_WIDTH, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
+
+    def draw_runs(row: ArmRow, cy: float) -> None:
         values = [p.value for p in row.points]
         lo, hi = min(values), max(values)
         bar_x = x_of(lo) - BAR_HEIGHT / 2
@@ -393,15 +436,35 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str) -> str:
         label_x = min(x_of(hi) + BAR_HEIGHT / 2 + 8,
                       range_limit - len(label) * RANGE_CHAR_WIDTH)
         add(_text(label_x, cy + 4, label, RANGE_TEXT_SIZE, TEXT_COLOR))
+
+    def draw_annotation(row: ArmRow, cy: float) -> None:
+        cells = (f"in {humanize(row.maxima.input)}", f"out {humanize(row.maxima.output)}",
+                 f"cached {humanize(row.maxima.cache_read)}", f"ctx {humanize(row.maxima.ctx)}",
+                 f"sub ctx {humanize(row.maxima.sub_ctx)}")
+        cell_x = float(annot_x)
+        for cell, cell_w in zip(cells, ANNOT_FIELD_WIDTHS):
+            add(f'<text x="{_num(cell_x)}" y="{_num(cy + 4)}" font-size="{ANNOT_FONT_SIZE}" fill="{MUTED_COLOR}" '
+                f'font-family=\'{ANNOT_FONT_STACK.replace(chr(34), "&quot;")}\'>{escape(cell)}</text>')
+            cell_x += cell_w
+
+    for i, row in enumerate(rows):
+        cy = rows_top + i * ROW_HEIGHT + ROW_HEIGHT / 2
+        add(_text(left, cy - 3, row.arm, ARM_ID_SIZE, TEXT_COLOR, "700"))
+        assert ARM_ID_WIDTH + len(row.description) * DESC_CHAR_WIDTH + DESC_GAP <= GUTTER_WIDTH, \
+            f"{row.arm} description overflows the gutter"
+        add(_text(left + ARM_ID_WIDTH, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
+        add(_text(left + ARM_ID_WIDTH, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
+        if row.failed:
+            add(f'<rect x="{_num(plot_left)}" y="{_num(cy - BAR_HEIGHT / 2)}" width="{_num(plot_right - plot_left)}" '
+                f'height="{BAR_HEIGHT}" rx="{BAR_HEIGHT / 2}" fill="{FAILED_COLOR}"/>')
+            add(_text((plot_left + plot_right) / 2, cy + 4, FAILED_LABEL, FAILED_TEXT_SIZE, TEXT_COLOR, "700",
+                      anchor="middle"))
+        else:
+            draw_runs(row, cy)
         if annotate:
-            cells = (f"in {humanize(row.maxima.input)}", f"out {humanize(row.maxima.output)}",
-                     f"cached {humanize(row.maxima.cache_read)}", f"ctx {humanize(row.maxima.ctx)}",
-                     f"sub ctx {humanize(row.maxima.sub_ctx)}")
-            cell_x = float(annot_x)
-            for cell, cell_w in zip(cells, ANNOT_FIELD_WIDTHS):
-                add(f'<text x="{_num(cell_x)}" y="{_num(cy + 4)}" font-size="{ANNOT_FONT_SIZE}" fill="{MUTED_COLOR}" '
-                    f'font-family=\'{ANNOT_FONT_STACK.replace(chr(34), "&quot;")}\'>{escape(cell)}</text>')
-                cell_x += cell_w
+            draw_annotation(row, cy)
+    for k, line in enumerate(note_lines):
+        add(_text(left, rows_bottom + AXIS_HEIGHT + FOOTNOTE_TOP + k * FOOTNOTE_LINE, line, FOOTNOTE_SIZE, MUTED_COLOR))
     add('</svg>')
     return "\n".join(out) + "\n"
 
@@ -420,6 +483,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     p.add_argument("--scenario", choices=cost.SCENARIOS, default=cost.PRIMARY_SCENARIO)
     p.add_argument("--drop-status", nargs="+", default=(), metavar="STATUS",
                    help="exclude attempts with these statuses (only completed runs are charted anyway)")
+    p.add_argument("--notes", type=Path, help="JSON notes file naming failed arms and their footnote per task")
     a = p.parse_args(argv)
     if not a.runs_dir.is_dir():
         print(f"charts: error: runs dir {a.runs_dir} does not exist", file=sys.stderr)
@@ -431,10 +495,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     except OSError as exc:
         print(f"charts: error: cannot create {a.out_dir}: {exc}", file=sys.stderr)
         return 1
+    notes = TaskNotes()
+    if a.notes is not None:
+        try:
+            notes = load_notes(a.notes, task)
+        except (OSError, ValueError) as exc:
+            print(f"charts: error: {exc}", file=sys.stderr)
+            return 1
+    gate = gate_failures(runs, task)
+    if notes.failed - gate:
+        print(f"charts: error: {', '.join(sorted(notes.failed - gate))} listed as failed on {task} "
+              "but passed the task gate", file=sys.stderr)
+        return 1
+    if gate - notes.failed:
+        print(f"charts: warning: {', '.join(sorted(gate - notes.failed))} failed the {task} gate "
+              "but are not marked in the notes file", file=sys.stderr)
     label = task_label(task)
     titles = {"cost": f"{label}: {a.scenario} cost per run", "time": f"{label}: wall time per run"}
     for metric, name in CHART_FILES.items():
-        rows = build_rows(runs, task, metric, a.scenario, a.drop_status)
+        rows = build_rows(runs, task, metric, a.scenario, a.drop_status, notes.failed)
         if not rows:
             print(f"charts: error: no completed {task} runs with {metric} data in {a.runs_dir}", file=sys.stderr)
             return 1
@@ -445,7 +524,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                   file=sys.stderr)
         path = a.out_dir / name.format(task=task)
         try:
-            path.write_text(render_chart(rows, titles[metric], metric), encoding="utf-8")
+            path.write_text(render_chart(rows, titles[metric], metric, notes.footnote), encoding="utf-8")
         except OSError as exc:
             print(f"charts: error: cannot write {path}: {exc}", file=sys.stderr)
             return 1

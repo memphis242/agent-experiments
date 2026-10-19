@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="938.0" viewBox="0 0 1130 938.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="1106.0" viewBox="0 0 1130 1106.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 1: wall time per run</title>
-<rect x="8" y="8" width="1114" height="922.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1114" height="1090.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 1: wall time per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">170 runs across 17 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">190 runs across 19 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
 <text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="117.4" cy="96.0" r="5" fill="#a78bfa"/>
@@ -33,21 +33,22 @@
 <rect x="28" y="650.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="738.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="826.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="122.0" x2="456.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
-<line x1="542.3" y1="122.0" x2="542.3" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="542.3" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">5 min</text>
-<line x1="628.7" y1="122.0" x2="628.7" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="628.7" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">10 min</text>
-<line x1="715.0" y1="122.0" x2="715.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="715.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">15 min</text>
-<line x1="801.3" y1="122.0" x2="801.3" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="801.3" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
-<line x1="887.7" y1="122.0" x2="887.7" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="887.7" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">25 min</text>
-<line x1="974.0" y1="122.0" x2="974.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">30 min</text>
-<line x1="456.0" y1="870.0" x2="974.0" y2="870.0" stroke="#484f58" stroke-width="1"/>
+<rect x="28" y="914.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
+<line x1="456.0" y1="122.0" x2="456.0" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
+<line x1="542.3" y1="122.0" x2="542.3" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="542.3" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">5 min</text>
+<line x1="628.7" y1="122.0" x2="628.7" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="628.7" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">10 min</text>
+<line x1="715.0" y1="122.0" x2="715.0" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="715.0" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">15 min</text>
+<line x1="801.3" y1="122.0" x2="801.3" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="801.3" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
+<line x1="887.7" y1="122.0" x2="887.7" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="887.7" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">25 min</text>
+<line x1="974.0" y1="122.0" x2="974.0" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">30 min</text>
+<line x1="456.0" y1="958.0" x2="974.0" y2="958.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="141.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="141.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="155.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -320,4 +321,18 @@
 <circle cx="688.2" cy="848.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
 <line x1="624.8" y1="837.0" x2="624.8" y2="859.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="704.2" y="852.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.3 to 13.5</text>
+<text x="36.0" y="889.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A18</text>
+<text x="78.0" y="889.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, medium</text>
+<text x="78.0" y="903.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="456.0" y="884.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="896.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="36.0" y="933.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A19</text>
+<text x="78.0" y="933.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, high</text>
+<text x="78.0" y="947.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="456.0" y="928.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="940.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="36.0" y="1014.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">* Solo Sonnet 5 (A18 at medium, A19 at high effort): 3 of 10 runs in each arm failed all five acceptance rounds on the same check, the MIR count. One hidden test log has</text>
+<text x="36.0" y="1031.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">an MIR line with neither FILE:LINE nor the ' - ' separator; the spec says FILE:LINE may be absent on MIR lines but is silent on the separator, which real ut_assert always</text>
+<text x="36.0" y="1048.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">prints. All six failed runs parsed the separator as required, reported one MIR too few, and kept that parser through four rounds of identical feedback naming the MIR</text>
+<text x="36.0" y="1065.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">requirement. Every run of the other 17 arms (170 runs) passed this check.</text>
 </svg>

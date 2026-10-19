@@ -157,3 +157,40 @@ class AnnotationTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class FailedArmTest(unittest.TestCase):
+    def test_failed_arm_draws_a_full_red_bar_and_footnote_and_leaves_the_axis_alone(self):
+        ns = "{http://www.w3.org/2000/svg}"
+        runs = [run("A1", 1.5, 4.0), run("A18", 9.0, 30.0, passed=False), run("A18", 2.0, 5.0)]
+        rows = charts.build_rows(runs, "task1", "cost", "billed", failed=frozenset({"A18"}))
+        root = ET.fromstring(charts.render_chart(rows, "T", "cost", "the reason"))
+        red = [r for r in root.iter(ns + "rect") if r.get("fill") == charts.FAILED_COLOR]
+        self.assertEqual(len(red), 1)
+        texts = [t.text for t in root.iter(ns + "text")]
+        self.assertIn(charts.FAILED_LABEL, texts)
+        self.assertIn("* the reason", texts)
+        self.assertNotIn("$10", texts)                       # the failed arm's 9.00 does not set the axis
+        dots = [c for c in root.iter(ns + "circle") if float(c.get("r")) == charts.DOT_RADIUS]
+        self.assertEqual(len(dots), 1)                       # only A1's run is drawn as a dot
+
+    def test_gate_failures(self):
+        def gated(arm, passed, used):
+            r = run(arm, 1.0, 1.0, passed=passed)
+            r.update(rounds_used=used, max_rounds=5)
+            return r
+        runs = ([gated("A1", True, 1)] * 3 + [gated("A2", True, 5)] + [gated("A2", True, 1)] * 2
+                + [gated("A3", True, 5)] * 2 + [gated("A3", True, 1)] + [gated("A4", False, 5)])
+        self.assertEqual(charts.gate_failures(runs, "task1"), {"A3", "A4"})
+
+    def test_notes_need_a_footnote_for_failed_arms(self):
+        import json, tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "notes.json"
+            path.write_text(json.dumps({"task1": {"failed": ["A18"]}}))
+            with self.assertRaises(ValueError):
+                charts.load_notes(path, "task1")
+            path.write_text(json.dumps({"task1": {"failed": ["A18"], "footnote": "why"}}))
+            self.assertEqual(charts.load_notes(path, "task1"), charts.TaskNotes(frozenset({"A18"}), "why"))
+            self.assertEqual(charts.load_notes(path, "task2"), charts.TaskNotes())

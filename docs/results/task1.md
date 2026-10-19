@@ -1,6 +1,6 @@
-# Task 1 results (ut_assert log translator), 170 runs, 2026-10-18
+# Task 1 results (ut_assert log translator), 190 runs, 2026-10-18
 
-All 170 runs passed acceptance. Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 and A17, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel.
+All 170 runs of A1 to A17 passed acceptance; solo Sonnet 5 (A18, A19) failed the task, with 3 of 10 runs in each arm failing all five rounds (see * below). Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 to A19, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel.
 
 ## Spread across arms
 
@@ -31,10 +31,14 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task1 | 10/10 | 1.09 | 0.93 to 1.33 | 0.41 | 6.4 to 10.9 | 3 to 11 | 2 to 4 | 1 to 2 | 0 | 48.7 to 61.5 | 79.9 to 105.2 |
 | A16 | solo Haiku 5.5, high effort | task1 | 10/10 | 0.31 | 0.12 to 0.64 | 0.52 | 5.4 to 11.4 | 29 to 80 | 0 | 1 to 2 | 0 | 106.5 to 183.9 | - |
 | A17 | solo Haiku 5.5, xhigh effort | task1 | 10/10 | 0.55 | 0.41 to 0.66 | 0.25 | 7.3 to 13.5 | 40 to 67 | 0 | 1 | 0 | 151.0 to 198.3 | - |
+| A18 | solo Sonnet 5, medium effort | task1 | 7/10* | 2.88 | 0.89 to 4.29 | 3.41 | 5.1 to 21.2 | 39 to 119 | 0 | 2 to 5 | 0 | 68.1 to 176.7 | 40.6 |
+| A19 | solo Sonnet 5, high effort | task1 | 7/10* | 4.96 | 0.96 to 5.62 | 4.66 | 6.5 to 25.8 | 28 to 144 | 0 | 1 to 5 | 0 | 81.3 to 241.3 | - |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.21, A11 0.32, A12 0.35, A17
 0.38, A14 0.43, A13 0.73, A15 0.75, A10 0.87, A7 0.90, A9 0.92, A3 0.92, A5 1.01, A4
 1.38, A6 1.78, A2 1.88, A8 2.10.
+A18 and A19 failed the task and are not ranked; their spend per pass would be 1.97 and
+3.40.
 
 Notes:
 
@@ -45,7 +49,7 @@ Notes:
   built-in general-purpose agent, which the validator confirmed ran on the arm's model)
   and cost 1.38 to 2.10 times A1. Eager Sonnet 4.6 (A8) remains the most expensive and
   slowest arm (10.8 to 25.6 min).
-- Every run that needed more than one round failed the same check in round one, the
+- Among A1 to A17, every run that needed more than one round failed the same check in round one, the
   Markdown failures section: A5 once (four rounds), A14 twice, A15 once and A16 three
   times (two rounds each). The three A16 runs also failed the Markdown N/A column check.
 - A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs 0.35
@@ -66,7 +70,7 @@ Notes:
   0.64 USD) and the three second-round runs above. At xhigh (A17) it passed every run in
   one round at 0.38 of A1, about the cost of A12, and took 7.3 to 13.5 minutes, roughly
   twice solo Opus.
-- Solo Haiku's main context peaked at 107K to 198K tokens, the highest on this task;
+- Solo Haiku's main context peaked at 107K to 198K tokens, the highest of the arms that passed;
   every Haiku run crossed the 100,000-token prompt threshold above which Haiku 5.5 is
   billed at five times its base rates, and its cost follows how far it went past it: A16's
   cheapest run peaked at 107K (0.12 USD), its two dearest at 184K and 178K (0.60 and 0.64
@@ -75,3 +79,23 @@ Notes:
   artefact: when the final result comes from a short turn triggered by a background
   notification, `num_turns` reports only that turn. The column will be recomputed from
   transcripts.
+- \* Solo Sonnet 5 (A18 at medium, A19 at high effort) failed Task 1 under the task gate: 3 of
+  10 runs in each arm used all five acceptance rounds without passing, so neither arm advances
+  (A19 was later given a one-repetition Task 2 trial; see the Task 2 report). All six failed
+  runs ended on the same check, the per-suite MIR count. One hidden test log contains an MIR
+  line with neither FILE:LINE nor the ` - ` separator (`[  MIR] 01.003 Verify the panel colors
+  by eye`). The spec gives the line format as `NN.MMM FILE:LINE - TEXT` and says FILE:LINE may
+  be absent on MIR lines, but is silent on the separator, and real ut_assert always prints
+  `FILE:LINE - `. Each failed run parsed the separator as required, so the line was treated as
+  unrecognized (ignored without `--strict`) and the suite reported one MIR too few. Adding
+  ` - ` to that line makes all six final tools report the right count. The feedback in rounds
+  two to five was the same restatement of the MIR requirement each time, as it is for every
+  arm, and none of the six runs changed its parser in response (A18 rep 8, for one, made four
+  commits of MIR parsing fixes and tests without finding the case). Every run of the other 17 arms (170 runs) passed this check, most on the
+  first round. Solo Sonnet 5 also needed extra rounds far more often than any other arm (18 of
+  its 20 runs, against 7 of 170 elsewhere), with first-round misses spread over failure
+  elements, TSF counting, the unreadable-input exit code and the Markdown section.
+- A18 rep 9 ran a subagent although the solo arms deny the Agent tool: it invoked the bundled
+  `code-review` skill, which spawns one (skills stay available in every arm). The validator
+  flagged it, the only validation violation in the experiment so far; it is the 41K subagent
+  context in A18's row, and the run is one of the six that failed.

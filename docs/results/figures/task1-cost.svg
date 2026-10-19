@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1510" height="938.0" viewBox="0 0 1510 938.0" role="img" aria-label="Task 1: billed cost per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1510" height="1089.0" viewBox="0 0 1510 1089.0" role="img" aria-label="Task 1: billed cost per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 1: billed cost per run</title>
-<rect x="8" y="8" width="1494" height="922.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1494" height="1073.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 1: billed cost per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">170 runs across 17 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">190 runs across 19 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
 <text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="117.4" cy="96.0" r="5" fill="#a78bfa"/>
@@ -34,19 +34,20 @@
 <rect x="28" y="650.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="738.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="826.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="122.0" x2="456.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$0</text>
-<line x1="559.6" y1="122.0" x2="559.6" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="559.6" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$1</text>
-<line x1="663.2" y1="122.0" x2="663.2" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="663.2" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$2</text>
-<line x1="766.8" y1="122.0" x2="766.8" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="766.8" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$3</text>
-<line x1="870.4" y1="122.0" x2="870.4" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="870.4" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$4</text>
-<line x1="974.0" y1="122.0" x2="974.0" y2="870.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="890.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$5</text>
-<line x1="456.0" y1="870.0" x2="974.0" y2="870.0" stroke="#484f58" stroke-width="1"/>
+<rect x="28" y="914.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
+<line x1="456.0" y1="122.0" x2="456.0" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$0</text>
+<line x1="559.6" y1="122.0" x2="559.6" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="559.6" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$1</text>
+<line x1="663.2" y1="122.0" x2="663.2" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="663.2" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$2</text>
+<line x1="766.8" y1="122.0" x2="766.8" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="766.8" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$3</text>
+<line x1="870.4" y1="122.0" x2="870.4" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="870.4" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$4</text>
+<line x1="974.0" y1="122.0" x2="974.0" y2="958.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="978.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$5</text>
+<line x1="456.0" y1="958.0" x2="974.0" y2="958.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="141.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="141.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="155.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -404,4 +405,27 @@
 <text x="1236.0" y="852.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 7.7M</text>
 <text x="1324.0" y="852.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 198K</text>
 <text x="1390.0" y="852.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx -</text>
+<text x="36.0" y="889.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A18</text>
+<text x="78.0" y="889.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, medium</text>
+<text x="78.0" y="903.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="456.0" y="884.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="896.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="1108.0" y="896.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 270</text>
+<text x="1170.0" y="896.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 101K</text>
+<text x="1236.0" y="896.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 13M</text>
+<text x="1324.0" y="896.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 177K</text>
+<text x="1390.0" y="896.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx 41K</text>
+<text x="36.0" y="933.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A19</text>
+<text x="78.0" y="933.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, high</text>
+<text x="78.0" y="947.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="456.0" y="928.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
+<text x="715.0" y="940.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="1108.0" y="940.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 288</text>
+<text x="1170.0" y="940.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 138K</text>
+<text x="1236.0" y="940.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 17M</text>
+<text x="1324.0" y="940.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 241K</text>
+<text x="1390.0" y="940.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx -</text>
+<text x="36.0" y="1014.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">* Solo Sonnet 5 (A18 at medium, A19 at high effort): 3 of 10 runs in each arm failed all five acceptance rounds on the same check, the MIR count. One hidden test log has an MIR line with neither FILE:LINE nor the ' - ' separator;</text>
+<text x="36.0" y="1031.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">the spec says FILE:LINE may be absent on MIR lines but is silent on the separator, which real ut_assert always prints. All six failed runs parsed the separator as required, reported one MIR too few, and kept that parser through</text>
+<text x="36.0" y="1048.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">four rounds of identical feedback naming the MIR requirement. Every run of the other 17 arms (170 runs) passed this check.</text>
 </svg>
