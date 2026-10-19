@@ -194,3 +194,10 @@ class FailedArmTest(unittest.TestCase):
             path.write_text(json.dumps({"task1": {"failed": ["A18"], "footnote": "why"}}))
             self.assertEqual(charts.load_notes(path, "task1"), charts.TaskNotes(frozenset({"A18"}), "why"))
             self.assertEqual(charts.load_notes(path, "task2"), charts.TaskNotes())
+
+
+class LegendTest(unittest.TestCase):
+    def test_legend_wraps_instead_of_overflowing(self):
+        at = charts.legend_layout(["aaaa"] * 5, 0.0, 3 * (charts.legend_item_width("aaaa") + charts.LEGEND_ITEM_GAP))
+        self.assertEqual([row for _, row in at], [0, 0, 0, 1, 1])
+        self.assertEqual(at[3][0], 0.0)

@@ -1,8 +1,8 @@
-# Task 2 results (SAMPLE_APP status command), 150 runs, 2026-10-18
+# Task 2 results (SAMPLE_APP status command), 171 runs, 2026-10-18 (preliminary: A19 trial in progress)
 
-All 150 runs passed acceptance (10 repetitions per arm; for A1 to A9 the first three
+All 171 completed runs passed acceptance (10 repetitions per arm, except the A19 trial; for A1 to A9 the first three
 were run on three parallel slots and the remaining seven on six; A10 to A15 were added
-later and run on six or seven). Billed cost includes compaction
+later and run on six or seven, A16 and A17 on up to nine, A19 on six). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
@@ -33,10 +33,13 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A13 | solo Opus 5.5, medium effort | task2 | 10/10 | 2.91 | 2.22 to 3.47 | 1.26 | 9.8 to 15.4 | 36 to 66 | 0 | 1 | 0 | 121.0 to 159.6 | - |
 | A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task2 | 10/10 | 1.45 | 1.19 to 1.78 | 0.58 | 7.5 to 16.7 | 2 to 11 | 2 to 3 | 1 | 0 | 29.1 to 58.2 | 90.7 to 216.1 |
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task2 | 10/10 | 2.19 | 1.92 to 2.74 | 0.82 | 9.5 to 20.7 | 4 to 13 | 3 to 4 | 1 | 0 | 78.8 to 102.8 | 136.5 to 186.8 |
+| A16 | solo Haiku 5.5, high effort | task2 | 10/10 | 1.26 | 0.93 to 2.07 | 1.14 | 12.1 to 31.7 | 87 to 183 | 0 | 1 to 2 | 0 | 245.1 to 323.3 | - |
+| A17 | solo Haiku 5.5, xhigh effort | task2 | 10/10 | 2.25 | 1.55 to 4.16 | 2.61 | 18.0 to 33.2 | 6 to 221 | 0 | 1 to 2 | 0 | 315.8 to 469.0 | - |
+| A19 | solo Sonnet 5, high effort | task2 | 1/1† | 5.89 | 5.89 | 0.00 | 15.9 | 154 | 0 | 1 | 0 | 260.8 | - |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.33, A12 0.35, A14 0.37,
-A15 0.55, A13 0.74, A10 0.79, A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28,
-A8 1.41, A6 1.73.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.32, A11 0.33, A12 0.35, A14
+0.37, A15 0.55, A17 0.57, A13 0.74, A10 0.79, A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9
+0.96, A2 1.28, A8 1.41, A6 1.73. A19 (one run so far) is not ranked.
 
 Notes:
 
@@ -55,8 +58,8 @@ Notes:
   cost and wall-time spreads.
 - No run compacted at the default window, although several solo and conservative runs
   peaked above 190K tokens of main-agent context.
-- Second acceptance rounds: A2 one run, A6 four runs, A9 one run, A12 one run; all
-  other runs passed on the first round.
+- Second acceptance rounds: A2 one run, A6 four runs, A9 one run, A12 one run, A16 one
+  run, A17 one run; all other runs passed on the first round.
 - The aggregate warns that Task 1 runs carry a different run-code hash. The difference
   is the move of post-run analysis out of the run module between the two waves; the
   run pipeline itself was unchanged.
@@ -92,4 +95,16 @@ Notes:
   small-implementer in 6.
 - Haiku 5.5 is billed at five times its base rates for any request whose prompt
   exceeds 100,000 tokens. Costs here apply that rule per request; the Haiku subagents
-  of A11, A14 and A15 crossed it in some runs.
+  of A11, A14 and A15 crossed it in some runs, and every solo Haiku run (A16, A17) did.
+- A16 and A17 (solo Haiku 5.5 at high and xhigh effort) both passed all ten runs and
+  qualify for Task 3 under the task gate. At high effort (A16) solo Haiku is the cheapest
+  arm on Task 2 at 0.32 of A1, level with A11 and A12; at xhigh (A17) it costs 0.57 with
+  the widest spread of the cheap arms (1.55 to 4.16 USD). Each needed one second round,
+  both for the same check (the status packet's default divisor). Solo Haiku is slower
+  than most arms (12 to 33 minutes; only eager Sonnet 5, A6, runs longer) and reaches the highest main contexts on
+  the task, 245K to 323K (A16) and 316K to 469K (A17), with no compaction. A17's turn
+  floor of 6 is the CLI counting artefact described below.
+- † A19 (solo Sonnet 5 at high effort) failed Task 1 under the task gate (see the Task 1
+  report) and runs Task 2 as a deliberate trial: one repetition, and the full ten only if
+  it passes. Rep 1 passed on the first round at 5.89 USD, 1.49 times A1's spend per pass,
+  so reps 2 to 10 are running; this row will be completed when they finish.

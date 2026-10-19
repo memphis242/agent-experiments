@@ -52,6 +52,8 @@ SUBTITLE_SIZE = 13
 SUBTITLE_GAP = 22
 LEGEND_GAP = 26                 # subtitle baseline to legend row centre
 LEGEND_TO_ROWS = 26             # legend row centre to the top of the first row
+LEGEND_ROW_GAP = 22             # centre-to-centre spacing when the legend wraps
+HOLLOW_LABEL = "did not pass"
 LEGEND_ITEM_GAP = 22
 LEGEND_FONT_SIZE = 12
 LEGEND_SWATCH_RADIUS = 5
@@ -329,6 +331,24 @@ def legend_entries(rows: Sequence[ArmRow]) -> list[tuple[str, str]]:
     return known + ([FALLBACK_FAMILY] if FALLBACK_FAMILY[0] in present else [])
 
 
+def legend_item_width(label: str) -> float:
+    return 2 * LEGEND_SWATCH_RADIUS + 6 + len(label) * LEGEND_CHAR_WIDTH
+
+
+def legend_layout(labels: Sequence[str], left: float, limit: float) -> list[tuple[float, int]]:
+    """(x, row) of each legend item, wrapping to a new row when the next item would pass `limit`."""
+    out: list[tuple[float, int]] = []
+    x, row = left, 0
+    for label in labels:
+        width = legend_item_width(label)
+        assert left + width <= limit, f"legend item {label!r} is wider than the legend row"
+        if x > left and x + width > limit:
+            x, row = left, row + 1
+        out.append((x, row))
+        x += width + LEGEND_ITEM_GAP
+    return out
+
+
 def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = "") -> str:
     """The SVG text of one chart. `unit` is 'cost' (dollar prefix) or 'time' (min suffix)."""
     assert unit in ("cost", "time")
@@ -350,7 +370,11 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
     assert not annotate or annot_x + sum(ANNOT_FIELD_WIDTHS) <= card_x + card_w - PAD_X + 1e-6
     range_limit = annot_x - ANNOT_GAP if annotate else plot_right + PLOT_RIGHT_PAD
     scale = (plot_right - plot_left) / limit
-    rows_top = card_y + HEADER_TOP + SUBTITLE_GAP + LEGEND_GAP + LEGEND_TO_ROWS
+    legend_items = legend_entries(rows) + [(HOLLOW_LABEL, "")]
+    legend_limit = annot_x - ANNOT_GAP if annotate else card_x + card_w - PAD_X
+    legend_at = legend_layout([label for label, _ in legend_items], card_x + PAD_X, legend_limit)
+    legend_rows = 1 + max(row for _, row in legend_at)
+    rows_top = card_y + HEADER_TOP + SUBTITLE_GAP + LEGEND_GAP + LEGEND_TO_ROWS + LEGEND_ROW_GAP * (legend_rows - 1)
     rows_bottom = rows_top + ROW_HEIGHT * len(rows)
     note_lines = textwrap.wrap("* " + footnote, int((card_w - 2 * PAD_X) / FOOTNOTE_CHAR_WIDTH)) if footnote else []
     card_h = (rows_bottom - card_y + AXIS_HEIGHT + CARD_BOTTOM_PAD
@@ -381,17 +405,15 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
               SUBTITLE_SIZE, MUTED_COLOR))
 
     # Legend: colour families present, then the hollow marker.
-    lx = float(left)
-    for label, color in legend_entries(rows):
-        add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" '
-            f'r="{LEGEND_SWATCH_RADIUS}" fill="{color}"/>')
-        add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, label, LEGEND_FONT_SIZE, MUTED_COLOR))
-        lx += 2 * LEGEND_SWATCH_RADIUS + 6 + len(label) * LEGEND_CHAR_WIDTH + LEGEND_ITEM_GAP
-    add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(legend_y)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
-        f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
-    add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, legend_y + 4, "did not pass", LEGEND_FONT_SIZE, MUTED_COLOR))
-    legend_end = lx + 2 * LEGEND_SWATCH_RADIUS + 6 + len("did not pass") * LEGEND_CHAR_WIDTH
-    assert legend_end <= (annot_x - ANNOT_GAP if annotate else card_x + card_w - PAD_X), "legend overflows its row"
+    for (label, color), (lx, row) in zip(legend_items, legend_at):
+        ly = legend_y + row * LEGEND_ROW_GAP
+        if color:
+            add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(ly)}" '
+                f'r="{LEGEND_SWATCH_RADIUS}" fill="{color}"/>')
+        else:
+            add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(ly)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
+                f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
+        add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, ly + 4, label, LEGEND_FONT_SIZE, MUTED_COLOR))
     if annotate:
         add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
 

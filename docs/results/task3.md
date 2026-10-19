@@ -1,7 +1,7 @@
-# Task 3 results (housekeeping staleness detection), 45 runs, 2026-10-18
+# Task 3 results (housekeeping staleness detection), 58 runs, 2026-10-18 (preliminary: A17 in progress)
 
-All 45 valid runs passed acceptance. Billed cost includes compaction requests
-(one occurred, in a subagent). Ranges are min to max over the three repetitions;
+All 58 valid runs passed acceptance. Billed cost includes compaction requests
+(one occurred, in a subagent). Ranges are min to max over the repetitions (three per arm, ten for A16 so far);
 spend per pass is total spend over all attempts divided by passes. Nineteen
 attempts from the first wave were cut off by the subscription session limit
 (recorded as `cli_error`), dropped and rerun from scratch; they are excluded here.
@@ -9,7 +9,7 @@ The first eight runs were made on six parallel slots, the rest on three. A10 to 
 were added later and run on six; nine of their attempts stopped at a session limit
 within seconds of starting (recorded as `usage_limit`) and were likewise rerun.
 A13 to A15 were added after that and run with up to nine runs in parallel, with no
-dropped attempts.
+dropped attempts. A16 and A17 run on six slots.
 
 ## Spread across arms
 
@@ -38,9 +38,11 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A13 | solo Opus 5.5, medium effort | task3 | 3/3 | 7.40 | 6.30 to 8.04 | 1.74 | 21.5 to 28.6 | 89 to 129 | 0 | 1 | 0 | 257.5 to 282.4 | - |
 | A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 3/3 | 3.38 | 3.06 to 3.57 | 0.51 | 20.8 to 26.5 | 14 to 20 | 3 | 1 to 2 | 0 | 66.8 to 91.5 | 216.0 to 302.2 |
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 3/3 | 4.77 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 7 | 3 to 4 | 1 | 0 | 144.5 to 158.5 | 230.7 to 248.0 |
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A14 0.38, A11 0.40, A12 0.46,
-A15 0.54, A3 0.78, A4 0.78, A10 0.79, A13 0.84, A9 0.86, A7 0.95, A5 0.96, A2 1.35,
-A6 1.60, A8 1.73.
+| A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.85 | 2.61 to 5.65 | 3.04 | 23.9 to 38.0 | 144 to 279 | 0 | 1 to 2 | 0 | 407.9 to 573.8 | - |
+| A17 | solo Haiku 5.5, xhigh effort | task3 | 3/3† | 4.59 | 3.58 to 5.46 | 1.88 | 25.3 to 33.7 | 176 to 274 | 0 | 1 | 0 | 498.3 to 584.4 | - |
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A14 0.38, A11 0.40, A16 0.44, A12
+0.46, A17 0.52, A15 0.54, A3 0.78, A4 0.78, A10 0.79, A13 0.84, A9 0.86, A7 0.95, A5
+0.96, A2 1.35, A6 1.60, A8 1.73.
 
 Notes:
 
@@ -69,7 +71,7 @@ Notes:
 - Solo and conservative Opus main agents peaked at 242K to 331K tokens; eager main agents
   at 143K to 251K; eager subagents at 148K to 382K.
 - Second or later acceptance rounds: A6 three runs, A8 two runs, A11 one run, A12
-  three runs, A14 one run; every other run passed on the first round.
+  three runs, A14 one run, A16 six runs; every other run passed on the first round.
 - A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs
   0.46 of A1, but all three of its runs needed a second round for the same genuine
   defect: no fresh event (ID 41) when input resumes after a stale period, caught by
@@ -110,4 +112,14 @@ Notes:
   transcripts.
 - Haiku 5.5 is billed at five times its base rates for any request whose prompt
   exceeds 100,000 tokens. Costs here apply that rule per request; the Haiku subagents of
-  A11, A14 and A15 crossed it in some runs.
+  A11, A14 and A15 crossed it in some runs, and every solo Haiku run (A16, A17) did.
+- A16 (solo Haiku 5.5 at high effort) passed all ten Task 3 runs, at 0.44 of A1, between
+  A11 and A12, and qualifies for Task 4 under the task gate. Six of its runs needed a
+  second round, every one for the defect that also cost A11 and A12 a round: no fresh
+  event (ID 41) when input resumes after a stale period, caught by the hidden unit test
+  and the live check. No run needed more than two rounds. Its main context reached 408K
+  to 574K tokens, the highest of any arm so far, with no compaction, and its runs took 24
+  to 38 minutes.
+- † A17 (solo Haiku 5.5 at xhigh effort) has 3 of its 10 Task 3 runs complete, all
+  passing in the first round at 0.52 of A1 with main contexts of 498K to 584K; the row is
+  preliminary until the remaining seven finish.
