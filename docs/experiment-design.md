@@ -89,7 +89,9 @@ failure the main agent has already investigated. The delegation paragraph is
 followed by a fixed section that explains `codex-agent`, lists the agents with
 their Claude Code descriptions, and says to run long subagents with the Bash
 tool's `run_in_background` (the main agent is notified on completion, and the
-print-mode wait covers background commands as it does background subagents).
+print-mode wait covers background commands as it does background subagents),
+not to poll a background subagent with `pgrep`, `ps` or a loop, and to run it
+in the foreground with a two-hour Bash timeout when it must wait for one.
 Each agent's Claude Code definition body is passed to Codex as developer
 instructions, and the working agreement (CLAUDE.md without its delegation
 section) as Codex's global AGENTS.md, matching what a Claude Code subagent
@@ -100,6 +102,25 @@ web search, apps, plugins, memories and fast mode are disabled; `codex-agent`
 refuses to run inside a subagent. The two arms run Task 1 to Task 3 with ten
 repetitions; Task 4 follows if their Task 3 spend per pass is on par with the
 Task 4 finalists.
+
+The no-polling instruction comes from the first Codex pilots (rep 1 of Tasks 1
+and 2, 2026-10-19). Three of the four passed in round 1. In the fourth (A22
+Task 1, run 4326636d) the main agent started its Codex tester in the
+background and then, instead of waiting for the notification, waited in the
+foreground on `until ... ! pgrep -f "codex-agent tester"; do sleep 15; done`
+with the two-hour timeout. `pgrep -f` matches the loop's own shell, whose
+command line contains the pattern, so the loop could never end; the tester
+had finished in three minutes. The same self-matching loop appears in the
+Claude-only arms while they wait on builds and CTF runs (eight runs
+lost 2 to 10 minutes to it), where the ten-minute Bash ceiling bounds the
+loss; the Codex arms' two-hour ceiling, needed to wait on a subagent in the
+foreground, let it stall the round for two hours. This was treated as an
+integration fault of the Codex arms rather than a result: the delegation
+section now forbids polling a background subagent, the stalled run was
+stopped, and all four pilots are rerun on the corrected instructions (the
+originals are kept as pilots and excluded from the results). The Claude-only
+arms are unchanged, so their self-matching loops stay in the record as
+ordinary behaviour.
 
 A Codex arm's run is void, stopped before acceptance and rerun, when a subagent
 call hits the ChatGPT plan's Codex usage limit (status `usage_limit`) or fails

@@ -92,6 +92,23 @@ feedback blames the app's own unit tests.
 1b191f23 (A14, task3, rep 2) also hit it in round 1, but failed a genuine check in the same
 round, so its round count is unchanged.
 
+## Harness faults
+
+### H-1: Codex pilots ran before the no-polling instruction (A21, A22)
+
+The A22 Task 1 pilot (4326636d) stalled for two hours in a self-matching
+`pgrep` loop the main agent wrote to wait on a background Codex subagent (see
+the Codex arms in `docs/experiment-design.md`). The delegation section now
+forbids polling a background subagent. All four pilots ran on the old text,
+so all four are kept as pilots, excluded from the results, and rerun as rep 1:
+
+| Run | Arm | Task | Outcome on the old text |
+|---|---|---|---|
+| d78a28d2 | A21 | task1 | passed, round 1 |
+| 020d8055 | A21 | task2 | passed, round 1 |
+| 6a951429 | A22 | task2 | passed, round 1 |
+| 4326636d | A22 | task1 | stopped in round 1 during the stall |
+
 ## Gate exemptions
 
 - A11 on Task 4: rep 2's failure comes from defect T4-1, so it does not count against the
