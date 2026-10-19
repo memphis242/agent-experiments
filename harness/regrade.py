@@ -10,6 +10,10 @@ line per round and check, old and new verdict) and a summary of every verdict ch
 The graded commit of a round is HEAD at the end of the round's agent session (rounds[].ended_epoch),
 taken from the HEAD reflog, else the last commit made by then. The pack graded the working tree, which
 may have held uncommitted changes; the final round's are visible and are flagged as `dirty_final`.
+A round in which HEAD did not move (`no_commit_in_round`) may have been graded on uncommitted work the
+repository no longer holds; a verdict difference in such a round is reported as `unreproducible`, not as
+a change. Every finished round is also appended to regrade.jsonl as it completes, and rounds already in
+that file are skipped, so an interrupted re-grade resumes where it stopped.
 """
 from __future__ import annotations
 
@@ -39,6 +43,7 @@ class Job:
     arm: str
     rep: int
     round_no: int
+    started_epoch: float
     ended_epoch: float
     old: dict[str, Any]
 
@@ -91,15 +96,18 @@ def collect_jobs(runs_dir: Path, task: str, only: Sequence[str]) -> list[Job]:
                 continue
             if isinstance(rnd.get("acceptance"), dict) and "ended_epoch" in rnd:
                 jobs.append(Job(path.parent.name, path.parent, str(record.get("arm")), int(record.get("rep", 0)),
-                                int(rnd["round"]), float(rnd["ended_epoch"]), rnd["acceptance"]))
+                                int(rnd["round"]), float(rnd["started_epoch"]), float(rnd["ended_epoch"]),
+                                rnd["acceptance"]))
     return jobs
 
 
-def prepare_checkout(job: Job, dest: Path) -> tuple[str, str, bool]:
+def prepare_checkout(job: Job, dest: Path) -> tuple[str, str, bool, bool]:
     """Clone the run's repo into dest at the round's graded commit, with the run's CTF set-up beside it.
-    Returns (sha, source, dirty_final)."""
+    Returns (sha, source, dirty_final, no_commit_in_round)."""
     repo = job.run_dir / "repo"
     sha, source = graded_commit(repo, job.ended_epoch)
+    assert job.started_epoch <= job.ended_epoch, job
+    no_commit = graded_commit(repo, job.started_epoch)[0] == sha
     if dest.exists():
         shutil.rmtree(dest)
     subprocess.run(["git", "clone", "--quiet", "--shared", "--no-checkout", str(repo), str(dest)], check=True)
@@ -115,7 +123,7 @@ def prepare_checkout(job: Job, dest: Path) -> tuple[str, str, bool]:
     if (ctf / "venv").is_dir():
         (dest / "ctf" / "venv").symlink_to(ctf / "venv")
     dirty = bool(git(repo, "status", "--porcelain").strip()) and sha == git(repo, "rev-parse", "HEAD").strip()
-    return sha, source, dirty
+    return sha, source, dirty, no_commit
 
 
 def verdicts(result: dict[str, Any] | None) -> dict[str, bool]:
@@ -129,8 +137,8 @@ def regrade(job: Job, pack: Path, scratch: Path, timeout_s: float) -> dict[str, 
                              "old_checks": verdicts(job.old)}
     try:
         work.mkdir(parents=True, exist_ok=True)
-        sha, source, dirty = prepare_checkout(job, work / "repo")
-        entry.update(commit=sha, commit_source=source, dirty_final=dirty)
+        sha, source, dirty, no_commit = prepare_checkout(job, work / "repo")
+        entry.update(commit=sha, commit_source=source, dirty_final=dirty, no_commit_in_round=no_commit)
         env = run.child_env(work / "config", include_token=False)
         assert run.TOKEN_ENV not in env
         result = acceptance.run_pack(pack, work, work / "repo", job.round_no, timeout_s, wrap=run.wrap_netns,
@@ -149,6 +157,8 @@ def regrade(job: Job, pack: Path, scratch: Path, timeout_s: float) -> dict[str, 
     entry["changes"] = [{"id": cid, "old": old.get(cid), "new": new_checks.get(cid)}
                         for cid in sorted(set(old) | set(new_checks)) if old.get(cid) != new_checks.get(cid)]
     entry["verdict_changed"] = "error" in entry or entry.get("new_passed") != entry["old_passed"]
+    # Without a commit in the round the pack may have graded work the repository no longer holds.
+    entry["unreproducible"] = bool(entry.get("no_commit_in_round")) and bool(entry["changes"]) and "error" not in entry
     return entry
 
 
@@ -176,19 +186,34 @@ def main(argv: Sequence[str] | None = None) -> int:
         p.error(f"no {a.task} rounds with an acceptance result under {a.runs_dir}")
     a.out.mkdir(parents=True, exist_ok=True)
     a.scratch.mkdir(parents=True, exist_ok=True)
-    print(f"re-grading {len(jobs)} rounds of {len({j.run_id for j in jobs})} runs, {a.parallel} at a time")
+    journal = a.out / "regrade.jsonl"
+    finished: dict[tuple[str, int], dict[str, Any]] = {}
+    if journal.is_file():
+        for line in journal.read_text(encoding="utf-8").splitlines():
+            if line.strip():
+                done_entry = json.loads(line)
+                finished[(done_entry["run"], done_entry["round"])] = done_entry
+    todo = [j for j in jobs if (j.run_id, j.round_no) not in finished]
+    print(f"re-grading {len(todo)} rounds of {len({j.run_id for j in todo})} runs, {a.parallel} at a time "
+          f"({len(jobs) - len(todo)} already in {journal})", flush=True)
     lock = threading.Lock()
 
     def one(job: Job) -> dict[str, Any]:
         entry = regrade(job, a.pack.resolve(), a.scratch.resolve(), timeout_s)
         with lock:
-            mark = "CHANGED" if entry["verdict_changed"] or entry["changes"] else "same"
+            mark = ("UNREPRODUCIBLE" if entry["unreproducible"] else
+                    "CHANGED" if entry["verdict_changed"] or entry["changes"] else "same")
             print(f"{job.run_id} round {job.round_no}: {entry['old_passed']} -> {entry.get('new_passed')} {mark} "
                   f"{entry['changes'] or ''} {entry.get('error', '')}", flush=True)
+            with journal.open("a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry) + "\n")
         return entry
 
     with ThreadPoolExecutor(max_workers=a.parallel) as pool:
-        entries = list(pool.map(one, jobs))
+        new_entries = list(pool.map(one, todo))
+    wanted = {(j.run_id, j.round_no) for j in jobs}
+    entries = [e for k, e in finished.items() if k in wanted] + new_entries
+    assert len(entries) == len(jobs)
     entries.sort(key=lambda e: (e["run"], e["round"]))
     (a.out / "regrade.json").write_text(json.dumps({"pack": str(a.pack.resolve()), "rounds": entries}, indent=2)
                                         + "\n", encoding="utf-8")
@@ -200,8 +225,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             for cid in sorted(set(old) | set(new)) or ["(none)"]:
                 w.writerow([e["run"], e["arm"], e["rep"], e["round"], e.get("commit", ""), cid, old.get(cid, ""),
                             new.get(cid, e.get("error", "")), int(old.get(cid) != new.get(cid))])
-    changed = [e for e in entries if e["verdict_changed"] or e["changes"]]
+    unreproducible = [e for e in entries if e.get("unreproducible")]
+    changed = [e for e in entries if (e["verdict_changed"] or e["changes"]) and not e.get("unreproducible")]
     print(f"{len(changed)} of {len(entries)} rounds changed a verdict; details in {a.out / 'regrade.json'}")
+    print(f"{len(unreproducible)} rounds without a commit graded differently (likely uncommitted work, "
+          f"unreproducible): " + ", ".join(f"{e['run']} round {e['round']}" for e in unreproducible))
     for e in changed:
         print(f"  {e['run']} round {e['round']}: passed {e['old_passed']} -> {e.get('new_passed')}; "
               + ", ".join(f"{c['id']} {c['old']}->{c['new']}" for c in e["changes"]) + f" {e.get('error', '')}")
