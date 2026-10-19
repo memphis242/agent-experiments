@@ -6,10 +6,13 @@ Usage:
     check.py --measure-baseline <repo-path> <baseline.json>
 
 Exit status: 0 every check passed, 1 at least one check failed, 2 infrastructure
-error (the checks themselves could not run).
+error found before the agent's code was used (the checks themselves could not run).
+Once the agent's code is in use, every fault, a time budget overrun included, is a
+failed check.
 
 The agent's repository is never modified: it is copied into a scratch directory
-(see HK_ACCEPT_TMPDIR) where it is built, unit tested, measured and run.
+(see HK_ACCEPT_TMPDIR) where it is built, unit tested, measured and run. CTF runs
+from a scratch copy too, with the template's own runner and configuration.
 """
 from __future__ import annotations
 
@@ -40,7 +43,7 @@ EXPECTED_HIDDEN_TESTS = 18
 
 TOTAL_BUDGET_S = 25 * 60
 BUDGET_RESERVE_S = 60
-PORT_WAIT_S = 300
+PORT_WAIT_S = 60
 JOBS = max(1, min(32, os.cpu_count() or 4))
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 
@@ -78,7 +81,21 @@ EVENT_MSG_LEN = 122
 
 
 class Fail(Exception):
-    """A check did not hold; the message is the experimenter detail."""
+    """A check did not hold; the message is the experimenter detail. `feedback`, when given,
+    replaces the check's generic feedback with one naming the behavior that failed."""
+
+    def __init__(self, detail: str, feedback: str | None = None) -> None:
+        super().__init__(detail)
+        assert feedback is None or feedback.strip()
+        self.feedback = feedback
+
+
+class BuildFailed(Fail):
+    """The check depends on the build, which failed; reported with one short feedback."""
+
+
+class OutOfTime(Fail):
+    """The time budget ran out while the agent's code was in use (a hang, for example)."""
 
 
 class InfraError(Exception):
@@ -127,8 +144,9 @@ def run_cmd(args: list[str], cwd: Path, timeout: float, env: dict[str, str] | No
     try:
         proc = subprocess.Popen(args, cwd=cwd, env=full_env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                 text=True, errors="replace", start_new_session=True)
-    except FileNotFoundError as exc:
-        raise InfraError(f"cannot run {args[0]}: {exc}") from exc
+    except OSError as exc:
+        # The tools are checked before any check runs, so a missing program here is one the build should have made.
+        raise Fail(f"cannot run {args[0]}: {exc}") from exc
     try:
         out, _ = proc.communicate(timeout=max(1.0, timeout))
         return proc.returncode, out
@@ -184,15 +202,156 @@ def build_step(ctx: Ctx) -> tuple[bool, str]:
     return ok, log
 
 
-def runtest_step(ctx: Ctx) -> tuple[int, str]:
-    if "runtest" in ctx.cache:
-        return ctx.cache["runtest"]  # type: ignore[return-value]
+def require_build(ctx: Ctx) -> None:
+    """Raise BuildFailed unless the build completed; checks that need the build call this first."""
     ok, _ = build_step(ctx)
     if not ok:
-        raise Fail("build did not complete")
-    rc, out = run_cmd(["make", f"-j{JOBS}", "native_std.runtest"], ctx.work, min(900, ctx.remaining()))
-    ctx.cache["runtest"] = (rc, out)
-    return rc, out
+        raise BuildFailed("the build did not complete")
+
+
+# --------------------------------------------------------------------------
+# Unit test run. Self-contained so the Task 2 and Task 4 packs can share it: they differ only in
+# APP_TEST_PREFIX and the app directory exempted in GUARDED_PATHS.
+#
+# `make native_std.runtest` runs every registered test of the mission in parallel and stops
+# scheduling new ones at the first failure. Framework tests that share a working directory (the
+# OSAL functional tests mount ./test) can fail under that load without any fault in the code. So:
+# the app's own tests decide the verdict; tests the make run never started are run here, in
+# parallel across working directories and serially within one; a failing test outside the app is
+# rerun once on its own; and one that still fails counts against the agent only when the agent
+# changed framework or other app code (GUARDED_PATHS since TEMPLATE_COMMIT).
+# --------------------------------------------------------------------------
+TEMPLATE_COMMIT = "2517752"
+APP_TEST_PREFIX = "coverage-hk-"
+APP_TEST_UNITS = ("hk_app", "hk_cmds", "hk_dispatch", "hk_utils")
+GUARDED_PATHS = ("osal", "psp", "cfe", "libs", "apps", ":(exclude)apps/hk")
+UNIT_TEST_TIMEOUT_S = 180
+UNIT_RUN_RESERVE_S = 420  # left for the checks after the unit tests
+OUT_OF_TIME = "time budget exhausted"
+
+
+@dataclass(frozen=True)
+class TestOutcome:
+    name: str
+    passed: bool
+    how: str  # "make", "run here" (never started by make), "retried" (rerun once on its own) or OUT_OF_TIME
+    log_tail: str
+
+
+@dataclass(frozen=True)
+class UnitRun:
+    make_rc: int
+    make_tail: str
+    registered: tuple[str, ...]
+    outcomes: dict[str, TestOutcome]
+    framework_changed: bool
+    framework_note: str
+
+    def failing(self, app: bool) -> list[TestOutcome]:
+        return [o for o in self.outcomes.values() if not o.passed and o.name.startswith(APP_TEST_PREFIX) == app]
+
+    def summary(self) -> str:
+        """Experimenter detail: everything that was not a plain pass in the make run."""
+        run_here = [o for o in self.outcomes.values() if o.how == "run here" and o.passed]
+        lines = [f"native_std.runtest exit {self.make_rc}; {len(self.registered)} registered tests; "
+                 f"{len(run_here)} not started by make passed when run here"]
+        if self.make_rc != 0:
+            lines.append("make tail: " + self.make_tail)
+        for o in sorted(self.outcomes.values(), key=lambda o: o.name):
+            if (o.how != "make" or not o.passed) and o not in run_here:
+                lines.append(f"{o.name}: {'pass' if o.passed else 'FAIL'} ({o.how})"
+                             + ("" if o.passed else ": " + short(o.log_tail, 400)))
+        lines.append(self.framework_note)
+        return "\n".join(lines)
+
+
+def framework_changed(repo: Path) -> tuple[bool, str]:
+    """Whether the agent changed GUARDED_PATHS since TEMPLATE_COMMIT (committed, staged, unstaged or
+    untracked). Read-only git queries; an unanswerable query counts as changed."""
+    base = ["git", "--no-optional-locks", "-C", str(repo)]
+    rc1, out1 = run_cmd(base + ["diff", "--name-only", TEMPLATE_COMMIT, "--", *GUARDED_PATHS], repo, 60)
+    rc2, out2 = run_cmd(base + ["ls-files", "--others", "--exclude-standard", "--", *GUARDED_PATHS], repo, 60)
+    if rc1 != 0 or rc2 != 0:
+        return True, f"cannot compare framework code with {TEMPLATE_COMMIT}: {short(out1 + out2, 300)}"
+    changed = sorted(set((out1 + "\n" + out2).split()))
+    if changed:
+        return True, f"framework or other app code changed since {TEMPLATE_COMMIT}: {short(' '.join(changed), 400)}"
+    return False, f"framework and other app code unchanged since {TEMPLATE_COMMIT}"
+
+
+def run_one_test(results: Path, name: str, command: str, timeout: float) -> tuple[bool, str]:
+    """Run a registered test the way the mission's test makefile does: from the executable's directory,
+    stdout to <name>.log.tmp, renamed to <name>.log on success."""
+    exe = Path(command)
+    rc, out = run_cmd([f"./{exe.name}"], exe.parent, timeout)
+    tmp = results / f"{name}.log.tmp"
+    tmp.write_text(out)
+    if rc == 0:
+        tmp.replace(results / f"{name}.log")
+    return rc == 0, f"exit {rc}: " + out[-600:]
+
+
+def run_unit_tests(ctx: Ctx) -> UnitRun:
+    build = ctx.work / "build-native_std"
+    results = build / "test-results"
+    rc, out = run_cmd(["make", f"-j{JOBS}", "native_std.runtest"], ctx.work,
+                      min(900, ctx.remaining() - UNIT_RUN_RESERVE_S))
+    tail = " | ".join([ln for ln in out.splitlines() if "***" in ln or "FAIL" in ln][:6]) or out[-300:]
+    try:
+        listed = json.loads((build / "test-list.json").read_text())
+        tests = {t["name"]: t["command"] for t in listed if t.get("command")}
+    except (OSError, ValueError, TypeError, KeyError) as exc:
+        raise Fail(f"native_std.runtest exit {rc} produced no readable test list ({exc}): {tail}")
+    assert all(isinstance(n, str) and isinstance(c, str) for n, c in tests.items())
+    results.mkdir(exist_ok=True)
+    outcomes: dict[str, TestOutcome] = {}
+    not_started: list[str] = []
+    for name in tests:
+        if (results / f"{name}.log").is_file():
+            outcomes[name] = TestOutcome(name, True, "make", "")
+        elif (results / f"{name}.log.tmp").is_file():
+            text = (results / f"{name}.log.tmp").read_text(errors="replace")
+            outcomes[name] = TestOutcome(name, False, "make", text[-600:])
+        else:
+            not_started.append(name)
+
+    def run_group(names: list[str], how: str) -> None:
+        for name in names:
+            budget = min(UNIT_TEST_TIMEOUT_S, ctx.remaining() - UNIT_RUN_RESERVE_S)
+            if budget < 5:
+                outcomes[name] = TestOutcome(name, False, OUT_OF_TIME, "not run")
+                continue
+            try:
+                ok, log = run_one_test(results, name, tests[name], budget)
+            except Fail as exc:
+                ok, log = False, str(exc)
+            if not ok and ctx.remaining() < UNIT_RUN_RESERVE_S:
+                how = OUT_OF_TIME
+            outcomes[name] = TestOutcome(name, ok, how, log)
+
+    # Tests in one working directory share files, so they run one after another; directories run in parallel.
+    groups: dict[str, list[str]] = {}
+    for name in not_started:
+        groups.setdefault(str(Path(tests[name]).parent), []).append(name)
+    threads = [threading.Thread(target=run_group, args=(names, "run here")) for names in groups.values()]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    run_group(sorted(o.name for o in outcomes.values() if not o.passed and o.how != OUT_OF_TIME
+                     and not o.name.startswith(APP_TEST_PREFIX)), "retried")
+    assert set(outcomes) == set(tests)
+    changed, note = framework_changed(ctx.repo)
+    return UnitRun(rc, short(tail, 600), tuple(tests), outcomes, changed, note)
+
+
+def runtest_step(ctx: Ctx) -> UnitRun:
+    if "runtest" in ctx.cache:
+        return ctx.cache["runtest"]  # type: ignore[return-value]
+    require_build(ctx)
+    run = run_unit_tests(ctx)
+    ctx.cache["runtest"] = run
+    return run
 
 
 def hk_source_files(root: Path) -> list[str]:
@@ -200,17 +359,19 @@ def hk_source_files(root: Path) -> list[str]:
 
 
 def gcov_line_coverage(root: Path) -> dict[str, tuple[int, int]]:
-    """Per HK source file: (executed lines, instrumented lines), from the coverage test objects."""
+    """Per HK source file: (executed lines, instrumented lines), from the HK unit test objects. A file
+    compiled into several test objects counts a line as executed when any of them executed it."""
     base = root / "build-native_std" / "native"
-    result: dict[str, tuple[int, int]] = {}
-    gcdas = sorted(base.rglob("coverage-hk-*-object.dir/**/*.gcda"))
+    gcdas = sorted(g for g in base.rglob("coverage-hk-*-object.dir/**/*.gcda")
+                   if not any(part == "coverage-hk-hidden-object.dir" for part in g.parts))
     if not gcdas:
         raise Fail("no coverage data (.gcda) found for the HK sources after running the unit tests")
     src_dir = (root / "apps" / "hk" / "fsw" / "src").resolve()
+    hits: dict[str, dict[int, int]] = {}
     for gcda in gcdas:
         rc, out = run_cmd(["gcov", "--json-format", "--stdout", gcda.name], gcda.parent, 120)
         if rc != 0:
-            raise InfraError(f"gcov failed on {gcda}: {short(out)}")
+            raise Fail(f"gcov failed on {gcda}: {short(out)}")
         # gcov may print several JSON documents; decode them one by one.
         dec = json.JSONDecoder()
         pos = 0
@@ -230,16 +391,11 @@ def gcov_line_coverage(root: Path) -> dict[str, tuple[int, int]]:
                     continue
                 if path.parent != src_dir or path.suffix != ".c":
                     continue
-                counts: dict[int, int] = {}
+                counts = hits.setdefault(path.name, {})
                 for ln in f.get("lines", []):
                     n = int(ln["line_number"])
                     counts[n] = max(counts.get(n, 0), int(ln["count"]))
-                hit = sum(1 for c in counts.values() if c > 0)
-                prev = result.get(path.name, (0, 0))
-                # The same file may be reported by more than one object; keep the better covered one.
-                if prev[1] == 0 or hit * prev[1] > prev[0] * len(counts):
-                    result[path.name] = (hit, len(counts))
-    return result
+    return {name: (sum(1 for c in counts.values() if c > 0), len(counts)) for name, counts in hits.items()}
 
 
 # --------------------------------------------------------------------------
@@ -308,7 +464,7 @@ def await_free_ports(timeout: float) -> None:
         if not busy:
             return
         if time.monotonic() >= end:
-            raise InfraError(f"UDP ports {busy} stayed in use for {timeout:.0f} s (another cFS on this host?)")
+            raise Fail(f"UDP ports {busy} stayed in use for {timeout:.0f} s after the previous cFS was stopped")
         time.sleep(2.0)
 
 
@@ -319,7 +475,7 @@ class Ground:
             self.rx.bind((HOST, TO_LAB_PORT))
         except OSError as exc:
             self.rx.close()
-            raise InfraError(f"cannot listen on {HOST}:{TO_LAB_PORT}: {exc}") from exc
+            raise Fail(f"cannot listen on {HOST}:{TO_LAB_PORT}: {exc}") from exc
         self.rx.settimeout(0.1)
         self.tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.packets: list[Pkt] = []
@@ -435,7 +591,7 @@ class CfsProcess:
         try:
             probe.bind((HOST, CI_LAB_PORT))
         except OSError as exc:
-            raise InfraError(f"UDP port {CI_LAB_PORT} is already in use: {exc}") from exc
+            raise Fail(f"UDP port {CI_LAB_PORT} is already in use: {exc}") from exc
         finally:
             probe.close()
         logf = open(self.log_path, "wb")
@@ -533,8 +689,6 @@ class Scenario:
             fn()
         except Fail as exc:
             self.errors[name] = str(exc)
-        except InfraError:
-            raise
         except Exception as exc:  # noqa: BLE001 - a malformed packet must not hide the other checks
             self.errors[name] = f"{type(exc).__name__}: {exc}"
 
@@ -707,14 +861,14 @@ class Scenario:
     # -- driver -----------------------------------------------------------------
     def run(self) -> None:
         exe_dir = self.ctx.work / "build-native_std" / "exe" / "cpu1"
-        ok, _ = build_step(self.ctx)
-        if not ok:
-            self.startup_error = "the build did not complete"
-            return
         run_dir = self.ctx.scratch / "cfs-run"
         run_dir.mkdir(exist_ok=True)
-        await_free_ports(PORT_WAIT_S)
-        self.g = Ground()
+        try:
+            await_free_ports(PORT_WAIT_S)
+            self.g = Ground()
+        except Fail as exc:
+            self.startup_error = str(exc)
+            return
         self.cfs = CfsProcess(exe_dir, run_dir / "cfs.log")
         try:
             try:
@@ -746,9 +900,11 @@ class Scenario:
 
 
 def scenario(ctx: Ctx) -> Scenario:
-    """Run the UDP scenario; a scenario with any failure is repeated once on a fresh cFS boot."""
+    """Run the UDP scenario; a scenario with any failure is repeated once on a fresh cFS boot. The
+    first attempt's errors stay in the notes, which every live check's detail carries."""
     sc = ctx.cache.get("scenario")
     if sc is None:
+        require_build(ctx)
         sc = Scenario(ctx)
         sc.run()
         if (sc.startup_error is not None or sc.errors) and ctx.remaining() > 240:
@@ -760,12 +916,14 @@ def scenario(ctx: Ctx) -> Scenario:
     return sc  # type: ignore[return-value]
 
 
-def live_result(ctx: Ctx, step: str) -> None:
+def live_result(ctx: Ctx, step: str) -> str:
     sc = scenario(ctx)
     if sc.startup_error is not None:
         raise Fail(f"scenario could not run: {sc.startup_error}")
     if step in sc.errors:
         raise Fail(sc.errors[step])
+    first = sc.notes.get("first_attempt_errors")
+    return f"passed on the second cFS boot; first attempt: {first}" if first else ""
 
 
 # --------------------------------------------------------------------------
@@ -775,7 +933,7 @@ def live_result(ctx: Ctx, step: str) -> None:
 class CheckSpec:
     check_id: str
     feedback: str
-    fn: Callable[[Ctx], None]
+    fn: Callable[[Ctx], str | None]  # returns experimenter detail for a passing check, if any
 
 
 def c_build(ctx: Ctx) -> None:
@@ -787,36 +945,45 @@ def c_build(ctx: Ctx) -> None:
         raise Fail("build produced diagnostics:\n" + short("\n".join(diag[:12]), 1800))
 
 
-def c_unit(ctx: Ctx) -> None:
-    rc, out = runtest_step(ctx)
-    results = ctx.work / "build-native_std" / "test-results"
+def c_unit(ctx: Ctx) -> str:
+    run = runtest_step(ctx)
+    detail = run.summary()
     problems: list[str] = []
-    logs = sorted(results.glob("coverage-hk-*.log")) if results.is_dir() else []
-    wanted = {f"coverage-hk-{n}.log" for n in ("hk_app", "hk_cmds", "hk_dispatch", "hk_utils")}
-    missing = sorted(wanted - {p.name for p in logs})
+    missing = [u for u in APP_TEST_UNITS if f"{APP_TEST_PREFIX}{u}" not in run.outcomes]
     if missing:
-        problems.append("missing HK test logs: " + ", ".join(missing))
-    for p in logs:
-        text = read_text(p)
-        fails = [ln for ln in text.splitlines() if ln.startswith("[ FAIL]")]
-        bad = re.findall(r"FAIL::([1-9][0-9]*)", text)
-        if fails or bad:
-            problems.append(f"{p.name}: {len(fails)} failing assertions")
-    if rc != 0:
-        tail = [ln for ln in out.splitlines() if "***" in ln or "FAIL" in ln][:6]
-        problems.append(f"native_std.runtest exit {rc}: " + " | ".join(tail))
+        problems.append("missing HK tests: " + ", ".join(f"{APP_TEST_PREFIX}{u}" for u in missing))
+    if any(o.how == OUT_OF_TIME for o in run.outcomes.values()):
+        raise OutOfTime("the unit tests did not finish within the time budget\n" + detail)
+    app_failing = [o.name for o in run.failing(app=True)]
+    results = ctx.work / "build-native_std" / "test-results"
+    for name in sorted(n for n, o in run.outcomes.items() if o.passed and n.startswith(APP_TEST_PREFIX)):
+        text = read_text(results / f"{name}.log")
+        if any(ln.startswith("[ FAIL]") for ln in text.splitlines()) or re.search(r"FAIL::([1-9][0-9]*)", text):
+            app_failing.append(name)
+    other_failing = [o.name for o in run.failing(app=False)]
+    if app_failing:
+        problems.append("failing HK tests: " + ", ".join(sorted(app_failing)))
+    if other_failing and run.framework_changed:
+        problems.append("failing tests outside HK (framework or other app code changed): "
+                        + ", ".join(sorted(other_failing)))
+    elif other_failing:
+        detail += "\nexcused (failed again when rerun alone; framework and other app code unchanged): " + \
+                  ", ".join(sorted(other_failing))
     if problems:
-        raise Fail("; ".join(problems))
+        failing = sorted(app_failing) + (sorted(other_failing) if run.framework_changed else [])
+        named = ", ".join(failing) if failing else ", ".join(f"{APP_TEST_PREFIX}{u}" for u in missing)
+        raise Fail("; ".join(problems) + "\n" + detail,
+                   f"`make -j native_std.runtest` must pass: these unit tests fail or are missing: {named}. "
+                   "Every existing and new HK unit test has to succeed.")
+    return detail
 
 
-def c_coverage(ctx: Ctx) -> None:
-    rc, _ = runtest_step(ctx)
-    if rc != 0:
-        raise Fail("the unit tests did not pass, so coverage was not evaluated")
+def c_coverage(ctx: Ctx) -> str:
+    run = runtest_step(ctx)
     try:
         baseline = json.loads(BASELINE_FILE.read_text())
     except (OSError, ValueError) as exc:
-        raise InfraError(f"baseline coverage file unreadable: {exc}") from exc
+        raise Fail(f"baseline coverage file unreadable: {exc}") from exc
     now = gcov_line_coverage(ctx.work)
     low: list[str] = []
     for name, base in sorted(baseline["files"].items()):
@@ -829,10 +996,23 @@ def c_coverage(ctx: Ctx) -> None:
             low.append(f"{name}: {cur[0]}/{cur[1]} lines = {100.0 * cur[0] / cur[1]:.2f}%, "
                        f"baseline {base['covered']}/{base['lines']} = {100.0 * base['covered'] / base['lines']:.2f}%")
     ctx.cache["coverage_now"] = now
+    # Files without a baseline value have no "current value" to stay above; they are reported only.
+    figures = "; ".join(f"{n}: {c}/{t}" + ("" if n in baseline["files"] else " (new file, no baseline)")
+                        for n, (c, t) in sorted(now.items()))
+    app_failed = bool(run.failing(app=True))
+    note = "coverage " + figures + ("\nmeasured although some HK unit tests failed" if app_failed else "")
     if low:
-        raise Fail("; ".join(low))
+        raise Fail("; ".join(low) + "\n" + note)
+    return note
 
 
+# Requirement areas of the hidden unit test. Each test case has a default area (its "Tnn" tag); an
+# "AREA: <key>" comment inside a test function switches the area for the assertions below it, so a
+# failing assertion is attributed to the behavior it checks rather than to the case as a whole.
+FRESH_ON_ARRIVAL = ("the fresh transition, which happens when a stale entry's input packet arrives and not at the "
+                    "next combined send: on that arrival HK must send exactly one event 41 naming both message IDs "
+                    "in hex and StaleInputCount must drop at once, while further arrivals of the now fresh input "
+                    "and unrelated inputs stay silent")
 HIDDEN_AREAS: dict[str, str] = {
     "T01": "the StaleCycles default of 3 in housekeeping telemetry",
     "T02": "SET_STALE_CYCLES accepting 1 to 255 (event 38 with the value, CommandCounter, StaleCycles)",
@@ -840,12 +1020,97 @@ HIDDEN_AREAS: dict[str, str] = {
     "T04": "the stale transition (exactly one event 40 naming both message IDs in hex, consecutive missed "
            "cycles counted per copy table entry, StaleInputCount, StaleTransitionCtr)",
     "T05": "a changed threshold taking effect at the next combined send, not immediately, in both directions (raising makes a stale entry fresh with event 41, lowering makes it stale with event 40)",
-    "T06": "the fresh transition (exactly one event 41 naming both message IDs, missed cycles restarting)",
+    "T06": FRESH_ON_ARRIVAL,
     "T07": "the REPORT_STALE packet contents (counts, copy table order, invalid unused slots, 16 entry limit)",
-    "T08": "RESET_COUNTERS zeroing StaleTransitionCtr only",
+    "T08": "RESET_COUNTERS zeroing StaleTransitionCtr only (StaleInputCount and the StaleCycles threshold unchanged)",
     "T09": "loading a new copy table resetting missed cycles and stale states without events",
     "T10": "length validation of the new commands",
+    "fresh-on-arrival": FRESH_ON_ARRIVAL,
+    "restart-after-fresh": "missed cycles restarting after the fresh transition (a full threshold of new misses "
+                           "before the next event 40, StaleTransitionCtr counting each transition)",
+    "reset-keeps-state": "RESET_COUNTERS leaving stale states intact (no new event 40 for an entry that was "
+                         "already stale before the reset)",
 }
+TEST_FN_RE = re.compile(r"^static void Test_(\w+)\(void\)")
+AREA_RE = re.compile(r"/\*\s*AREA:\s*([A-Za-z0-9-]+)\s*\*/")
+REGISTER_RE = re.compile(r'UtTest_Add\(\s*Test_\w+\s*,\s*\w+\s*,\s*\w+\s*,\s*"(\w+)"\s*\)')
+
+
+@dataclass(frozen=True)
+class HiddenSource:
+    cases: tuple[str, ...]           # registered case names, in registration order
+    line_area: dict[int, str]        # source line inside a test function -> area key
+    case_area: dict[str, str]        # case name -> default area key
+
+
+def case_tag(name: str) -> str:
+    m = re.match(r"T\d\d", name)
+    assert m, name
+    return m.group(0)
+
+
+def parse_hidden_source(text: str) -> HiddenSource:
+    line_area: dict[int, str] = {}
+    current: str | None = None
+    area = ""
+    for n, line in enumerate(text.splitlines(), 1):
+        m = TEST_FN_RE.match(line)
+        if m:
+            current, area = m.group(1), case_tag(m.group(1))
+            continue
+        if current is None:
+            continue
+        if line.startswith("}"):
+            current = None
+            continue
+        marker = AREA_RE.search(line)
+        if marker:
+            area = marker.group(1)
+        line_area[n] = area
+    cases = tuple(REGISTER_RE.findall(text))
+    assert len(cases) == EXPECTED_HIDDEN_TESTS, cases
+    assert all(a in HIDDEN_AREAS for a in line_area.values()), sorted(set(line_area.values()) - set(HIDDEN_AREAS))
+    return HiddenSource(cases, line_area, {c: case_tag(c) for c in cases})
+
+
+def hidden_failure_areas(src: HiddenSource, out: str) -> tuple[list[str], list[str], list[str]]:
+    """From the runner's log: (reported case names, failing case names, area keys of the failures).
+    An assertion inside a test function maps to its area; one in a shared helper or the setup maps to
+    the default area of the case it ran in; a run that stopped early blames the first case that never
+    reported, by registration order."""
+    reported: list[str] = []
+    failing: list[str] = []
+    areas: list[str] = []
+    case: str | None = None
+
+    def add(area: str) -> None:
+        if area not in areas:
+            areas.append(area)
+
+    for line in out.splitlines():
+        m = re.match(r"\[BEGIN\]\s+\d+\s+(\S+)", line)
+        if m:
+            case = m.group(1) if m.group(1) in src.case_area else None
+            continue
+        m = re.match(r"\[\s*END\]\s+\d+\s+(\S+)\s+TOTAL::(\d+)\s+PASS::(\d+)\s+FAIL::(\d+)", line)
+        if m:
+            if m.group(1) in src.case_area:
+                reported.append(m.group(1))
+                if int(m.group(4)) > 0 and m.group(1) not in failing:
+                    failing.append(m.group(1))
+            case = None
+            continue
+        m = re.match(r"\[ FAIL\]\s+\S+\s+([^:\s]+):(\d+)\s", line)
+        if m and case is not None:
+            if m.group(1) == HIDDEN_TEST.name and int(m.group(2)) in src.line_area:
+                add(src.line_area[int(m.group(2))])
+            else:
+                add(src.case_area[case])
+    missing = [c for c in src.cases if c not in reported]
+    if missing:
+        add(src.case_area[missing[0]])
+    return reported, failing, areas
+
 
 HIDDEN_CMAKE = """
 add_cfe_coverage_test(hk UNIT_NAME hidden
@@ -857,69 +1122,42 @@ target_include_directories(coverage-hk-hidden-testrunner PRIVATE
 """
 
 
-class HiddenFail(Fail):
-    def __init__(self, detail: str, feedback: str | None = None) -> None:
-        super().__init__(detail)
-        self.feedback = feedback
-
-
 def c_hidden(ctx: Ctx) -> None:
-    ok, _ = build_step(ctx)
-    if not ok:
-        raise Fail("build did not complete")
+    require_build(ctx)
+    src = parse_hidden_source(HIDDEN_TEST.read_text())
     cmake = ctx.work / "apps" / "hk" / "unit-test" / "CMakeLists.txt"
     if not cmake.is_file():
-        raise HiddenFail("apps/hk/unit-test/CMakeLists.txt is missing")
+        raise Fail("apps/hk/unit-test/CMakeLists.txt is missing")
     shutil.copy2(HIDDEN_TEST, ctx.work / "apps" / "hk" / "unit-test" / "hk_hidden_tests.c")
     with open(cmake, "a") as fh:
         fh.write(HIDDEN_CMAKE)
     rc, out = run_cmd(["make", "native_std.prep"], ctx.work, min(600, ctx.remaining()))
     if rc != 0:
-        raise HiddenFail("reconfigure failed:\n" + short(out[-1500:], 1800),
-                         "The HK build configuration no longer configures with the HK sources as specified.")
+        raise Fail("reconfigure failed:\n" + short(out[-1500:], 1800),
+                   "The HK build configuration no longer configures with the HK sources as specified.")
     arch = ctx.work / "build-native_std" / "native" / "default_cpu1"
     rc, out = run_cmd(["make", "-C", str(arch), f"-j{JOBS}", "coverage-hk-hidden-testrunner"], ctx.work,
                       min(900, ctx.remaining()))
     if rc != 0:
         diag = [ln for ln in out.splitlines() if re.search(r"error|undefined reference", ln)]
-        raise HiddenFail("compile/link failed:\n" + short("\n".join(diag[:15]) or out[-1500:], 2000),
-                         "The HK sources do not compile and link against the names, types, function codes and "
-                         "event IDs given in the specification (for example HK_SetStaleCyclesCmd_t, "
-                         "HK_ReportStaleCmd_t, HK_StaleReportTlm_t, HK_StaleReport_Payload_t, "
-                         "HK_SET_STALE_CYCLES_CC, HK_REPORT_STALE_CC, HK_STALE_RPT_TLM_MID, "
-                         "HK_STALE_CYCLES_INF_EID, HK_STALE_CYCLES_ERR_EID, HK_INPUT_STALE_EID, "
-                         "HK_INPUT_FRESH_EID, and the appended HK_HkTlm_Payload_t fields).")
+        raise Fail("compile/link failed:\n" + short("\n".join(diag[:15]) or out[-1500:], 2000),
+                   "The HK sources do not compile and link against the names, types, function codes and "
+                   "event IDs given in the specification (for example HK_SetStaleCyclesCmd_t, "
+                   "HK_ReportStaleCmd_t, HK_StaleReportTlm_t, HK_StaleReport_Payload_t, "
+                   "HK_SET_STALE_CYCLES_CC, HK_REPORT_STALE_CC, HK_STALE_RPT_TLM_MID, "
+                   "HK_STALE_CYCLES_INF_EID, HK_STALE_CYCLES_ERR_EID, HK_INPUT_STALE_EID, "
+                   "HK_INPUT_FRESH_EID, and the appended HK_HkTlm_Payload_t fields).")
     runner = arch / "apps" / "hk" / "unit-test" / "coverage-hk-hidden-testrunner"
     rc, out = run_cmd([str(runner)], runner.parent, min(180, ctx.remaining()))
-    names: list[str] = []
-    failing: list[str] = []
-    for m in re.finditer(r"\[\s*END\]\s+(\d+)\s+(\S+)\s+TOTAL::(\d+)\s+PASS::(\d+)\s+FAIL::(\d+)", out):
-        name = m.group(2)
-        if name == "SUMMARY":
-            continue
-        names.append(name)
-        if int(m.group(5)) > 0:
-            failing.append(name)
+    reported, failing, areas = hidden_failure_areas(src, out)
     fail_lines = [ln for ln in out.splitlines() if ln.startswith("[ FAIL]")]
     complete = re.search(r"COMPLETE: (\d+) tests", out)
-    if rc != 0 or failing or len(names) != EXPECTED_HIDDEN_TESTS or complete is None:
-        areas: list[str] = []
-        unfinished = EXPECTED_HIDDEN_TESTS - len(names)
-        tags = [n.split("_")[0] for n in failing]
-        if unfinished > 0 and names:
-            # The run stopped early (crash); blame the cases that never reported.
-            tags.append(f"T{len(names) + 1:02d}")
-        for tag in tags:
-            key = re.match(r"T\d+", tag)
-            area = HIDDEN_AREAS.get(key.group(0)[:3] if key else "")
-            if area and area not in areas:
-                areas.append(area)
-        detail = (f"runner exit {rc}; reported {len(names)} of {EXPECTED_HIDDEN_TESTS} cases; failing: {failing}; "
-                  + short(" | ".join(fail_lines[:12]), 1500) + "\n" + short(out[-800:], 800))
-        if not areas:
-            areas.append("the stale tracking behavior as a whole")
-        raise HiddenFail(detail, "Unit-level exercise of the HK staleness logic found deviations from the "
-                                 "specification in: " + "; ".join(sorted(areas)) + ".")
+    if rc != 0 or failing or len(reported) != EXPECTED_HIDDEN_TESTS or complete is None:
+        detail = (f"runner exit {rc}; reported {len(reported)} of {EXPECTED_HIDDEN_TESTS} cases; failing: {failing}; "
+                  f"areas: {areas}; " + short(" | ".join(fail_lines[:12]), 1500) + "\n" + short(out[-800:], 800))
+        texts = sorted({HIDDEN_AREAS[a] for a in areas}) or ["the stale tracking behavior as a whole"]
+        raise Fail(detail, "Unit-level exercise of the HK staleness logic found deviations from the "
+                           "specification in: " + "; ".join(texts) + ".")
 
 
 def c_to_lab(ctx: Ctx) -> None:
@@ -954,28 +1192,28 @@ def c_copy_table(ctx: Ctx) -> None:
         raise Fail(f"no entry {want} in the default copy table; entries for the input: {near}")
 
 
-def c_layout(ctx: Ctx) -> None:
-    live_result(ctx, "layout")
+def c_layout(ctx: Ctx) -> str:
+    return live_result(ctx, "layout")
 
 
-def c_set(ctx: Ctx) -> None:
-    live_result(ctx, "set")
+def c_set(ctx: Ctx) -> str:
+    return live_result(ctx, "set")
 
 
-def c_stale(ctx: Ctx) -> None:
-    live_result(ctx, "stale")
+def c_stale(ctx: Ctx) -> str:
+    return live_result(ctx, "stale")
 
 
-def c_report(ctx: Ctx) -> None:
-    live_result(ctx, "report")
+def c_report(ctx: Ctx) -> str:
+    return live_result(ctx, "report")
 
 
-def c_fresh(ctx: Ctx) -> None:
-    live_result(ctx, "fresh")
+def c_fresh(ctx: Ctx) -> str:
+    return live_result(ctx, "fresh")
 
 
-def c_reset(ctx: Ctx) -> None:
-    live_result(ctx, "reset")
+def c_reset(ctx: Ctx) -> str:
+    return live_result(ctx, "reset")
 
 
 def c_ccdd(ctx: Ctx) -> None:
@@ -1007,7 +1245,65 @@ def c_ccdd(ctx: Ctx) -> None:
         raise Fail("; ".join(problems))
 
 
-def c_ctf(ctx: Ctx) -> None:
+# CTF runs from a scratch directory assembled from: the template's runner, configuration, shims and
+# setup script (PRISTINE_CTF, from TEMPLATE_COMMIT); the agent's own ctf/ files otherwise (the CCDD
+# definitions and the test scripts the task asks for); a fresh clone of the repository's CTF checkout
+# at the pinned commit; and the harness-built virtualenv, used read-only (no bytecode is written).
+PRISTINE_CTF = ("run_ctf.sh", "setup_ctf.sh", "configs", "shims")
+FIXTURE_TEMPLATE = Path("/workspace/agent-experiments-fixture/mission-template")
+
+
+def ctf_ready(repo: Path) -> str | None:
+    """Why CTF cannot run for this repository (the harness sets it up before the agent starts), or None."""
+    if not os.access(repo / "ctf" / "venv" / "bin" / "python", os.X_OK):
+        return "ctf/venv/bin/python is missing (ctf/setup_ctf.sh was not run)"
+    if not (repo / "ctf" / "CTF" / "ctf").is_file() or not (repo / "ctf" / "CTF" / ".git").exists():
+        return "the ctf/CTF checkout is missing (ctf/setup_ctf.sh was not run)"
+    return None
+
+
+def ctf_env(ctx: Ctx) -> Path:
+    """Assemble the scratch CTF directory once; returns its ctf/ directory."""
+    if "ctf_env" in ctx.cache:
+        return ctx.cache["ctf_env"]  # type: ignore[return-value]
+    root = ctx.scratch / "ctf-env"
+    ctf = root / "ctf"
+    shutil.copytree(ctx.work / "ctf", ctf, symlinks=True)
+    pristine = root / "pristine"
+    pristine.mkdir()
+    rc, out = run_cmd(["sh", "-c", 'git --no-optional-locks -C "$1" archive "$2" ctf | tar -x -C "$3"', "sh",
+                       str(ctx.repo), TEMPLATE_COMMIT, str(pristine)], root, 120)
+    source = pristine / "ctf"
+    if rc != 0 or not (source / "run_ctf.sh").is_file():
+        source = FIXTURE_TEMPLATE / "ctf"
+        if not (source / "run_ctf.sh").is_file():
+            raise Fail(f"cannot get the template's CTF runner from {TEMPLATE_COMMIT} or {source}: {short(out, 300)}")
+    for name in PRISTINE_CTF:
+        target = ctf / name
+        if target.is_dir() and not target.is_symlink():
+            shutil.rmtree(target)
+        elif target.exists() or target.is_symlink():
+            target.unlink()
+        if (source / name).is_dir():
+            shutil.copytree(source / name, target, symlinks=True)
+        else:
+            shutil.copy2(source / name, target)
+    pin = re.search(r'^CTF_COMMIT="([0-9a-f]{40})"', (ctf / "setup_ctf.sh").read_text(), re.M)
+    if pin is None:
+        raise Fail("the template's setup_ctf.sh names no pinned CTF commit")
+    rc, out = run_cmd(["git", "clone", "--quiet", "--no-hardlinks", "--no-checkout", str(ctx.repo / "ctf" / "CTF"),
+                       str(ctf / "CTF")], root, 300)
+    if rc == 0:
+        rc, out = run_cmd(["git", "-C", str(ctf / "CTF"), "-c", "advice.detachedHead=false", "checkout", "--quiet",
+                           pin.group(1)], root, 120)
+    if rc != 0:
+        raise Fail(f"cannot clone the CTF checkout at {pin.group(1)}: {short(out, 400)}")
+    (ctf / "venv").symlink_to(ctx.repo / "ctf" / "venv")
+    ctx.cache["ctf_env"] = ctf
+    return ctf
+
+
+def c_ctf(ctx: Ctx) -> str:
     script = ctx.repo / "ctf" / "tests" / "hk_staleness.json"
     if not script.is_file():
         raise Fail("ctf/tests/hk_staleness.json does not exist")
@@ -1019,21 +1315,19 @@ def c_ctf(ctx: Ctx) -> None:
     missing = [w for w in ("SET_STALE_CYCLES", "SEND_COMBINED_PKT", "StaleInputCount") if w not in text]
     if missing:
         raise Fail("ctf/tests/hk_staleness.json does not reference: " + ", ".join(missing))
-    runner = ctx.repo / "ctf" / "run_ctf.sh"
-    if not runner.is_file():
-        raise Fail("ctf/run_ctf.sh does not exist")
-    ok, _ = build_step(ctx)
-    if not ok:
-        raise Fail("build did not complete")
-    await_free_ports(PORT_WAIT_S)
+    require_build(ctx)
+    ctf = ctf_env(ctx)
+    runner = ctf / "run_ctf.sh"
+    test = ctf / "tests" / "hk_staleness.json"
     results = ctx.scratch / "ctf-results"
     results.mkdir(exist_ok=True)
     env = {"CFS_ROOT": str(ctx.work), "CFS_RUN_DIR": str(ctx.work / "build-native_std" / "exe" / "cpu1"),
-           "CTF_RESULTS_DIR": str(results)}
+           "CTF_RESULTS_DIR": str(results), "PYTHONDONTWRITEBYTECODE": "1"}
     cfs_dir = (ctx.work / "build-native_std" / "exe" / "cpu1").resolve()
 
     def attempt() -> tuple[int, str]:
-        rc, out = run_cmd(["bash", str(runner), str(script)], ctx.repo / "ctf", min(900, ctx.remaining()), env)
+        await_free_ports(PORT_WAIT_S)
+        rc, out = run_cmd(["bash", str(runner), str(test)], ctf, min(900, ctx.remaining()), env)
         for pid_dir in Path("/proc").glob("[0-9]*"):
             try:
                 if (pid_dir / "cwd").resolve() == cfs_dir:
@@ -1043,15 +1337,13 @@ def c_ctf(ctx: Ctx) -> None:
         return rc, out
 
     rc, out = attempt()
-    if rc != 0 and "CTF is not set up" in out:
-        raise InfraError("CTF is not set up in the repository under test: " + short(out, 300))
     first = ""
     if rc != 0 and ctx.remaining() > 240:
         first = f"first attempt: exit {rc}: " + short(out[-1500:], 1800) + "\n"
-        await_free_ports(PORT_WAIT_S)
         rc, out = attempt()
     if rc != 0:
         raise Fail(first + f"run_ctf.sh exit {rc}: " + short(out[-1500:], 1800))
+    return ("passed on the second attempt; " + first) if first else ""
 
 
 def c_report_doc(ctx: Ctx) -> None:
@@ -1119,8 +1411,10 @@ CHECKS: list[CheckSpec] = [
               "packet 2 message ID, all other slots CFE_SB_INVALID_MSG_ID, and CommandCounter +1.",
               c_report),
     CheckSpec("fresh-transition",
-              "When the next SAMPLE_APP housekeeping packet arrives for a stale entry, HK must emit exactly one "
-              "event 41 naming both message IDs in hex, and StaleInputCount must return to 0.",
+              "The fresh transition happens when a stale entry's input packet arrives, in HK's incoming-data "
+              "handling, not at the next combined send: when the next SAMPLE_APP housekeeping packet arrives for "
+              "the stale entry, HK must send exactly one event 41 naming both message IDs in hex at that moment, "
+              "and StaleInputCount must return to 0.",
               c_fresh),
     CheckSpec("reset-counters",
               "RESET_COUNTERS must set StaleTransitionCtr to 0 and leave StaleInputCount and StaleCycles "
@@ -1143,32 +1437,62 @@ CHECKS: list[CheckSpec] = [
 ]
 
 
-def evaluate(ctx: Ctx) -> list[Result]:
+BUILD_FAILED_FEEDBACK = ("Not evaluated because the build does not complete; this requirement is checked once "
+                         "`make native_std.prep && make -j native_std.install` succeeds.")
+OUT_OF_TIME_FEEDBACK = ("Not verified: the acceptance run ran out of time while exercising this requirement. Make sure "
+                        "the build, the unit tests, cFS and the CTF test each finish promptly and nothing hangs.")
+
+
+def failed_result(spec: CheckSpec, exc: Fail, ctx: Ctx) -> Result:
+    if isinstance(exc, BuildFailed):
+        return Result(spec.check_id, False, BUILD_FAILED_FEEDBACK, str(exc))
+    if isinstance(exc, OutOfTime):
+        return Result(spec.check_id, False, OUT_OF_TIME_FEEDBACK, str(exc))
+    detail = str(exc)
+    if spec.check_id in LIVE_IDS:
+        sc = ctx.cache.get("scenario")
+        if isinstance(sc, Scenario):
+            detail += f" | notes={sc.notes}"
+    return Result(spec.check_id, False, exc.feedback or spec.feedback, detail)
+
+
+def provisional(done: list[Result], running: CheckSpec | None) -> list[Result]:
+    """The result file as it stands if the run is killed now: finished checks, the running one as a hang,
+    the rest as not reached."""
+    out = list(done)
+    seen = {r.check_id for r in done}
+    for spec in CHECKS:
+        if spec.check_id in seen:
+            continue
+        why = ("did not finish before the overall time limit killed the run" if spec is running
+               else "not reached before the overall time limit killed the run")
+        out.append(Result(spec.check_id, False, OUT_OF_TIME_FEEDBACK, why))
+    return out
+
+
+def evaluate(ctx: Ctx, out: Path | None = None) -> list[Result]:
+    """Run every check. With `out`, a provisional result file is kept up to date before each check, so a
+    run killed by the outer time limit still reports a failed round instead of an infrastructure error."""
     results: list[Result] = []
     for spec in CHECKS:
         assert ID_RE.match(spec.check_id), spec.check_id
+        if out is not None:
+            write_out(out, provisional(results, spec))
         if ctx.remaining() < 5:
-            raise InfraError(f"time budget exhausted before check {spec.check_id} could run")
+            results.append(failed_result(spec, OutOfTime(f"time budget exhausted before check {spec.check_id} "
+                                                         "could run"), ctx))
+            continue
         try:
-            spec.fn(ctx)
-            results.append(Result(spec.check_id, True, "", ""))
+            detail = spec.fn(ctx)
+            results.append(Result(spec.check_id, True, "", detail or ""))
         except InfraError:
             raise
-        except HiddenFail as exc:
-            fb = exc.feedback or spec.feedback
-            results.append(Result(spec.check_id, False, fb, str(exc)))
         except Fail as exc:
-            detail = str(exc)
-            if spec.check_id in LIVE_IDS:
-                sc = ctx.cache.get("scenario")
-                if isinstance(sc, Scenario):
-                    detail += f" | notes={sc.notes}"
-            results.append(Result(spec.check_id, False, spec.feedback, detail))
+            results.append(failed_result(spec, exc, ctx))
         except Exception:  # noqa: BLE001 - the agent's code produced something the check did not anticipate
             results.append(Result(spec.check_id, False, spec.feedback,
                                   "unexpected exception in the check:\n" + traceback.format_exc()))
-    if ctx.remaining() < 0:
-        raise InfraError("time budget exhausted")
+    assert [r.check_id for r in results] == [c.check_id for c in CHECKS]
     return results
 
 
@@ -1188,7 +1512,9 @@ def write_out(path: Path, results: list[Result]) -> None:
         checks.append({"id": r.check_id, "passed": r.passed, "feedback": r.feedback, "detail": r.detail})
     doc = {"passed": all(r.passed for r in results), "checks": checks}
     assert len({c["id"] for c in checks}) == len(checks)
-    path.write_text(json.dumps(doc, indent=2) + "\n")
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(doc, indent=2) + "\n")
+    tmp.replace(path)
 
 
 SCRATCH_ROOT = Path("/workspace/tmp-acceptance")
@@ -1216,9 +1542,9 @@ def measure_baseline(repo: Path, out: Path) -> int:
         ok, log = build_step(ctx)
         if not ok:
             raise InfraError("baseline build failed:\n" + log[-1500:])
-        rc, text = runtest_step(ctx)
-        if rc != 0:
-            raise InfraError("baseline unit tests failed:\n" + text[-1500:])
+        run = runtest_step(ctx)
+        if run.failing(app=True) or run.failing(app=False):
+            raise InfraError("baseline unit tests failed:\n" + run.summary())
         cov = gcov_line_coverage(ctx.work)
         doc = {"method": "gcov --json-format line coverage of apps/hk/fsw/src/*.c after native_std.runtest",
                "files": {n: {"covered": c, "lines": t} for n, (c, t) in sorted(cov.items())}}
@@ -1244,7 +1570,16 @@ def main(argv: list[str]) -> int:
     if not repo.is_dir():
         print(f"repository {repo} not found", file=sys.stderr)
         return 2
-    for tool in ("make", "cmake", "gcov", "gcc"):
+    try:
+        assert isinstance(json.loads(BASELINE_FILE.read_text())["files"], dict)
+    except (OSError, ValueError, KeyError, AssertionError) as exc:
+        print(f"baseline coverage file unreadable: {exc}", file=sys.stderr)
+        return 2
+    ctf_problem = ctf_ready(repo)
+    if ctf_problem is not None:
+        print(f"CTF is not set up in the repository under test: {ctf_problem}", file=sys.stderr)
+        return 2
+    for tool in ("make", "cmake", "gcov", "gcc", "git", "tar"):
         if shutil.which(tool) is None:
             print(f"required tool not found: {tool}", file=sys.stderr)
             return 2
@@ -1253,7 +1588,7 @@ def main(argv: list[str]) -> int:
     scratch = Path(tempfile.mkdtemp(prefix="hk-accept-", dir=pick_scratch_parent()))
     try:
         ctx = Ctx(repo, scratch, deadline)
-        results = evaluate(ctx)
+        results = evaluate(ctx, out)
         write_out(out, results)
         return 0 if all(r.passed for r in results) else 1
     except InfraError as exc:

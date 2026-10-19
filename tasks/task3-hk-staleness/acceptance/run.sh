@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Usage: run.sh <repo-path> <out.json>
-# Exit 0 every check passed, 1 a check failed, 2 infrastructure error.
-# Total budget 25 minutes; cFS is always stopped and the scratch tree removed on exit.
+# Exit 0 every check passed, 1 a check failed, 2 infrastructure error found before the agent's code was used.
+# Total budget 25 minutes; cFS is always stopped and the scratch tree removed on exit. check.py keeps a
+# provisional result file (unfinished checks failed) up to date, so a run stopped by the timeout below
+# reports a failed round.
 set -u
 if [ "$#" -ne 2 ]; then
     echo "usage: run.sh <repo-path> <out.json>" >&2
@@ -43,5 +45,6 @@ timeout --kill-after=30 1500 python3 -I "$here/check.py" "$repo" "$out"
 rc=$?
 case "$rc" in
     0|1) [ -f "$out" ] || exit 2; exit "$rc" ;;
+    124|137) [ -f "$out" ] || exit 2; echo "check.py stopped by the time limit; provisional result kept" >&2; exit 1 ;;
     *) exit 2 ;;
 esac

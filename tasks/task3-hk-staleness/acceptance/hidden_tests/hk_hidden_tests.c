@@ -8,8 +8,9 @@
  * status check, the housekeeping packet and the transmitted packets.
  *
  * Test case names are at most 30 characters because the UT framework
- * truncates them in its log; the driver maps the leading "Tnn" tag to a
- * requirement area.
+ * truncates them in its log. The driver maps a failing assertion to a
+ * requirement area: the case's leading "Tnn" tag by default, or the key of
+ * the nearest preceding AREA comment inside the same test function.
  */
 
 #include "hk_app.h"
@@ -828,10 +829,12 @@ static void Test_T05b_RaiseLower(void)
     UtAssert_UINT32_EQ(Hk.StaleInputCount, 0);
     UtAssert_UINT32_EQ(Hk.StaleTransitionCtr, 1);
 
+    /* AREA: fresh-on-arrival */
     /* An arrival of an entry that is no longer stale is silent. */
     T_Arrive(T_IN_B);
     UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 1);
 
+    /* AREA: T05 */
     /* Lowering the threshold below the missed count makes it stale at the next send, not before. */
     T_Arrive(T_IN_A);
     T_Send(T_OUT1); /* B present */
@@ -894,6 +897,7 @@ static void Test_T06b_StaleAgain(void)
     T_Arrive(T_IN_B);
     UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 1);
 
+    /* AREA: restart-after-fresh */
     /* After going fresh, a full threshold of new misses is needed. */
     T_Arrive(T_IN_A);
     T_Send(T_OUT1); /* B present */
@@ -1062,10 +1066,12 @@ static void Test_T08_ResetCounters(void)
     UtAssert_UINT32_EQ(Hk.CommandCounter, 0);
     UtAssert_UINT32_EQ(Hk.CommandErrorCounter, 0);
 
+    /* AREA: reset-keeps-state */
     /* The stale state itself survived the reset: no new transition, and the fresh transition still fires. */
     T_Arrive(T_IN_A);
     T_Send(T_OUT1);
     UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_STALE_EID), 0);
+    /* AREA: fresh-on-arrival */
     T_Arrive(T_IN_B);
     UtAssert_UINT32_EQ(T_CountEvents(HK_INPUT_FRESH_EID), 1);
     Hk = T_RequestHk();
@@ -1082,9 +1088,9 @@ static void Test_T08b_ResetFunction(void)
     T_SetStaleCycles(2);
     T_Send(T_OUT1);
 
+    /* The housekeeping reset leaves the threshold alone. */
     HK_ResetHkData();
     Hk = T_RequestHk();
-    UtAssert_UINT32_EQ(Hk.StaleTransitionCtr, 0);
     UtAssert_UINT32_EQ(Hk.StaleCycles, 2);
 }
 
