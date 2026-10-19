@@ -133,7 +133,7 @@ class CodexAgentLauncherTest(unittest.TestCase):
         while not (self.home / "fake-invocation.json").exists() and time.time() < deadline:
             time.sleep(0.1)
         proc.send_signal(signal.SIGTERM)
-        proc.wait(timeout=30)
+        proc.communicate(timeout=30)
         summary = codex.summarize(self.home)
         [call] = summary["per_call"]
         self.assertEqual(call["stopped_by_signal"], "SIGTERM")
@@ -275,6 +275,54 @@ class CodexLoginTest(unittest.TestCase):
         self.assertFalse(dead.exists())
         self.assertTrue(live.exists())
         self.assertIn("2026-10-19", self.user_auth.read_text())
+
+
+    def fake_refreshing_codex(self, refresh):
+        script = self.base / "fake-codex"
+        script.write_text(textwrap.dedent(f'''\
+            #!/usr/bin/env python3
+            import json, os, sys
+            from pathlib import Path
+            sys.stdin.read()
+            auth = Path(os.environ["CODEX_HOME"]) / "auth.json"
+            data = json.loads(auth.read_text())
+            if {refresh!r} and data["last_refresh"] < "2026-10-16":
+                data["last_refresh"] = "2026-10-19T12:00:00Z"
+                data["tokens"]["refresh_token"] = "rotated"
+                auth.write_text(json.dumps(data))
+            print("OK")
+            '''))
+        script.chmod(0o755)
+        return mock.patch.object(codex, "resolve_codex_bin", return_value=script)
+
+    def refresh(self):
+        config = self.base / "cfg"
+        config.mkdir(exist_ok=True)
+        (config / "config.toml").write_text("")
+        (self.base / "runs").mkdir(exist_ok=True)
+        return codex.refresh_login(self.base / "runs", config)
+
+    def test_refresh_login_forces_a_refresh_and_writes_it_back(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T17:00:48Z", self.now + timedelta(days=5)))
+        with self.fake_refreshing_codex(True):
+            outcome = self.refresh()
+        self.assertTrue(outcome["forced"] and outcome["refreshed"] and outcome["written_back"])
+        self.assertIn("rotated", self.user_auth.read_text())
+        self.assertEqual(list((self.base / "runs").iterdir()), [])  # scratch home removed
+
+    def test_refresh_login_keeps_the_login_when_codex_did_not_refresh(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T17:00:48Z", self.now + timedelta(days=5)))
+        before = self.user_auth.read_text()
+        with self.fake_refreshing_codex(False):
+            outcome = self.refresh()
+        self.assertFalse(outcome["refreshed"] or outcome["written_back"])
+        self.assertEqual(self.user_auth.read_text(), before)
+
+    def test_refresh_login_refuses_while_a_run_holds_a_copy(self):
+        self.user_auth.write_text(fake_auth("2026-10-15T17:00:48Z", self.now + timedelta(days=5)))
+        self.run_copy("live", self.user_auth.read_text(), {"pid": os.getpid(), "start": codex._proc_start(os.getpid())})
+        with self.fake_refreshing_codex(True), self.assertRaises(codex.CodexError):
+            self.refresh()
 
 
 class CodexRunWiringTest(unittest.TestCase):

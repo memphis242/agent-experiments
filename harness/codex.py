@@ -16,6 +16,7 @@ import json
 import os
 import shutil
 import subprocess
+import tempfile
 import tomllib
 from collections import Counter
 from dataclasses import dataclass, field
@@ -524,3 +525,82 @@ def leak_scan_files(home: Path) -> list[Path]:
     """Files whose new lines the leak scan reads: session logs and the tasks handed to subagents."""
     tasks = sorted((home / CALLS_DIR).glob("*/task.txt")) if (home / CALLS_DIR).is_dir() else []
     return [*rollout_files(home), *tasks]
+
+
+# -- login refresh ---------------------------------------------------------------------------------
+REFRESH_PROMPT = "Reply with the single word OK."
+FORCED_LAST_REFRESH = "2000-01-01T00:00:00Z"  # an age past LOGIN_REFRESH_AGE, so Codex refreshes on start
+
+
+def live_login_copies(runs_dir: Path) -> list[str]:
+    """Run dirs whose live run.py holds a copy of the login. Caller holds AUTH_LOCK."""
+    sweep_stale_logins(runs_dir)
+    return [str(copy.parent.parent) for copy in sorted(runs_dir.glob(f"*/{HOME_DIR}/{AUTH_FILE}"))]
+
+
+def refresh_login(runs_dir: Path, codex_config: Path) -> dict[str, Any]:
+    """Refresh the user's Codex login once, in a scratch CODEX_HOME, while no run holds a copy.
+
+    Before its refresh point the scratch copy's last_refresh is backdated so that Codex
+    refreshes it on start; one minimal request follows. The refreshed login is written back
+    to ~/.codex/auth.json only when Codex really refreshed it. AUTH_LOCK is held throughout,
+    so no run copies the login meanwhile. Returns the outcome (never token contents)."""
+    with AUTH_LOCK.open("w") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        live = live_login_copies(runs_dir)
+        if live:
+            raise CodexError(f"{len(live)} live Codex run(s) hold a copy of the login: {live}")
+        before = login_refresh_point()
+        original = _last_refresh(USER_AUTH)
+        scratch = Path(tempfile.mkdtemp(prefix=".codex-refresh-", dir=runs_dir))
+        try:
+            shutil.copyfile(codex_config / "config.toml", scratch / "config.toml")
+            data = _auth_fields(USER_AUTH)
+            if not data:
+                raise CodexError(f"no readable Codex login at {USER_AUTH}; run `codex login`")
+            forced = before is not None and before > datetime.now(timezone.utc)
+            if forced:
+                data = {**data, "last_refresh": FORCED_LAST_REFRESH}
+            copy = scratch / AUTH_FILE
+            copy.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            copy.chmod(0o600)
+            (scratch / "work").mkdir()
+            try:
+                done = subprocess.run(
+                    [str(resolve_codex_bin()), "exec", "--skip-git-repo-check", "-C", str(scratch / "work"),
+                     "-c", 'model_reasoning_effort="low"', "-"], input=REFRESH_PROMPT, text=True,
+                    capture_output=True, env={**os.environ, "CODEX_HOME": str(scratch)}, timeout=SETUP_TIMEOUT_S)
+            except (OSError, subprocess.TimeoutExpired) as exc:
+                raise CodexError(f"the refresh request failed: {exc}") from exc
+            refreshed = _last_refresh(copy) > max(original, FORCED_LAST_REFRESH if forced else "")
+            written_back = refreshed and _write_back(copy)
+        finally:
+            shutil.rmtree(scratch, ignore_errors=True)
+        return {"forced": forced, "request_exit": done.returncode, "refreshed": refreshed,
+                "written_back": written_back, "refresh_point_before": before.isoformat() if before else None,
+                "refresh_point_after": (lambda p: p.isoformat() if p else None)(login_refresh_point()),
+                "detail": "" if refreshed else (done.stderr or done.stdout).strip()[-400:]}
+
+
+if __name__ == "__main__":
+    import argparse
+    import sys
+    parser = argparse.ArgumentParser(description="Codex login maintenance for the experiment runs.")
+    parser.add_argument("command", choices=["refresh-point", "refresh-login"])
+    parser.add_argument("--runs-dir", type=Path, required=True)
+    parser.add_argument("--codex-config", type=Path, help="an arm's codex/ dir (refresh-login)")
+    args = parser.parse_args()
+    if args.command == "refresh-point":
+        point = login_refresh_point()
+        print(json.dumps({"refresh_point": point.isoformat() if point else None,
+                          "starts_blocked_from": (point - RUN_MARGIN).isoformat() if point else None}))
+        sys.exit(0)
+    if args.codex_config is None:
+        parser.error("refresh-login needs --codex-config")
+    try:
+        outcome = refresh_login(args.runs_dir, args.codex_config)
+    except CodexError as exc:
+        print(json.dumps({"refreshed": False, "error": str(exc)}))
+        sys.exit(1)
+    print(json.dumps(outcome))
+    sys.exit(0 if outcome["refreshed"] else 1)
