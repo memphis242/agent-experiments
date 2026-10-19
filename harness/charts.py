@@ -92,6 +92,7 @@ FAMILIES: tuple[tuple[str, str, str], ...] = (
     ("solo Haiku 5.5", "Solo Haiku 5.5", "#f87171"),
     ("Haiku 5.5", "Haiku 5.5", "#4ade80"),
     ("solo Sonnet 5.5", "Solo Sonnet 5.5", "#f472b6"),
+    ("solo Sonnet 5,", "Solo Sonnet 5", "#22d3ee"),
     ("solo Opus 5.5", "Solo Opus 5.5", "#9ca3af"),
 )
 FALLBACK_FAMILY = ("Other", "#9ca3af")
