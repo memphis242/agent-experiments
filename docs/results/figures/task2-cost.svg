@@ -3,7 +3,7 @@
 <title>Task 2: billed cost per run</title>
 <rect x="8" y="8" width="1494" height="988.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 2: billed cost per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">171 runs across 18 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">174 runs across 18 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
 <text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="117.4" cy="96.0" r="5" fill="#a78bfa"/>
@@ -410,14 +410,17 @@
 <text x="1390.0" y="874.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx -</text>
 <text x="36.0" y="911.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A19</text>
 <text x="78.0" y="911.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, high</text>
-<text x="78.0" y="925.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=1</text>
-<rect x="702.1" y="906.0" width="16.0" height="16" rx="8.0" fill="#22d3ee" fill-opacity="0.34"/>
-<circle cx="710.1" cy="914.0" r="4.6" fill="#22d3ee" fill-opacity="0.92"/>
-<line x1="710.1" y1="903.0" x2="710.1" y2="925.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="726.1" y="918.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.89</text>
-<text x="1108.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 260</text>
-<text x="1170.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 68K</text>
-<text x="1236.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 21M</text>
-<text x="1324.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 261K</text>
+<text x="78.0" y="925.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=4</text>
+<rect x="690.3" y="906.0" width="91.4" height="16" rx="8.0" fill="#22d3ee" fill-opacity="0.34"/>
+<circle cx="698.3" cy="914.0" r="4.6" fill="#22d3ee" fill-opacity="0.92"/>
+<circle cx="710.1" cy="909.8" r="4.6" fill="#22d3ee" fill-opacity="0.92"/>
+<circle cx="767.2" cy="918.2" r="4.6" fill="#22d3ee" fill-opacity="0.92"/>
+<circle cx="773.7" cy="907.0" r="4.6" fill="#22d3ee" fill-opacity="0.92"/>
+<line x1="738.7" y1="903.0" x2="738.7" y2="925.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="789.7" y="918.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.61 to 7.36</text>
+<text x="1108.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 306</text>
+<text x="1170.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 86K</text>
+<text x="1236.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 27M</text>
+<text x="1324.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 294K</text>
 <text x="1390.0" y="918.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx -</text>
 </svg>

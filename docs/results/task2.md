@@ -1,6 +1,6 @@
-# Task 2 results (SAMPLE_APP status command), 171 runs, 2026-10-18 (preliminary: A19 trial in progress)
+# Task 2 results (SAMPLE_APP status command), 174 runs, 2026-10-19 (preliminary: A19 in progress)
 
-All 171 completed runs passed acceptance (10 repetitions per arm, except the A19 trial; for A1 to A9 the first three
+All 174 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
 were run on three parallel slots and the remaining seven on six; A10 to A15 were added
 later and run on six or seven, A16 and A17 on up to nine, A19 on six). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
@@ -35,11 +35,11 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task2 | 10/10 | 2.19 | 1.92 to 2.74 | 0.82 | 9.5 to 20.7 | 4 to 13 | 3 to 4 | 1 | 0 | 78.8 to 102.8 | 136.5 to 186.8 |
 | A16 | solo Haiku 5.5, high effort | task2 | 10/10 | 1.26 | 0.93 to 2.07 | 1.14 | 12.1 to 31.7 | 87 to 183 | 0 | 1 to 2 | 0 | 245.1 to 323.3 | - |
 | A17 | solo Haiku 5.5, xhigh effort | task2 | 10/10 | 2.25 | 1.55 to 4.16 | 2.61 | 18.0 to 33.2 | 6 to 221 | 0 | 1 to 2 | 0 | 315.8 to 469.0 | - |
-| A19 | solo Sonnet 5, high effort | task2 | 1/1† | 5.89 | 5.89 | 0.00 | 15.9 | 154 | 0 | 1 | 0 | 260.8 | - |
+| A19 | solo Sonnet 5, high effort | task2 | 4/4† | 6.52 | 5.61 to 7.36 | 1.75 | 15.9 to 27.8 | 135 to 185 | 0 | 1 | 0 | 248.8 to 294.0 | - |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.32, A11 0.33, A12 0.35, A14
 0.37, A15 0.55, A17 0.57, A13 0.74, A10 0.79, A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9
-0.96, A2 1.28, A8 1.41, A6 1.73. A19 (one run so far) is not ranked.
+0.96, A2 1.28, A8 1.41, A6 1.73. A19 (4 of 10 runs so far) is not ranked; it would be 1.65.
 
 Notes:
 
@@ -106,5 +106,7 @@ Notes:
   floor of 6 is the CLI counting artefact described below.
 - † A19 (solo Sonnet 5 at high effort) failed Task 1 under the task gate (see the Task 1
   report) and runs Task 2 as a deliberate trial: one repetition, and the full ten only if
-  it passes. Rep 1 passed on the first round at 5.89 USD, 1.49 times A1's spend per pass,
-  so reps 2 to 10 are running; this row will be completed when they finish.
+  it passes. Rep 1 passed on the first round at 5.89 USD, so reps 2 to 10 were queued,
+  at the end of the queue behind Task 4. Reps 1 to 4 all passed on the first round, at
+  1.65 times A1's spend per pass, the most expensive solo arm on the task; this row will be
+  completed when reps 5 to 10 finish.
