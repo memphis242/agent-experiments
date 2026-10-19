@@ -1,0 +1,13 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -224,7 +224,8 @@
+         if (j == STOR_MAX_ENTRIES)
+         {
+             E->MsgIdValue = CFE_SB_MsgIdToValue(D->MsgId);
+-            if (CFE_SB_Subscribe(D->MsgId, STOR_Data.CommandPipe) != CFE_SUCCESS)
++            if (CFE_SB_SubscribeEx(D->MsgId, STOR_Data.CommandPipe, CFE_SB_DEFAULT_QOS, 4) != CFE_SUCCESS ||
++                CFE_SB_Subscribe(D->MsgId, STOR_Data.CommandPipe) != CFE_SUCCESS)
+             {
+                 CFE_EVS_SendEvent(STOR_SUB_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: subscribe failed for 0x%X",
+                                   (unsigned int)E->MsgIdValue);

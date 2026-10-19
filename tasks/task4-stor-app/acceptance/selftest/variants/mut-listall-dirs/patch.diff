@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -95,7 +95,6 @@
+         if (isdir && Recurse)
+         {
+             STOR_Walk(ChildRel, true, Total, Out, Max, Err);
+-            continue;
+         }
+         if (*Total < Max)
+         {

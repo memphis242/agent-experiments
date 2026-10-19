@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -87,7 +87,7 @@
+             {
+                 rc = -5;
+             }
+-            for (j = i + 1; j < STOR_MAX_ENTRIES && rc == CFE_SUCCESS; j++)
++            for (j = i + 1; j < i + 2 && j < STOR_MAX_ENTRIES && rc == CFE_SUCCESS; j++)
+             {
+                 if (CFE_SB_MsgId_Equal(T->Entries[i].MsgId, T->Entries[j].MsgId))
+                 {

@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "WAKEUP does not run a purge pass",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Every WAKEUP must run a purge pass, so files closed since th"
+    ]
+  },
+  "expected_behaviours": [
+    "purge-wakeup"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

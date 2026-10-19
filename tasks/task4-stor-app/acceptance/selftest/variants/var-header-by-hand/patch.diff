@@ -1,0 +1,14 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -353,7 +353,9 @@
+             CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: cannot create %s", Path);
+             return;
+         }
+-        CFE_FS_InitHeader(&Hdr, "STOR packet file", STOR_FILE_SUBTYPE);
++        memset(&Hdr, 0, sizeof(Hdr));
++        strncpy((char *)Hdr.Description, "STOR packet file", sizeof(Hdr.Description) - 1);
++        Hdr.SubType = STOR_FILE_SUBTYPE;
+         if (CFE_FS_WriteHeader(E->Fd, &Hdr) != (int32)sizeof(Hdr))
+         {
+             CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: header write failed %s", Path);

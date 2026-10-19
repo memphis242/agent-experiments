@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the quota check ignores the header of a new file",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "The quota check must include the 64-byte file header when th"
+    ]
+  },
+  "expected_behaviours": [
+    "quota-header"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

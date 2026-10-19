@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Usage: run.sh <repo-path> <out.json>
-# Exit 0 every check passed, 1 a check failed, 2 infrastructure error.
+# Exit 0 every check passed, 1 a check failed, 2 infrastructure error found before the agent's code was used.
 set -u
 if [ "$#" -ne 2 ]; then
     echo "usage: run.sh <repo-path> <out.json>" >&2
@@ -33,10 +33,29 @@ trap cleanup EXIT
 trap 'exit 2' TERM INT
 
 export STOR_PACK_TMP="$scratch"
-# Each step enforces its own timeout; the total stays under 30 minutes.
-timeout --kill-after=20 1750 python3 -I -B "$here/check.py" "$repo" "$out"
+# From here on the agent's code is used: every outcome is a result file with exit 0 or 1, never exit 2.
+fallback() { # <detail>: a valid result when check.py could not write one
+    python3 -I - "$out" "$1" <<'PY'
+import json, sys
+fb = ("This requirement could not be verified because the review ran out of time: the build, the unit tests, the cFS "
+      "startups with STOR or the CTF test took far longer than expected, so check that none of them hangs.")
+json.dump({"passed": False, "checks": [{"id": "review-completed", "passed": False, "feedback": fb,
+                                         "detail": sys.argv[2]}]}, open(sys.argv[1], "w"), indent=2)
+PY
+}
+trap 'fallback "run.sh was interrupted"; exit 1' TERM INT
+# check.py keeps its own budget (36 min) and writes its result on SIGTERM; the total stays under the harness's 40 min.
+timeout --preserve-status --kill-after=30 2220 python3 -I -B "$here/check.py" "$repo" "$out"
 rc=$?
-case "$rc" in
-    0|1) [ -f "$out" ] || exit 2; exit "$rc" ;;
-    *) exit 2 ;;
-esac
+if [ "$rc" -eq 0 ] || [ "$rc" -eq 1 ]; then
+    if python3 -I -c 'import json,sys; d=json.load(open(sys.argv[1])); sys.exit(0 if d["passed"] == (sys.argv[2] == "0") else 1)' "$out" "$rc" 2>/dev/null; then
+        exit "$rc"
+    fi
+    fallback "check.py exited $rc without a consistent result file"
+    exit 1
+fi
+if [ "$rc" -eq 2 ] && [ ! -f "$out" ]; then
+    exit 2  # check.py refused to start (arguments, tools, scratch space): the agent's code was not used
+fi
+fallback "check.py ended with status $rc (killed after the time limit, or crashed)"
+exit 1

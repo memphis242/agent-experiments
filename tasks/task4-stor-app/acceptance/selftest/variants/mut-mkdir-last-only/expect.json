@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "only the last level of a directory path is created (parents are assumed to exist)",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "At startup STOR must create TelemetryRoot and FileRoot when "
+    ]
+  },
+  "expected_behaviours": [
+    "startup-roots"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

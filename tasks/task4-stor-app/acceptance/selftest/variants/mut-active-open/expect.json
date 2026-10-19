@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "ActiveEntries counts only entries with an open file",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "ActiveEntries must be the number of used entries in the acti"
+    ]
+  },
+  "expected_behaviours": [
+    "hk-active-entries"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor.h b/apps/stor/fsw/src/stor.h
+--- a/apps/stor/fsw/src/stor.h
++++ b/apps/stor/fsw/src/stor.h
+@@ -13,7 +13,7 @@
+ 
+ #define STOR_MAX_FILES      2048
+ #define STOR_MAX_LIST       512
+-#define STOR_IDLE_CLOSE_SEC 10
++#define STOR_IDLE_CLOSE_SEC 5
+ #define STOR_MAX_SCAN_MIDS  64
+ 
+ typedef struct

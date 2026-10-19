@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "an unknown function code does not increment CommandErrorCounter (sample_app pattern)",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "An unknown function code on STOR_CMD_MID must send STOR_CC_E"
+    ]
+  },
+  "expected_behaviours": [
+    "cmd-bad-cc"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

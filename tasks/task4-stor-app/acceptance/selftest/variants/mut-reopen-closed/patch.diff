@@ -1,0 +1,31 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -313,6 +313,27 @@
+     {
+         STOR_CloseEntry(E);
+         newfile = true;
++    }
++    if (newfile && E->SeqInit && E->OpenBytes > 0 && E->OpenBytes + Size <= STOR_Data.Tbl.MaxPacketFileBytes)
++    {
++        char   RPath[OS_MAX_PATH_LEN];
++        uint32 k;
++        snprintf(RPath, sizeof(RPath), "%s/tlm_%04X_%08u.bin", STOR_Data.Tbl.TelemetryRoot, (unsigned int)E->MsgIdValue,
++                 (unsigned int)E->OpenSeq);
++        if (OS_OpenCreate(&E->Fd, RPath, OS_FILE_FLAG_NONE, OS_READ_WRITE) == OS_SUCCESS)
++        {
++            OS_lseek(E->Fd, 0, OS_SEEK_END);
++            for (k = 0; k < STOR_Data.NumClosed; k++)
++            {
++                if (STOR_Data.Closed[k].MsgIdValue == E->MsgIdValue && STOR_Data.Closed[k].Seq == E->OpenSeq)
++                {
++                    STOR_Data.Closed[k] = STOR_Data.Closed[--STOR_Data.NumClosed];
++                    break;
++                }
++            }
++            E->Open = true;
++            newfile = false;
++        }
+     }
+     cost = Size + (newfile ? sizeof(CFE_FS_Header_t) : 0);
+ 

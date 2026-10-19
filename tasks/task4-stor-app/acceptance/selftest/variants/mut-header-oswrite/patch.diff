@@ -1,0 +1,14 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -354,7 +354,9 @@
+             return;
+         }
+         CFE_FS_InitHeader(&Hdr, "STOR packet file", STOR_FILE_SUBTYPE);
+-        if (CFE_FS_WriteHeader(E->Fd, &Hdr) != (int32)sizeof(Hdr))
++        Hdr.ContentType = 0x63464531;
++        Hdr.Length      = sizeof(Hdr);
++        if (OS_write(E->Fd, &Hdr, sizeof(Hdr)) != (int32)sizeof(Hdr))
+         {
+             CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: header write failed %s", Path);
+             OS_close(E->Fd);

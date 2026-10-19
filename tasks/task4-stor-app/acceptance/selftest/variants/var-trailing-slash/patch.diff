@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -24,7 +24,7 @@
+ static void STOR_Abs(char *Out, size_t Len, const char *Rel)
+ {
+     if (Rel[0] == '\0')
+-        snprintf(Out, Len, "%s", STOR_Data.Tbl.FileRoot);
++        snprintf(Out, Len, "%s/", STOR_Data.Tbl.FileRoot);
+     else
+         snprintf(Out, Len, "%s/%s", STOR_Data.Tbl.FileRoot, Rel);
+ }

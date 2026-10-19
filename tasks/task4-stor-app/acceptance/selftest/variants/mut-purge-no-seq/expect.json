@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "purge picks the first closed file of the lowest priority, without ordering by sequence",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Purge must delete closed files in ascending order of the cur"
+    ]
+  },
+  "expected_behaviours": [
+    "purge-order"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a command path starting with / is accepted",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A command path that contains .., starts with / or is empty ("
+    ]
+  },
+  "expected_behaviours": [
+    "path-reject"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

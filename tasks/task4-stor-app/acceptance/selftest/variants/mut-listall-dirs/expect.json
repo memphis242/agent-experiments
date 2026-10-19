@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "LIST_ALL also lists the directories it descends into",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "LIST_ALL must list every regular file under FileRoot with it"
+    ]
+  },
+  "expected_behaviours": [
+    "list-all"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

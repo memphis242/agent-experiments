@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "directory traversals do not skip . and ..",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Directory traversals (startup scan, LIST_DIR, LIST_ALL) must"
+    ]
+  },
+  "expected_behaviours": [
+    "list-dots"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

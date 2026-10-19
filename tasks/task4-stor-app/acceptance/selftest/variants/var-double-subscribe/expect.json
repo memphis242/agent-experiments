@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "every table entry is subscribed twice (CFE_SB_SubscribeEx with the default limit, then CFE_SB_Subscribe), which the software bus accepts as one subscription"
+}

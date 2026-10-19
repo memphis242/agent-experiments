@@ -1,0 +1,48 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -213,12 +213,8 @@
+     char        Dst[STOR_ABS_MAX];
+     char        Src[STOR_PATH_LEN];
+     osal_id_t   In;
+-    osal_id_t   Out;
+     os_fstat_t  St;
+     uint32      size;
+-    uint8       buf[512];
+-    int32       got;
+-    bool        ok = true;
+ 
+     if (!STOR_PathOk(Cmd->Payload.DestPath, false))
+     {
+@@ -256,29 +252,11 @@
+         STOR_Data.CommandErrorCounter++;
+         return;
+     }
+-    if (!STOR_MakeDirs(Dst, false) ||
+-        OS_OpenCreate(&Out, Dst, OS_FILE_FLAG_CREATE | OS_FILE_FLAG_TRUNCATE, OS_READ_WRITE) != OS_SUCCESS)
+-    {
+-        OS_close(In);
+-        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: cannot create %s", Dst);
+-        STOR_Data.CommandErrorCounter++;
+-        return;
+-    }
+-    while ((got = OS_read(In, buf, sizeof(buf))) > 0)
+-    {
+-        if (OS_write(Out, buf, got) != got)
+-        {
+-            ok = false;
+-            break;
+-        }
+-    }
+-    if (got < 0) ok = false;
+     OS_close(In);
+-    OS_close(Out);
+-    if (!ok)
++    if (!STOR_MakeDirs(Dst, false) || OS_cp(Src, Dst) != OS_SUCCESS)
+     {
+         OS_remove(Dst);
+-        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: copy failed %s", Dst);
++        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: copy to %s failed", Dst);
+         STOR_Data.CommandErrorCounter++;
+         return;
+     }

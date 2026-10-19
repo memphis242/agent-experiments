@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "the table is managed only in the SEND_HK handler after the housekeeping packet is transmitted (the sample_app placement), not on WAKEUP"
+}

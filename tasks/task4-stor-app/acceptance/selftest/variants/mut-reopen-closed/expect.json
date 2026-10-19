@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the next packet after a close is appended to the last closed file when it still fits",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A closed packet file (roll-over, CLOSE_FILES, idle close, ta"
+    ]
+  },
+  "expected_behaviours": [
+    "pkt-no-reopen"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

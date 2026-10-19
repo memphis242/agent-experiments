@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the duplicate MsgId check only compares adjacent entries",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "The table validation function must reject a table in which t"
+    ]
+  },
+  "expected_behaviours": [
+    "tbl-reject-duplicate"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

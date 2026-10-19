@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "a table update is detected only through the CFE_TBL_Manage return code (CFE_TBL_INFO_UPDATED); the address is read unconditionally only for the initial load"
+}

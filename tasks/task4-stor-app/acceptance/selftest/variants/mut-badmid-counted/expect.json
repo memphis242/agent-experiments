@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a message on an unknown MID increments CommandErrorCounter",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A message on a MID that is neither a STOR command MID nor a "
+    ]
+  },
+  "expected_behaviours": [
+    "bad-mid"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

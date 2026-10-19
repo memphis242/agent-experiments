@@ -1,0 +1,22 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -241,8 +241,16 @@
+ 
+ static uint32 STOR_PriorityOf(uint32 MsgIdValue)
+ {
+-    const STOR_Entry_t *E = STOR_FindEntry(MsgIdValue);
+-    return (E == NULL) ? 0 : E->Priority;
++    uint32 i;
++    for (i = 0; i < STOR_MAX_ENTRIES; i++)
++    {
++        if (CFE_SB_IsValidMsgId(STOR_Data.Tbl.Entries[i].MsgId) &&
++            CFE_SB_MsgIdToValue(STOR_Data.Tbl.Entries[i].MsgId) == MsgIdValue)
++        {
++            return STOR_Data.Tbl.Entries[i].Priority;
++        }
++    }
++    return 0;
+ }
+ 
+ void STOR_Purge(void)

@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -314,7 +314,7 @@
+         STOR_CloseEntry(E);
+         newfile = true;
+     }
+-    cost = Size + (newfile ? sizeof(CFE_FS_Header_t) : 0);
++    cost = Size;
+ 
+     if ((uint64)STOR_Data.TelemetryBytesUsed + cost > STOR_Data.Tbl.TelemetryQuotaBytes)
+     {

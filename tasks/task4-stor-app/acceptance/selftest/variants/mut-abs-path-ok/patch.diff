@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -8,7 +8,7 @@
+     {
+         return false;
+     }
+-    if (Rel[0] == '/' || strstr(Rel, "..") != NULL)
++    if (strstr(Rel, "..") != NULL)
+     {
+         return false;
+     }

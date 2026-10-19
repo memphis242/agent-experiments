@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "a table update is detected by a change of CFE_TBL_GetInfo TimeOfLastUpdate after CFE_TBL_Manage"
+}

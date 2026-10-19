@@ -13,7 +13,8 @@ new cFS application in `apps/stor` following the conventions of
 register it in the mission, exercise it with CTF, and report.
 
 NASA's DS and FM apps in this tree solve related problems; you may study
-them, but STOR is a new app with the interfaces below.
+them, but STOR is a new app with the interfaces below. Where this
+specification and sample_app differ, this specification wins.
 
 ## Naming
 
@@ -27,6 +28,9 @@ Topics (`fsw/inc/stor_topicids.h`, defaults): commands `CMD` 0xC4,
 `STATS_TLM` 0xC6. Message IDs `STOR_CMD_MID`, `STOR_SEND_HK_MID`,
 `STOR_WAKEUP_MID`, `STOR_HK_TLM_MID`, `STOR_LIST_TLM_MID`,
 `STOR_STATS_TLM_MID`.
+
+All structures below are in native byte order with natural alignment (no
+packing pragmas).
 
 ## Configuration table
 
@@ -51,7 +55,7 @@ typedef struct
     char            FileRoot[STOR_PATH_LEN];      /* directory for the file area */
     uint32          TelemetryQuotaBytes;
     uint32          FileQuotaBytes;
-    uint32          MaxPacketFileBytes;           /* roll over when exceeded */
+    uint32          MaxPacketFileBytes;           /* a packet file never exceeds this; exactly reaching it is allowed */
     uint8           PurgeThresholdPercent;        /* 1..100, of TelemetryQuotaBytes */
     uint8           Spare[3];
     STOR_EntryDef_t Entries[STOR_MAX_ENTRIES];
@@ -71,15 +75,39 @@ priority 20 decimation 1, `SAMPLE_APP_HK_TLM_MID` priority 30
 decimation 2, `CFE_TIME_HK_TLM_MID` priority 40 decimation 1.
 
 On table load (initial or update) STOR subscribes to every used entry's
-`MsgId`, unsubscribes from entries no longer present, and resets the
-runtime copies of priority, decimation and threshold to the table values.
+`MsgId` (with `CFE_SB_Subscribe`, the default message limit), unsubscribes
+from entries no longer present, and resets the runtime copies of priority,
+decimation and threshold to the table values. Use a command pipe depth of
+at least 32. On an update, an entry whose `MsgId` is still present keeps its
+counters, open file and sequence; a removed entry's open file is closed and
+its counters discarded; new entries start at 0. Quotas, `MaxPacketFileBytes`
+and the threshold apply immediately; changing the roots by a table update
+need not be supported.
+
+STOR checks for a table update (`CFE_TBL_Manage`, then
+`CFE_TBL_GetAddress`; either one reporting `CFE_TBL_INFO_UPDATED` means a
+new table is active) at least once per SEND_HK cycle, for example on every
+WAKEUP or in the SEND_HK handler. A table update takes effect no later than
+the second SEND_HK after the table is activated: the housekeeping that
+SEND_HK produces already reflects it. Release the table address
+(`CFE_TBL_ReleaseAddress`) after each use; table services cannot activate an
+update while the address is held.
 
 ## Telemetry and command storage
 
-- Startup: create both roots if missing (`OS_mkdir`, parents must exist or
-  be created one level at a time), scan them, and initialize
-  `TelemetryBytesUsed` and `FileBytesUsed` from the sizes of regular files
-  found (packet files for the telemetry area; all files for the file area).
+- Startup: create both roots if missing, one directory level at a time
+  with `OS_mkdir` (an already existing directory is not an error), then
+  scan them. `TelemetryBytesUsed` is initialized to the total size of the
+  packet files directly in `TelemetryRoot` (not recursive);
+  `FileBytesUsed` and `FileCount` to the total size and number of all
+  regular files under `FileRoot`, recursively. Every directory traversal
+  (this scan, LIST_DIR, LIST_ALL) skips the `.` and `..` entries that
+  `OS_DirectoryRead` returns. No purge runs during initialization.
+- A packet file is a regular file directly in `TelemetryRoot` whose name
+  matches `tlm_<MMMM>_<NNNNNNNN>.bin` exactly; its contents are not
+  inspected. Other files and directories in `TelemetryRoot` are ignored by
+  accounting and purge. STOR creates nothing in `TelemetryRoot` except
+  packet files (no index, temporary or state files, no subdirectories).
 - For every received packet whose MID is a used entry: `Received`++ for that
   entry; store it when `(Received - 1) % Decimation == 0`, otherwise
   `Decimated`++ and `PacketsDecimated`++.
@@ -94,51 +122,83 @@ runtime copies of priority, decimation and threshold to the table values.
   `sample_defs/default_osconfig.cmake`. Each file starts with a
   `CFE_FS_Header_t` written with `CFE_FS_WriteHeader`, sub type
   `STOR_FILE_SUBTYPE` = 0x5354, description "STOR packet file".
+- A packet file, once closed (roll-over, CLOSE_FILES, idle close or table
+  update), is never reopened: the next packet stored for that MID creates a
+  new file with the next sequence number.
 - Roll over: if appending would make the file exceed `MaxPacketFileBytes`,
-  close it and open the next sequence before writing.
+  close it first; the packet then goes to a new file (next sequence),
+  subject to the quota rule. A packet that cannot fit even in an empty file
+  (header plus packet larger than `MaxPacketFileBytes`) is dropped without
+  closing the open file: `STOR_FILE_WRITE_ERR_EID`, `Dropped`++,
+  `PacketsDropped`++.
 - `TelemetryBytesUsed` is the total size on disk of the packet files,
   headers included.
-- Quota: if storing the packet (including the file header when a new file
-  would be created) would make `TelemetryBytesUsed` exceed
-  `TelemetryQuotaBytes` after purging, the packet is dropped: `Dropped`++
-  for the entry, `PacketsDropped`++, and event `STOR_TLM_QUOTA_ERR_EID`
-  once per entry until it successfully stores again.
-- Purge: after every store, and on every WAKEUP, while `TelemetryBytesUsed`
-  exceeds `PurgeThresholdPercent` percent of `TelemetryQuotaBytes`, delete
-  one closed packet file: the one whose MID has the lowest current
-  priority, lowest sequence first; among equal priorities, the oldest
-  sequence. Open files are never purged. Each deletion: `FilesPurged`++,
+- Quota: a packet that is due to be stored (not decimated) is dropped when
+  `TelemetryBytesUsed` as it stands when the packet arrives, plus the packet
+  size, plus `sizeof(CFE_FS_Header_t)` if the packet would start a new file
+  (first packet for the entry, after a close, or on roll-over), would exceed
+  `TelemetryQuotaBytes`. The quota check never deletes files; space is freed
+  only by the purge rule. A dropped packet never creates a file. On a drop:
+  `Dropped`++ for the entry, `PacketsDropped`++, and `STOR_TLM_QUOTA_ERR_EID`
+  on the entry's first drop and not again for that entry until a packet of
+  that entry is stored.
+- Purge: while `TelemetryBytesUsed > (uint64)TelemetryQuotaBytes *
+  PurgeThresholdPercent / 100` (integer division), delete one closed packet
+  file: the first in ascending order of (current priority of the file's MID,
+  sequence number, MID value). A packet file whose MID is not a used entry
+  has priority 0. Open files are never purged. Each deletion: `FilesPurged`++,
   bytes subtracted. Each purge pass that deletes at least one file:
   `PurgeCycles`++ and one event `STOR_PURGE_INF_EID` with the count. If
-  nothing can be purged, stop.
-- WAKEUP (1 Hz): run the purge check and close any packet file that has not
-  been written for 10 seconds or more.
+  nothing can be purged, stop. A purge pass runs after every store, after
+  SET_PRIORITY, SET_PURGE_THRESHOLD and CLOSE_FILES, after a table update,
+  and on every WAKEUP.
+- WAKEUP (1 Hz): table check (if done on WAKEUP), purge pass, then close
+  every packet file whose last write is 10 seconds or more ago (a file
+  closed this way becomes purgeable at the next pass). Measure idle time
+  with cFE time (any `CFE_TIME_*` call), never host clocks.
+- Write failures: if a packet file cannot be created or its header cannot
+  be written, `STOR_FILE_WRITE_ERR_EID`; any partly created file is removed,
+  the sequence number is not consumed, and the packet counts as neither
+  stored nor dropped. If a packet write fails (`OS_write` returns anything
+  other than the packet size), `STOR_FILE_WRITE_ERR_EID`, the file is
+  closed, the packet counts as neither stored nor dropped, and
+  `TelemetryBytesUsed` includes whatever bytes reached the file.
 - The runtime priority, decimation and threshold can be changed by command
   (below) without a table update; a table update overrides them.
 
 ## File area
 
-- Paths given in commands are relative to `FileRoot`; a path containing
-  `..` or starting with `/` is rejected with `STOR_PATH_ERR_EID`.
+- Paths given in commands are relative to `FileRoot`. A path field with no
+  NUL within `STOR_PATH_LEN` bytes, or a relative path that is empty (except
+  for LIST_DIR), starts with `/`, or contains the substring `..`, is
+  rejected with `STOR_PATH_ERR_EID`. An unterminated `SourcePath` is also
+  rejected with `STOR_PATH_ERR_EID`.
 - `ADD_FILE { char SourcePath[STOR_PATH_LEN]; char DestPath[STOR_PATH_LEN]; }`:
   copy the source (an absolute onboard path) to `<FileRoot>/<DestPath>`,
-  creating intermediate directories. Rejected, with `CommandErrorCounter`++
-  and no partial file left behind, when: the source cannot be opened
-  (`STOR_FILE_SRC_ERR_EID`), the destination exists
-  (`STOR_FILE_EXISTS_ERR_EID`), or `FileBytesUsed` plus the source size
+  creating intermediate directories. Checks in this order, each rejection
+  with `CommandErrorCounter`++ and no file or directory left behind: path
+  (`STOR_PATH_ERR_EID`); the source cannot be opened or is a directory
+  (`STOR_FILE_SRC_ERR_EID`); the destination exists
+  (`STOR_FILE_EXISTS_ERR_EID`); `FileBytesUsed` plus the source size
   exceeds `FileQuotaBytes` (`STOR_FILE_QUOTA_ERR_EID`, `FileAddsRejected`++).
-  Success: `FileCount`++, bytes added, event `STOR_FILE_ADD_INF_EID`.
+  Directories are created only after all checks pass. A directory-creation
+  or copy failure sends `STOR_FILE_WRITE_ERR_EID`, removes any partial
+  destination and counts as a command error. `FileAddsRejected` counts only
+  quota rejections. Success: `FileCount`++, bytes added, event
+  `STOR_FILE_ADD_INF_EID`.
 - `DELETE_FILE { char Path[STOR_PATH_LEN]; }`: delete a regular file;
   missing or a directory is an error (`STOR_FILE_DEL_ERR_EID`). Success:
   `FileCount`--, bytes subtracted, `STOR_FILE_DEL_INF_EID`.
 - `LIST_DIR { char Path[STOR_PATH_LEN]; }`: list the immediate entries of
-  `<FileRoot>/<Path>` (empty path = root), directories with a trailing `/`
-  and size 0, in `OS_DirectoryRead` order.
+  `<FileRoot>/<Path>` (empty path = root) in `OS_DirectoryRead` order. Names
+  are the bare entry names (no directory prefix); directories have a
+  trailing `/` and size 0.
 - `LIST_ALL` (no payload): list every regular file under `FileRoot`
   recursively, names as paths relative to `FileRoot`, in depth-first
   pre-order: a directory's files in `OS_DirectoryRead` order, descending
   into each subdirectory at its position.
-- Listing output: one or more `STOR_ListTlm_t` packets:
+- Listing output: one or more `STOR_ListTlm_t` packets, each the full
+  `sizeof(STOR_ListTlm_t)` (entries beyond `EntriesInPacket` zero-filled):
 
   ```c
   #define STOR_LIST_ENTRIES_PER_PKT 4
@@ -156,8 +216,9 @@ runtime copies of priority, decimation and threshold to the table values.
   ```
 
   An empty directory yields one packet with `TotalEntries` 0. A missing
-  directory is an error (`STOR_LIST_ERR_EID`). Success events:
-  `STOR_LIST_INF_EID` with the entry count.
+  path, or a path that is not a directory, is an error
+  (`STOR_LIST_ERR_EID`) and sends no packet. Each successful listing
+  command sends exactly one `STOR_LIST_INF_EID` with the entry count.
 
 ## Commands
 
@@ -177,33 +238,53 @@ runtime copies of priority, decimation and threshold to the table values.
 | 9 | SEND_STATS | none |
 | 10 | CLOSE_FILES | none |
 
-Every accepted command increments `CommandCounter`; every rejected one
-increments `CommandErrorCounter` and sends the named error event, and
-nothing else changes. Command types are named `STOR_<Name>Cmd_t` in CamelCase
-(`STOR_NoopCmd_t`, `STOR_SetPriorityCmd_t`, `STOR_AddFileCmd_t`, ...),
-payloads `STOR_<Name>_Payload_t`. SET_PRIORITY and SET_DECIMATION reject
-value 0 or an unknown MsgId (`STOR_SET_PARAM_ERR_EID`); success
-`STOR_SET_PARAM_INF_EID`. SET_PURGE_THRESHOLD accepts 1..100
-(`STOR_SET_PARAM_ERR_EID` otherwise) and triggers a purge check.
-CLOSE_FILES closes every open packet file (`STOR_CLOSE_INF_EID` with the
-count). SEND_STATS transmits one `STOR_StatsTlm_t`:
+Only commands on `STOR_CMD_MID` change `CommandCounter`: every accepted one
+increments it (except RESET_COUNTERS, below); every rejected one increments
+`CommandErrorCounter` and sends the named error event, and nothing else
+changes (except `FileAddsRejected` as stated for ADD_FILE). Command types
+are named `STOR_<Name>Cmd_t` in CamelCase (`STOR_NoopCmd_t`,
+`STOR_SetPriorityCmd_t`, `STOR_AddFileCmd_t`, ...), payloads
+`STOR_<Name>_Payload_t`.
 
-```c
-typedef struct
-{
-    CFE_SB_MsgId_t MsgId; uint8 Priority; uint8 Decimation; uint16 Spare;
-    uint32 Received; uint32 Stored; uint32 Decimated; uint32 Dropped;
-} STOR_EntryStats_t;
+- SET_PRIORITY and SET_DECIMATION reject value 0 or an unknown MsgId
+  (`STOR_SET_PARAM_ERR_EID`); success `STOR_SET_PARAM_INF_EID`.
+- SET_PURGE_THRESHOLD accepts 1..100: it sets the runtime threshold, sends
+  `STOR_SET_PARAM_INF_EID`, then runs a purge pass. Other values are
+  rejected with `STOR_SET_PARAM_ERR_EID`.
+- CLOSE_FILES closes every open packet file (`STOR_CLOSE_INF_EID` with the
+  count), then runs a purge pass, so files it closed are deleted at once if
+  `TelemetryBytesUsed` is above the threshold.
+- SEND_STATS transmits one `STOR_StatsTlm_t`, then sends
+  `STOR_STATS_INF_EID`. It holds one element per used entry, in any order;
+  the remaining elements are all zero:
 
-typedef struct { STOR_EntryStats_t Entries[STOR_MAX_ENTRIES]; } STOR_Stats_Payload_t;
-```
+  ```c
+  typedef struct
+  {
+      CFE_SB_MsgId_t MsgId; uint8 Priority; uint8 Decimation; uint16 Spare;
+      uint32 Received; uint32 Stored; uint32 Decimated; uint32 Dropped;
+  } STOR_EntryStats_t;
 
-RESET_COUNTERS zeroes `CommandCounter`, `CommandErrorCounter`, all per-entry
-counters, `PacketsStored`, `PacketsDecimated`, `PacketsDropped`,
-`FilesPurged`, `PurgeCycles` and `FileAddsRejected`. It does not touch
-byte accounting, file counts, or runtime parameters. Bad command code and
-bad length follow the sample_app pattern (`STOR_CC_ERR_EID`,
-`STOR_CMD_LEN_ERR_EID`); bad MID `STOR_MID_ERR_EID`.
+  typedef struct { STOR_EntryStats_t Entries[STOR_MAX_ENTRIES]; } STOR_Stats_Payload_t;
+  ```
+
+- RESET_COUNTERS zeroes `CommandCounter`, `CommandErrorCounter`, all
+  per-entry counters, `PacketsStored`, `PacketsDecimated`, `PacketsDropped`,
+  `FilesPurged`, `PurgeCycles` and `FileAddsRejected`, and does not
+  increment `CommandCounter` afterwards: both command counters read 0. It
+  sends `STOR_RESET_INF_EID`. It does not touch byte accounting, file
+  counts, open files, or runtime parameters.
+- Bad command code: `STOR_CC_ERR_EID` and `CommandErrorCounter`++ (unlike
+  sample_app, which does not count it). Bad length on any `STOR_CMD_MID`
+  command: `STOR_CMD_LEN_ERR_EID`, `CommandErrorCounter`++, and the command
+  is not executed.
+- SEND_HK and WAKEUP never increment `CommandCounter`. A SEND_HK or WAKEUP
+  whose length is not `sizeof(CFE_MSG_CommandHeader_t)` is not acted on (no
+  housekeeping is sent, no WAKEUP processing runs): STOR sends
+  `STOR_CMD_LEN_ERR_EID` and increments `CommandErrorCounter`;
+  `CommandCounter` is unchanged.
+- A message on any other MID that is not a used entry sends
+  `STOR_MID_ERR_EID` and changes no counter.
 
 ## Housekeeping telemetry
 
@@ -220,6 +301,10 @@ uint16 FileAddsRejected; uint16 FileCount;
 uint16 ActiveEntries;    uint16 OpenPacketFiles;
 ```
 
+`ActiveEntries` is the number of used entries (`MsgId` not
+`CFE_SB_INVALID_MSG_ID`) in the currently active table;
+`OpenPacketFiles` the number of packet files currently open.
+
 ## Event IDs (`fsw/inc/stor_eventids.h`)
 
 1 INIT_INF, 2 CC_ERR, 3 NOOP_INF, 4 RESET_INF, 5 MID_ERR, 6 CMD_LEN_ERR,
@@ -229,7 +314,8 @@ uint16 ActiveEntries;    uint16 OpenPacketFiles;
 20 FILE_EXISTS_ERR, 21 FILE_QUOTA_ERR, 22 FILE_ADD_INF, 23 FILE_DEL_ERR,
 24 FILE_DEL_INF, 25 LIST_ERR, 26 LIST_INF, 27 CLOSE_INF, 28 STATS_INF.
 Macro names are `STOR_<NAME>_EID`. ERR events are ERROR type, INF events
-INFORMATION, except PURGE_INF which is DEBUG.
+INFORMATION, except PURGE_INF which is DEBUG. STOR registers with EVS
+(`CFE_EVS_Register`) before sending its first event.
 
 ## Mission integration
 
@@ -242,12 +328,20 @@ INFORMATION, except PURGE_INF which is DEBUG.
   directory).
 - `sample_defs/tables/sch_lab_table.c`: `STOR_SEND_HK_MID` every 4.9 s,
   `STOR_WAKEUP_MID` every 1.0 s.
-- `sample_defs/tables/to_lab_sub.c`: `STOR_HK_TLM_MID`, `STOR_LIST_TLM_MID`,
-  `STOR_STATS_TLM_MID`.
+- `sample_defs/tables/to_lab_sub.c`: `STOR_HK_TLM_MID` and
+  `STOR_STATS_TLM_MID` with buffer limit 1, and `STOR_LIST_TLM_MID` with
+  buffer limit 4 so that a whole listing reaches the ground:
+  `{CFE_SB_MSGID_WRAP_VALUE(STOR_LIST_TLM_MID), {0, 0}, 4}`.
 
 ## Non-functional requirements
 
-- Build with no warnings (`-Werror`); `make -j native_std.runtest` passes.
+- All STOR processing runs in the main task: no child tasks, ES memory
+  pools, background file dumps, or `CFE_FS_ParseInputFileName`. File and
+  directory work uses the OSAL file and directory API (`OS_OpenCreate`,
+  `OS_read`, `OS_write`, `OS_close`, `OS_stat`, `OS_mkdir`, `OS_remove`,
+  `OS_cp`, `OS_Directory*`).
+- Build with no warnings (`-Werror`); `make -j native_std.runtest` passes,
+  including STOR's tests and the mission's existing ones.
 - One coverage test file per source module in
   `apps/stor/unit-test/coveragetest/` (the build requires it); line coverage
   of every STOR source file at least 95 percent (the project convention is

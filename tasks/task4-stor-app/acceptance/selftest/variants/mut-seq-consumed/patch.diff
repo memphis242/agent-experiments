@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -351,6 +351,7 @@
+         if (OS_OpenCreate(&E->Fd, Path, OS_FILE_FLAG_CREATE | OS_FILE_FLAG_TRUNCATE, OS_READ_WRITE) != OS_SUCCESS)
+         {
+             CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: cannot create %s", Path);
++            E->NextSeq++;
+             return;
+         }
+         CFE_FS_InitHeader(&Hdr, "STOR packet file", STOR_FILE_SUBTYPE);

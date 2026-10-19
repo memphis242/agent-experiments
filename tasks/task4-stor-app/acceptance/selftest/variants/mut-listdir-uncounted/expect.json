@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "LIST_DIR does not increment CommandCounter",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Every accepted STOR_CMD_MID command (NOOP, SET_*, ADD_FILE, "
+    ]
+  },
+  "expected_behaviours": [
+    "cmd-counter"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

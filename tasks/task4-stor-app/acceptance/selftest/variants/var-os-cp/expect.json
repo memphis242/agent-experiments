@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "ADD_FILE copies with OS_cp after all checks instead of its own read/write loop"
+}

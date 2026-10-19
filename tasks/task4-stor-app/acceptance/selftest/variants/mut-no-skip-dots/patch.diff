@@ -1,0 +1,22 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -78,10 +78,6 @@
+         os_fstat_t  St;
+         bool        isdir;
+ 
+-        if (strcmp(Name, ".") == 0 || strcmp(Name, "..") == 0)
+-        {
+-            continue;
+-        }
+         if (Rel[0] == '\0')
+             snprintf(ChildRel, sizeof(ChildRel), "%s", Name);
+         else
+@@ -181,7 +177,6 @@
+         char        ChildRel[STOR_ABS_MAX];
+         char        ChildAbs[STOR_ABS_MAX];
+         os_fstat_t  St;
+-        if (strcmp(Name, ".") == 0 || strcmp(Name, "..") == 0) continue;
+         if (Rel[0] == '\0')
+             snprintf(ChildRel, sizeof(ChildRel), "%s", Name);
+         else

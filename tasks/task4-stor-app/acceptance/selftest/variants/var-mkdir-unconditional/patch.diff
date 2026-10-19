@@ -1,0 +1,34 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -31,10 +31,9 @@
+ 
+ bool STOR_MakeDirs(const char *Path, bool IncludeLast)
+ {
+-    char       Work[STOR_ABS_MAX];
+-    size_t     i;
+-    size_t     len;
+-    os_fstat_t St;
++    char   Work[STOR_ABS_MAX];
++    size_t i;
++    size_t len;
+ 
+     snprintf(Work, sizeof(Work), "%s", Path);
+     len = strlen(Work);
+@@ -44,13 +43,10 @@
+         {
+             char saved = Work[i];
+             Work[i]    = '\0';
+-            if (OS_stat(Work, &St) != OS_SUCCESS)
++            if (OS_mkdir(Work, 0) != OS_SUCCESS)
+             {
+-                if (OS_mkdir(Work, 0) != OS_SUCCESS)
+-                {
+-                    CFE_EVS_SendEvent(STOR_DIR_CREATE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: cannot create %s", Work);
+-                    return false;
+-                }
++                CFE_EVS_SendEvent(STOR_DIR_CREATE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: cannot create %s", Work);
++                return false;
+             }
+             Work[i] = saved;
+         }

@@ -1,0 +1,13 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -177,7 +177,8 @@
+     }
+     else if (v == STOR_SEND_HK_MID)
+     {
+-        if (STOR_VerifyLen(&Buf->Msg, sizeof(STOR_SendHkCmd_t))) STOR_SendHk();
++        STOR_VerifyLen(&Buf->Msg, sizeof(STOR_SendHkCmd_t));
++        STOR_SendHk();
+     }
+     else if (v == STOR_WAKEUP_MID)
+     {

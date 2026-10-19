@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a table registration failure is not reported with an event",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A table registration failure at startup must be reported wit"
+    ]
+  },
+  "expected_behaviours": [
+    "startup-err-tblreg"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

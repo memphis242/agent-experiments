@@ -1,0 +1,23 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -497,7 +497,7 @@
+     for (i = 0; i < STOR_MAX_ENTRIES; i++)
+     {
+         const STOR_Entry_t *E = &STOR_Data.Entries[i];
+-        STOR_EntryStats_t  *S = &STOR_Data.StatsTlm.Payload.Entries[n];
++        STOR_EntryStats_t  *S = &STOR_Data.StatsTlm.Payload.Entries[STOR_MAX_ENTRIES - 1 - n];
+         if (!E->Used)
+         {
+             continue;
+@@ -511,10 +511,6 @@
+         S->Dropped    = E->Dropped;
+         n++;
+     }
+-    for (; n < STOR_MAX_ENTRIES; n++)
+-    {
+-        STOR_Data.StatsTlm.Payload.Entries[n].MsgId = CFE_SB_INVALID_MSG_ID;
+-    }
+     CFE_SB_TimeStampMsg(CFE_MSG_PTR(STOR_Data.StatsTlm.TelemetryHeader));
+     CFE_SB_TransmitMsg(CFE_MSG_PTR(STOR_Data.StatsTlm.TelemetryHeader), true);
+     CFE_EVS_SendEvent(STOR_STATS_INF_EID, CFE_EVS_EventType_INFORMATION, "STOR: statistics sent");

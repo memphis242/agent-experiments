@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "directories are created with an unconditional OS_mkdir per level starting at /cf (no OS_stat first), relying on OS_mkdir returning success for an existing directory"
+}

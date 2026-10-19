@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "each received message is copied into a local buffer and processed from the copy"
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the startup scan of the file area does not descend into subdirectories",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "At startup FileBytesUsed and FileCount must be the total siz"
+    ]
+  },
+  "expected_behaviours": [
+    "scan-files"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

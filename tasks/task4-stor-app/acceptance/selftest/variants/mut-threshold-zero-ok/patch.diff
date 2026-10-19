@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -109,7 +109,7 @@
+             if (STOR_VerifyLen(&Buf->Msg, sizeof(STOR_SetPurgeThresholdCmd_t)))
+             {
+                 const STOR_SetPurgeThresholdCmd_t *C = (const STOR_SetPurgeThresholdCmd_t *)Buf;
+-                if (C->Payload.Percent < 1 || C->Payload.Percent > 100)
++                if (C->Payload.Percent > 100)
+                 {
+                     CFE_EVS_SendEvent(STOR_SET_PARAM_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: bad threshold %u",
+                                       (unsigned int)C->Payload.Percent);

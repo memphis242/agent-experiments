@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -36,8 +36,6 @@
+     STOR_Data.CommandErrorCounter = 0;
+     STOR_Data.PacketsStored       = 0;
+     STOR_Data.PacketsDecimated    = 0;
+-    STOR_Data.PacketsDropped      = 0;
+-    STOR_Data.FilesPurged         = 0;
+     STOR_Data.PurgeCycles         = 0;
+     STOR_Data.FileAddsRejected    = 0;
+     for (i = 0; i < STOR_MAX_ENTRIES; i++)

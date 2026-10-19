@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -101,7 +101,7 @@
+         {
+             STOR_ListEntry_t *L = &Out[*Total];
+             memset(L, 0, sizeof(*L));
+-            snprintf(L->Name, sizeof(L->Name), "%s%s", Recurse ? ChildRel : Name, isdir ? "/" : "");
++            snprintf(L->Name, sizeof(L->Name), "%s%s", ChildRel, isdir ? "/" : "");
+             L->Size = isdir ? 0 : (uint32)OS_FILESTAT_SIZE(St);
+         }
+         (*Total)++;

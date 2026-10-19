@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a failed packet file creation consumes the sequence number",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "When a packet file cannot be created or its header cannot be"
+    ]
+  },
+  "expected_behaviours": [
+    "write-fail-create"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

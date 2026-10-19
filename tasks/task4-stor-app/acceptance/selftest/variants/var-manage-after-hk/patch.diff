@@ -1,0 +1,27 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -392,7 +392,6 @@
+ {
+     uint32 i;
+     uint32 now = STOR_Now();
+-    STOR_PollTable();
+     STOR_Purge();
+     for (i = 0; i < STOR_MAX_ENTRIES; i++)
+     {
+@@ -463,7 +462,6 @@
+     STOR_HkTlm_Payload_t *P = &STOR_Data.HkTlm.Payload;
+     uint32                i;
+ 
+-    STOR_PollTable();
+     P->CommandCounter        = STOR_Data.CommandCounter;
+     P->CommandErrorCounter   = STOR_Data.CommandErrorCounter;
+     P->PurgeThresholdPercent = STOR_Data.PurgeThresholdPercent;
+@@ -487,6 +485,7 @@
+     }
+     CFE_SB_TimeStampMsg(CFE_MSG_PTR(STOR_Data.HkTlm.TelemetryHeader));
+     CFE_SB_TransmitMsg(CFE_MSG_PTR(STOR_Data.HkTlm.TelemetryHeader), true);
++    STOR_PollTable();
+ }
+ 
+ void STOR_SendStats(void)

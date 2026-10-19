@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "SEND_STATS fills the statistics elements from the last one backwards (the specification allows any order)"
+}

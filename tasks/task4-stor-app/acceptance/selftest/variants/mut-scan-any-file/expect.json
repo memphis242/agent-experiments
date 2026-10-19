@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the startup scan counts every regular file in TelemetryRoot, not only packet files",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "At startup TelemetryBytesUsed must be the total size of the "
+    ]
+  },
+  "expected_behaviours": [
+    "scan-tlm"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

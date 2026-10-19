@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "decimation stores when Received % Decimation == 0",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "For each used entry Received counts every packet; a packet i"
+    ]
+  },
+  "expected_behaviours": [
+    "decimation"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}
