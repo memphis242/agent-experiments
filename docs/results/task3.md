@@ -29,18 +29,18 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A3 | Opus 5.5 subagents, conservative | task3 | 5/5 | 7.12 | 6.16 to 8.25 | 2.09 | 18.1 to 22.6 | 88 to 112 | 0 | 1 | 0 | 242.4 to 291.8 | - |
 | A4 | Sonnet 5.5 subagents, eager | task3 | 5/5 | 6.87 | 6.36 to 7.37 | 1.01 | 21.1 to 32.8 | 7 to 13 | 3 to 4 | 1 | 0 | 126.1 to 172.0 | 149.8 to 188.7 |
 | A5 | Sonnet 5.5 subagents, conservative | task3 | 5/5 | 8.39 | 7.34 to 9.30 | 1.96 | 19.5 to 30.9 | 101 to 123 | 0 | 1 | 0 | 268.4 to 310.8 | - |
-| A6 | Sonnet 5 subagents, eager | task3 | 5/5 | 15.06 | 10.19 to 18.49 | 8.30 | 27.1 to 62.6 | 30 to 83 | 2 to 9 | 2 to 4 | 0 | 164.8 to 224.7 | 191.6 to 381.9 |
+| A6 | Sonnet 5 subagents, eager | task3 | 5/5 | 15.06 | 10.19 to 18.49 | 8.30 | 27.1 to 62.6 | 30 to 83 | 2 to 9 | 2 to 4* | 0 | 164.8 to 224.7 | 191.6 to 381.9 |
 | A7 | Sonnet 5 subagents, conservative | task3 | 5/5 | 8.41 | 7.94 to 8.85 | 0.91 | 21.5 to 31.3 | 106 to 123 | 0 | 1 | 0 | 284.2 to 307.3 | - |
-| A8 | Sonnet 4.6 subagents, eager | task3 | 5/5 | 14.79 | 10.05 to 18.95 | 8.90 | 28.0 to 48.4 | 22 to 104 | 2 to 4 | 1 to 3 | 0 to 1 | 196.6 to 251.2 | 162.8 to 167.1 |
+| A8 | Sonnet 4.6 subagents, eager | task3 | 5/5 | 14.79 | 10.05 to 18.95 | 8.90 | 28.0 to 48.4 | 22 to 104 | 2 to 4 | 1 to 3* | 0 to 1 | 196.6 to 251.2 | 162.8 to 167.1 |
 | A9 | Sonnet 4.6 subagents, conservative | task3 | 5/5 | 7.50 | 6.60 to 8.81 | 2.21 | 19.1 to 27.4 | 93 to 114 | 0 | 1 | 0 | 250.3 to 318.7 | - |
-| A10 | solo Sonnet 5.5, xhigh effort | task3 | 5/5 | 7.85 | 6.15 to 12.08 | 5.93 | 26.3 to 62.6 | 6 to 204 | 0 | 1 to 2 | 0 | 403.8 to 595.7 | - |
-| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 5/5 | 3.96 | 3.20 to 4.90 | 1.71 | 22.9 to 52.6 | 1 to 88 | 1 to 2 | 1 to 2 | 0 | 166.3 to 264.9 | 192.5 to 267.6 |
-| A12 | solo Sonnet 5.5, high effort | task3 | 5/5 | 4.13 | 3.74 to 4.52 | 0.77 | 21.8 to 34.5 | 7 to 107 | 0 | 2 | 0 | 265.8 to 316.1 | - |
+| A10 | solo Sonnet 5.5, xhigh effort | task3 | 5/5 | 7.85 | 6.15 to 12.08 | 5.93 | 26.3 to 62.6 | 6 to 204 | 0 | 1 to 2* | 0 | 403.8 to 595.7 | - |
+| A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 5/5 | 3.96 | 3.20 to 4.90 | 1.71 | 22.9 to 52.6 | 1 to 88 | 1 to 2 | 1 to 2* | 0 | 166.3 to 264.9 | 192.5 to 267.6 |
+| A12 | solo Sonnet 5.5, high effort | task3 | 5/5 | 4.13 | 3.74 to 4.52 | 0.77 | 21.8 to 34.5 | 7 to 107 | 0 | 2* | 0 | 265.8 to 316.1 | - |
 | A13 | solo Opus 5.5, medium effort | task3 | 5/5 | 7.42 | 6.30 to 8.04 | 1.74 | 21.5 to 28.6 | 89 to 129 | 0 | 1 | 0 | 257.5 to 282.4 | - |
-| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 3.09 | 2.42 to 3.57 | 1.15 | 20.8 to 26.5 | 14 to 21 | 3 | 1 to 2 | 0 | 53.8 to 91.5 | 182.2 to 302.2 |
-| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 4.94 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 28 | 3 to 4 | 1 to 2 | 0 | 139.9 to 158.5 | 230.7 to 250.3 |
-| A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.85 | 2.61 to 5.65 | 3.04 | 23.9 to 38.0 | 144 to 279 | 0 | 1 to 2 | 0 | 407.9 to 573.8 | - |
-| A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3 | 0 | 498.3 to 856.0 | - |
+| A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 3.09 | 2.42 to 3.57 | 1.15 | 20.8 to 26.5 | 14 to 21 | 3 | 1 to 2* | 0 | 53.8 to 91.5 | 182.2 to 302.2 |
+| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 4.94 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 28 | 3 to 4 | 1 to 2* | 0 | 139.9 to 158.5 | 230.7 to 250.3 |
+| A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.85 | 2.61 to 5.65 | 3.04 | 23.9 to 38.0 | 144 to 279 | 0 | 1 to 2* | 0 | 407.9 to 573.8 | - |
+| A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3* | 0 | 498.3 to 856.0 | - |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A14 0.37, A16 0.46, A11 0.47, A12
 0.49, A15 0.59, A17 0.71, A4 0.82, A3 0.85, A13 0.88, A9 0.89, A10 0.94, A5 1.00, A7 1.00,
@@ -121,3 +121,10 @@ Notes:
   arm on Tasks 1 to 3, with costs of 3.58 to 11.44 USD and wall times of 25 to 80 minutes.
 - A16 and A17 both qualify for Task 4 under the task gate: no run failed and none reached
   the final round.
+- \* Round counts and spend of these arms include runs that lost rounds to a defect outside
+  their own code, listed in [rerun-ledger.md](rerun-ledger.md) and to be rerun: an ambiguous
+  fresh-event rule in the spec with misleading feedback (A10 rep 4, A11 reps 3 to 5, A12
+  reps 1 to 5, A16 reps 2 to 7, A17 reps 3, 4, 7, 8 and 10), and the CLI stopping a background
+  subagent at its ten-minute wait ceiling (A6 reps 1 to 5, A8 reps 1, 2, 4 and 5, A11 rep 4,
+  A14 reps 2, 4 and 5, A15 rep 4). A re-grade of every round of all 97 runs on the corrected
+  pack changed no other verdict, so the remaining runs stand.

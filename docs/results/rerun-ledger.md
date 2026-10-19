@@ -73,7 +73,38 @@ round. All passed. Outcomes are unchanged; round counts and spend are inflated.
 | 19a7c17b | A17 | 8 | 3 | T3-2 |
 | b76a9d09 | A17 | 10 | 2 | |
 
-The re-grade of all Task 3 rounds on the fixed pack may add runs to this table.
+Re-grade (2026-10-19, `harness/regrade.py` at 47a3c75, every round of all 97 completed Task 3
+runs on the fixed pack; results in `/workspace/audit-scratch/t3-fix/regrade-final/`): 116 of 139
+rounds graded the same; 4 changed from fail to pass, exactly the T3-1 and T3-2 rounds above
+(a8329bee and d43fbb41 round 2 on the hidden test, ddba0caf and 19a7c17b round 2 on the unit
+tests). The T3-3 rounds still fail on the fixed pack, as they should: the spec, not the grader,
+was ambiguous. The other 19 differing rounds all belong to the ceiling-hit runs below, graded in
+rounds where the agent had not committed its work, which a checkout cannot reproduce; their
+final verdicts do not change. No run outside these two tables lost a round to a pack defect, so
+the other runs stand.
+
+### Task 3 runs cut off by the print-mode wait ceiling
+
+The CLI stopped a background subagent at its ten-minute wait ceiling in these runs (see the
+design document); they are rerun with the raised ceiling like the Task 1 and Task 2 ones.
+cca9ca4e is also in the table above.
+
+| Run | Arm | Rep | Rounds |
+|-----|-----|----:|-------:|
+| 5f0aa93f | A6 | 1 | 2 |
+| 85ef1e31 | A6 | 2 | 4 |
+| 3b06a362 | A6 | 3 | 2 |
+| 6dfaf2db | A6 | 4 | 4 |
+| 57a62334 | A6 | 5 | 2 |
+| 708bb929 | A8 | 1 | 2 |
+| 5be745a3 | A8 | 2 | 3 |
+| b6ee0d71 | A8 | 4 | 2 |
+| 8c8534f9 | A8 | 5 | 2 |
+| cca9ca4e | A11 | 4 | 2 |
+| 1b191f23 | A14 | 2 | 2 |
+| 7001758f | A14 | 4 | 2 |
+| 875dd8d3 | A14 | 5 | 2 |
+| d7444424 | A15 | 4 | 2 |
 
 ### OSAL functional-test race (Tasks 2 and 3; Task 4 superseded)
 
