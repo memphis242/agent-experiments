@@ -1,8 +1,8 @@
-# Task 2 results (SAMPLE_APP status command), 174 runs, 2026-10-19 (preliminary: A19 in progress)
+# Task 2 results (SAMPLE_APP status command), 194 runs, 2026-10-19 (preliminary: A19 in progress)
 
-All 174 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
+All 194 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
 were run on three parallel slots and the remaining seven on six; A10 to A15 were added
-later and run on six or seven, A16 and A17 on up to nine, A19 on six). Billed cost includes compaction
+later and run on six or seven, A16 and A17 on up to nine, A19 on six, the Codex arms A21 and A22 on three). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
@@ -19,11 +19,11 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | Arm | Description | Task | Passes/attempts | Spend per pass USD | Cost per run USD | Cost spread USD | Wall min per run | Turns per run | Spawns | Rounds | Compactions | Main ctx peak (K tokens) | Subagent ctx peak (K tokens) |
 |-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|
 | A1 | solo Opus 5.5 | task2 | 10/10 | 3.95 | 2.99 to 4.73 | 1.73 | 11.5 to 18.4 | 53 to 80 | 0 | 1 | 0 | 146.8 to 196.0 | - |
-| A2 | Opus 5.5 subagents, eager | task2 | 10/10 | 5.05 | 3.90 to 6.20 | 2.30 | 10.7 to 25.9 | 3 to 19 | 2 to 4 | 1 to 2 | 0 | 71.6 to 133.3 | 75.1 to 120.6 |
+| A2 | Opus 5.5 subagents, eager | task2 | 10/10 | 5.06 | 3.90 to 6.20 | 2.30 | 10.6 to 23.0 | 3 to 19 | 2 to 4 | 1 | 0 | 96.3 to 133.3 | 75.1 to 120.6 |
 | A3 | Opus 5.5 subagents, conservative | task2 | 10/10 | 3.66 | 3.21 to 4.40 | 1.19 | 11.9 to 16.9 | 7 to 75 | 0 | 1 | 0 | 154.6 to 190.8 | - |
 | A4 | Sonnet 5.5 subagents, eager | task2 | 10/10 | 3.28 | 2.51 to 4.44 | 1.93 | 9.8 to 28.5 | 6 to 22 | 2 to 4 | 1 | 0 | 91.0 to 140.3 | 67.1 to 148.2 |
 | A5 | Sonnet 5.5 subagents, conservative | task2 | 10/10 | 3.75 | 3.13 to 4.66 | 1.54 | 11.1 to 21.7 | 3 to 80 | 0 | 1 | 0 | 149.8 to 199.2 | - |
-| A6 | Sonnet 5 subagents, eager | task2 | 10/10 | 6.83 | 5.27 to 10.94 | 5.67 | 15.6 to 44.8 | 6 to 29 | 2 to 4 | 1 to 2 | 0 | 81.0 to 138.4 | 135.7 to 274.6 |
+| A6 | Sonnet 5 subagents, eager | task2 | 10/10 | 6.76 | 4.63 to 10.94 | 6.31 | 11.9 to 44.8 | 7 to 29 | 2 to 4 | 1 to 2 | 0 | 81.0 to 138.4 | 135.7 to 274.6 |
 | A7 | Sonnet 5 subagents, conservative | task2 | 10/10 | 3.68 | 3.18 to 4.29 | 1.11 | 12.3 to 17.9 | 52 to 74 | 0 | 1 | 0 | 154.2 to 186.9 | - |
 | A8 | Sonnet 4.6 subagents, eager | task2 | 10/10 | 5.56 | 4.59 to 7.18 | 2.59 | 14.7 to 25.6 | 2 to 17 | 2 to 4 | 1 | 0 | 97.2 to 169.9 | 77.2 to 129.5 |
 | A9 | Sonnet 4.6 subagents, conservative | task2 | 10/10 | 3.81 | 3.18 to 4.89 | 1.71 | 10.3 to 17.8 | 3 to 75 | 0 | 1 to 2* | 0 | 150.7 to 203.3 | - |
@@ -36,10 +36,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A16 | solo Haiku 5.5, high effort | task2 | 10/10 | 1.26 | 0.93 to 2.07 | 1.14 | 12.1 to 31.7 | 87 to 183 | 0 | 1 to 2 | 0 | 245.1 to 323.3 | - |
 | A17 | solo Haiku 5.5, xhigh effort | task2 | 10/10 | 2.25 | 1.55 to 4.16 | 2.61 | 18.0 to 33.2 | 6 to 221 | 0 | 1 to 2 | 0 | 315.8 to 469.0 | - |
 | A19 | solo Sonnet 5, high effort | task2 | 4/4† | 6.52 | 5.61 to 7.36 | 1.75 | 15.9 to 27.8 | 135 to 185 | 0 | 1 | 0 | 248.8 to 294.0 | - |
+| A21 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager | task2 | 10/10 | 2.80 | 2.19 to 3.32 | 1.13 | 11.0 to 16.5 | 3 to 44 | 3 to 4 | 1 | 0 | 76.7 to 132.1 | 67.7 to 103.5 |
+| A22 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger | task2 | 10/10 | 3.15 | 2.57 to 3.80 | 1.22 | 9.4 to 12.6 | 10 to 56 | 0 to 1 | 1 | 0 | 137.2 to 171.8 | 57.4 to 82.7 |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.32, A11 0.33, A12 0.35, A14
-0.37, A15 0.55, A17 0.57, A13 0.74, A10 0.79, A4 0.83, A3 0.93, A7 0.93, A5 0.95, A9
-0.96, A2 1.28, A8 1.41, A6 1.73. A19 (4 of 10 runs so far) is not ranked; it would be 1.65.
+0.37, A15 0.55, A17 0.57, A21 0.71, A13 0.74, A10 0.79, A22 0.80, A4 0.83, A3 0.93, A7
+0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.71. A19 (4 of 10 runs so far) is not ranked; it would be 1.65.
 
 Notes:
 
@@ -50,15 +52,18 @@ Notes:
   task. Its ten-run range still overlaps A1's fully, so the difference is a shift of
   the distribution rather than a separation.
 - Eager Opus 5.5 (A2) and eager Sonnet 4.6 (A8) cost 28 and 41 percent more per pass
-  than solo. Eager Sonnet 5 (A6) is the worst cell: 73 percent more per pass, the
-  widest spread (5.67 USD), the longest wall time (44.8 min), four of ten runs
+  than solo. Eager Sonnet 5 (A6) is the worst cell: 71 percent more per pass, the
+  widest spread (6.31 USD), the longest wall time (44.8 min), three of ten runs
   needing a second acceptance round, and a subagent context peak of 275K tokens.
-- Delegation lowers the main agent's context peak (72 to 170K against 147 to 203K for
+  Those three runs (reps 4, 5 and 10) are also the A6 runs in which the CLI stopped a
+  background subagent at its ten-minute print-mode wait ceiling; they are still to be
+  rerun with the raised ceiling, so A6's row is provisional.
+- Delegation lowers the main agent's context peak (81 to 170K against 147 to 203K for
   solo and conservative arms) and gives the shortest wall times, but also the widest
   cost and wall-time spreads.
 - No run compacted at the default window, although several solo and conservative runs
   peaked above 190K tokens of main-agent context.
-- Second acceptance rounds: A2 one run, A6 four runs, A9 one run, A12 one run, A16 one
+- Second acceptance rounds: A6 three runs, A9 one run, A12 one run, A16 one
   run, A17 one run; all other runs passed on the first round.
 - The aggregate warns that Task 1 runs carry a different run-code hash. The difference
   is the move of post-run analysis out of the run module between the two waves; the
@@ -104,6 +109,22 @@ Notes:
   than most arms (12 to 33 minutes; only eager Sonnet 5, A6, runs longer) and reaches the highest main contexts on
   the task, 245K to 323K (A16) and 316K to 469K (A17), with no compaction. A17's turn
   floor of 6 is the CLI counting artefact described below.
+- A21 and A22 run the A2 main agent (Claude Code Opus 5.5 at high effort) with
+  headless Codex GPT-6.1 Sol subagents at high effort; both passed all ten runs in one
+  round. Their cost includes the Codex subagents, priced at OpenAI's API rates for
+  GPT-6.1 Sol (see the design document). Eager Codex delegation (A21) is the cheapest
+  eager arm on the task at 0.71 of A1 (2.80 USD per run, of which Codex is 0.98, 35
+  percent), against 0.83 for eager Sonnet 5.5 subagents (A4) and 1.28 for eager Opus 5.5
+  subagents (A2), and it lowers the main agent's context peak to 77K to 132K. A22's
+  selective delegation costs 0.80 of A1 (3.15 USD per run, of which Codex is 0.18, 6
+  percent); its main agent worked alone in 4 of 10 runs (reps 1, 4, 5 and 6) and peaked
+  at 137K to 172K, close to the solo arms. The four Codex pilot runs, made on the
+  delegation text before it forbade polling a background subagent, are excluded (see
+  `superseded.json` and the rerun ledger).
+- A2 rep 7 and A6 rep 2 originally lost a background subagent to the CLI's ten-minute
+  print-mode wait ceiling. Both were rerun with the raised ceiling and the originals are
+  excluded (`superseded.json`); A2's spend per pass is unchanged at 1.28 of A1 and A6's
+  moves from 1.73 to 1.71.
 - † A19 (solo Sonnet 5 at high effort) failed Task 1 under the task gate (see the Task 1
   report) and runs Task 2 as a deliberate trial: one repetition, and the full ten only if
   it passes. Rep 1 passed on the first round at 5.89 USD, so reps 2 to 10 were queued,

@@ -75,8 +75,8 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A18": "solo Sonnet 5, medium effort",
     "A19": "solo Sonnet 5, high effort",
     "A20": "solo Sonnet 4.6, high effort",
-    "A21": "Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager",
-    "A22": "Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger",
+    "A21": "Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager",
+    "A22": "Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger",
 }
 
 

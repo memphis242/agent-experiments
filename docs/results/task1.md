@@ -1,6 +1,6 @@
-# Task 1 results (ut_assert log translator), 190 runs, 2026-10-18
+# Task 1 results (ut_assert log translator), 210 runs, 2026-10-19
 
-All 170 runs of A1 to A17 passed acceptance; solo Sonnet 5 (A18, A19) failed the task, with 3 of 10 runs in each arm failing all five rounds (see * below). Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 to A19, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel.
+All 190 runs of A1 to A17, A21 and A22 passed acceptance; solo Sonnet 5 (A18, A19) failed the task, with 3 of 10 runs in each arm failing all five rounds (see * below). Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 to A19, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel. The Codex arms (A21, A22) ran all ten repetitions on 2026-10-19, three runs at a time.
 
 ## Spread across arms
 
@@ -21,7 +21,7 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A5 | Sonnet 5.5 subagents, conservative | task1 | 10/10 | 1.48 | 1.17 to 2.62 | 1.45 | 4.7 to 9.0 | 20 to 55 | 0 | 1 to 4 | 0 | 61.9 to 106.5 | - |
 | A6 | Sonnet 5 subagents, eager | task1 | 10/10 | 2.60 | 1.88 to 3.43 | 1.56 | 7.0 to 21.7 | 2 to 12 | 2 to 4 | 1 | 0 | 59.7 to 78.9 | 55.5 to 99.9 |
 | A7 | Sonnet 5 subagents, conservative | task1 | 10/10 | 1.31 | 1.19 to 1.49 | 0.30 | 4.4 to 6.3 | 21 to 27 | 0 | 1 | 0 | 61.5 to 73.5 | - |
-| A8 | Sonnet 4.6 subagents, eager | task1 | 10/10 | 3.07 | 1.74 to 3.92 | 2.18 | 10.8 to 25.6 | 2 to 17 | 2 to 4 | 1 | 0 | 37.9 to 77.0 | 39.0 to 74.8 |
+| A8 | Sonnet 4.6 subagents, eager | task1 | 10/10 | 3.21 | 2.32 to 3.92 | 1.59 | 10.8 to 25.6 | 3 to 17 | 2 to 4 | 1 | 0 | 57.5 to 77.0 | 52.7 to 72.9 |
 | A9 | Sonnet 4.6 subagents, conservative | task1 | 10/10 | 1.34 | 1.16 to 1.54 | 0.38 | 4.5 to 6.0 | 22 to 29 | 0 | 1 | 0 | 62.3 to 76.9 | - |
 | A10 | solo Sonnet 5.5, xhigh effort | task1 | 10/10 | 1.27 | 1.11 to 1.77 | 0.66 | 7.0 to 11.7 | 29 to 47 | 0 | 1 | 0 | 95.9 to 138.7 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task1 | 10/10 | 0.47 | 0.31 to 0.58 | 0.27 | 1.6 to 6.4 | 3 to 20 | 0 to 1 | 1 | 0 | 37.7 to 63.4 | 44.6 to 64.8 |
@@ -33,10 +33,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A17 | solo Haiku 5.5, xhigh effort | task1 | 10/10 | 0.55 | 0.41 to 0.66 | 0.25 | 7.3 to 13.5 | 40 to 67 | 0 | 1 | 0 | 151.0 to 198.3 | - |
 | A18 | solo Sonnet 5, medium effort | task1 | 7/10* | 2.88 | 0.89 to 4.29 | 3.41 | 5.1 to 21.2 | 39 to 119 | 0 | 2 to 5 | 0 | 68.1 to 176.7 | 40.6 |
 | A19 | solo Sonnet 5, high effort | task1 | 7/10* | 4.96 | 0.96 to 5.62 | 4.66 | 6.5 to 25.8 | 28 to 144 | 0 | 1 to 5 | 0 | 81.3 to 241.3 | - |
+| A21 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager | task1 | 10/10 | 1.95 | 1.38 to 2.64 | 1.27 | 6.3 to 15.5 | 8 to 18 | 2 to 4 | 1 | 0 | 55.2 to 95.7 | 31.5 to 53.7 |
+| A22 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger | task1 | 10/10 | 1.38 | 1.20 to 1.53 | 0.33 | 5.1 to 7.2 | 4 to 8 | 1 | 1 | 0 | 56.2 to 72.6 | 25.3 to 36.3 |
 
 Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.21, A11 0.32, A12 0.35, A17
-0.38, A14 0.43, A13 0.73, A15 0.75, A10 0.87, A7 0.90, A9 0.92, A3 0.92, A5 1.01, A4
-1.38, A6 1.78, A2 1.88, A8 2.10.
+0.38, A14 0.43, A13 0.73, A15 0.75, A10 0.87, A7 0.90, A9 0.92, A3 0.92, A22 0.95, A5
+1.01, A21 1.34, A4 1.38, A6 1.78, A2 1.88, A8 2.20.
 A18 and A19 failed the task and are not ranked; their spend per pass would be 1.97 and
 3.40.
 
@@ -47,7 +49,7 @@ Notes:
   closer to solo than the three-repetition figures (0.87 to 1.25) suggested.
 - Eager arms spawned 2 to 4 subagents (implementer, tester, reviewer; occasionally a
   built-in general-purpose agent, which the validator confirmed ran on the arm's model)
-  and cost 1.38 to 2.10 times A1. Eager Sonnet 4.6 (A8) remains the most expensive and
+  and cost 1.38 to 2.20 times A1. Eager Sonnet 4.6 (A8) remains the most expensive and
   slowest arm (10.8 to 25.6 min).
 - Among A1 to A17, every run that needed more than one round failed the same check in round one, the
   Markdown failures section: A5 once (four rounds), A14 twice, A15 once and A16 three
@@ -99,3 +101,16 @@ Notes:
   `code-review` skill, which spawns one (skills stay available in every arm). The validator
   flagged it, the only validation violation in the experiment so far; it is the 41K subagent
   context in A18's row, and the run is one of the six that failed.
+- A21 and A22 run the A2 main agent (Claude Code Opus 5.5 at high effort) with
+  headless Codex GPT-6.1 Sol subagents at high effort; both passed all ten runs in one
+  round. Their cost includes the Codex subagents, priced at OpenAI's API rates for
+  GPT-6.1 Sol (see the design document). Eager Codex delegation (A21) costs 1.95 USD per
+  run, of which Codex is 0.65 (33 percent), and 1.34 of A1 per pass: less than eager
+  Opus 5.5 subagents (A2, 1.88) and level with eager Sonnet 5.5 (A4, 1.38). A22's
+  selective delegation started one Codex subagent per run and costs 1.38 USD per run,
+  of which Codex is 0.16 (12 percent), 0.95 of A1. The four Codex pilot runs, made on
+  the delegation text before it forbade polling a background subagent, are excluded
+  (see `superseded.json` and the rerun ledger).
+- A8 reps 7 and 10 originally lost a background subagent to the CLI's ten-minute
+  print-mode wait ceiling. Both were rerun with the raised ceiling and the originals
+  are excluded (`superseded.json`); A8's spend per pass moves from 2.10 to 2.20 of A1.

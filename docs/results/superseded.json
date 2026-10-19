@@ -1,0 +1,10 @@
+{
+  "a19f4fb4": "A8 task1 rep 7: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun as a76893e2 with the raised ceiling",
+  "6e175404": "A8 task1 rep 10: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun as 9e018a07 with the raised ceiling",
+  "2c2dba98": "A6 task2 rep 2: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun as 3bc0ced1 with the raised ceiling",
+  "2552ef0f": "A2 task2 rep 7: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun as 68553b70 with the raised ceiling",
+  "d78a28d2": "A21 task1 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as d5370706)",
+  "020d8055": "A21 task2 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as bf4627ed)",
+  "6a951429": "A22 task2 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as 517bdf6d)",
+  "4326636d": "A22 task1 rep 1: Codex pilot stopped in a self-matching pgrep loop before the no-polling instruction (rerun as 9de06c6c)"
+}
