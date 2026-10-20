@@ -4,7 +4,7 @@ What Experiment A has taught so far about running coding agents: which setups wo
 patterns repeat across tasks, and where agents (and the harness) fall down. This is a living
 summary; the evidence is in [docs/results/](docs/results/) (one report per task, the workbook
 and the charts) and the design in [docs/experiment-design.md](docs/experiment-design.md).
-Figures are as of 2026-10-20. A24 and A25 are still running and their numbers are preliminary.
+Figures are as of 2026-10-20.
 
 All costs are billed USD per passing run, including Codex subagents at OpenAI API rates.
 "x A1" is spend per pass relative to solo Opus 5.5 at high effort (A1).
@@ -13,10 +13,10 @@ All costs are billed USD per passing run, including Codex subagents at OpenAI AP
 
 | Setup | Arm | T1 | T2 | T3 | T4 USD |
 |---|---|---:|---:|---:|---:|
-| Opus 5.5 low main, all Codex subagents on GPT-6 Luna, tiered | A24 | 0.25 | 0.19 | 0.17 | 2.76 |
+| Opus 5.5 low main, all Codex subagents on GPT-6 Luna, tiered | A24 | 0.26 | 0.19 | 0.17 | 2.76 |
 | Opus 5.5 low main, Codex GPT-6.1 Sol implementer + GPT-6 Luna, tiered | A23 | 0.38 | 0.31 | 0.23 | 2.26 |
 | Opus 5.5 low main, Sonnet 5.5 implementer + Haiku 5.5, tiered | A14 | 0.43 | 0.37 | 0.41 | 6.25 |
-| Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | A25 | 0.75 | 0.98 | 0.88 | - |
+| Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | A25 | 0.75 | 0.98 | 0.84 | - |
 | Opus 5.5 high, Sonnet 5 subagents, conservative | A7 | 0.90 | 0.93 | 0.99 | - |
 | Solo Opus 5.5, high effort (baseline) | A1 | 1.00 | 1.00 | 1.00 | - |
 | Opus 5.5 high, Sonnet 5 subagents, eager | A6 | 1.78 | 1.71 | 1.75 | - |
@@ -34,7 +34,8 @@ A22 11.22 USD.
   and Haiku 5.5 subagents replaced by GPT-6.1 Sol and GPT-6 Luna, and nothing else changed.
   It costs 11 percent less on Task 1, 45 percent less on Task 3 and 64 percent less on Task 4.
 - **The cheapest subagent model is often enough.** A24 (every subagent on GPT-6 Luna) is
-  the cheapest arm on Tasks 1 to 3. On Task 4, the hardest task, it is where the stronger
+  the cheapest arm on Tasks 2 and 3 and the cheapest Opus-led arm on Task 1. Luna is so
+  cheap that the Opus orchestrator is 70 to 96 percent of its bill. On Task 4, the hardest task, it is where the stronger
   implementer pays off: every A24 run needed two or three acceptance rounds, against one
   or two for A23, and A24 cost 22 percent more and ran longer.
 - **The previous model generation is not a cheap substitute.** A25 (A23 on GPT-5.6 Sol and

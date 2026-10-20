@@ -1,8 +1,8 @@
-# Task 2 results (SAMPLE_APP status command), 204 runs, 2026-10-19 (preliminary: A19 in progress)
+# Task 2 results (SAMPLE_APP status command), 224 runs, 2026-10-19 (preliminary: A19 in progress)
 
-All 204 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
+All 224 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
 were run on three parallel slots and the remaining seven on six; A10 to A15 were added
-later and run on six or seven, A16 and A17 on up to nine, A19 on six, the Codex arms A21 and A22 on three, A23 on four). Billed cost includes compaction
+later and run on six or seven, A16 and A17 on up to nine, A19 on six, the Codex arms A21 and A22 on three, A23 on four, A24 and A25 on up to eight). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
@@ -39,11 +39,13 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A21 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager | task2 | 10/10 | 2.80 | 2.19 to 3.32 | 1.13 | 11.0 to 16.5 | 3 to 44 | 3 to 4 | 1 | 0 | 76.7 to 132.1 | 67.7 to 103.5 |
 | A22 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger | task2 | 10/10 | 3.15 | 2.57 to 3.80 | 1.22 | 9.4 to 12.6 | 10 to 56 | 0 to 1 | 1 | 0 | 137.2 to 171.8 | 57.4 to 82.7 |
 | A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task2 | 10/10 | 1.22 | 1.00 to 1.52 | 0.53 | 7.4 to 13.8 | 6 to 19 | 1 to 2 | 1 | 0 | 32.4 to 59.9 | 70.3 to 127.6 |
+| A24 | Opus 5.5 low main, Codex GPT-6 Luna, tiered | task2 | 10/10 | 0.75 | 0.53 to 0.97 | 0.43 | 5.6 to 14.0 | 3 to 20 | 2 to 3 | 1 | 0 | 34.8 to 63.9 | 69.3 to 149.0 |
+| A25 | Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | task2 | 10/10 | 3.87 | 1.75 to 6.23 | 4.49 | 8.1 to 122.5 | 5 to 18 | 1 to 2 | 1 | 0 | 28.8 to 61.2 | 162.3 to 244.1 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A23 0.31, A16 0.32, A11 0.33, A12
-0.35, A14 0.37, A15 0.55, A17 0.57, A21 0.71, A13 0.74, A10 0.79, A22 0.80, A4 0.83, A3
-0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.71. A19 (4 of 10 runs so far) is not
-ranked; it would be 1.65.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A24 0.19, A23 0.31, A16 0.32, A11
+0.33, A12 0.35, A14 0.37, A15 0.55, A17 0.57, A21 0.71, A13 0.74, A10 0.79, A22 0.80, A4
+0.83, A3 0.93, A7 0.93, A5 0.95, A9 0.96, A25 0.98, A2 1.28, A8 1.41, A6 1.71. A19 (4 of 10
+runs so far) is not ranked; it would be 1.65.
 
 Notes:
 
@@ -126,10 +128,21 @@ Notes:
 - A23 (added 2026-10-20) is the Codex counterpart of A14: Opus 5.5 at low effort
   directing headless Codex subagents, the implementer on GPT-6.1 Sol and the small
   implementer and tester on GPT-6 Luna, all at high effort, with A14's tiered delegation
-  text. It is the cheapest arm on the task: all ten runs passed in one round at 1.22 USD
+  text. All ten runs passed in one round at 1.22 USD
   per pass, 0.31 of A1 against A14's 0.37, of which Codex is 0.58 per run (48 percent).
   Its Opus main context peaked at 32K to 60K tokens. Twelve of its fourteen Codex calls
   went to the Sol implementer.
+- A24 and A25 (added 2026-10-20) keep A23's orchestrator, delegation text and roster and
+  change only the Codex models. A24 runs every subagent on GPT-6 Luna; A25 is A23 on the
+  previous generation, the implementer on GPT-5.6 Sol and the small implementer and tester
+  on GPT-5.6 Luna, all at high effort. Both passed all ten runs in one round. A24 is the
+  cheapest arm on the task at 0.75 USD per pass (0.19 of A1); Codex is 0.08 per run. A25
+  costs 3.87 USD (0.98 of A1, level with solo Opus), with Codex 3.27 per run (84 percent),
+  most of it a single GPT-5.6 Sol implementer call of 1 to 6 USD; that is about
+  conservative Sonnet 5 delegation (A7, 0.93) and well under eager Sonnet 5 (A6, 1.71).
+  A25 rep 3 polled the Codex subagent with a `pgrep -f` loop that matched its own shell,
+  against the arm's instructions, and waited out the two-hour Bash timeout (122 minutes);
+  without it A25 runs took 8 to 24 minutes.
 - A2 rep 7 and A6 rep 2 originally lost a background subagent to the CLI's ten-minute
   print-mode wait ceiling. Both were rerun with the raised ceiling and the originals are
   excluded (`superseded.json`); A2's spend per pass is unchanged at 1.28 of A1 and A6's

@@ -1,6 +1,6 @@
-# Task 3 results (housekeeping staleness detection), 127 runs, 2026-10-20
+# Task 3 results (housekeeping staleness detection), 147 runs, 2026-10-20
 
-All 127 valid runs passed acceptance. Billed cost includes compaction requests
+All 147 valid runs passed acceptance. Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the repetitions (five per arm so
 far for A1 to A15, ten for A16 and A17); spend per pass is total spend over all attempts
 divided by passes. Nineteen attempts from the first wave were cut off by the subscription
@@ -48,11 +48,14 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A21 | Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager | task3 | 10/10 | 5.41 | 4.65 to 6.57 | 1.92 | 17.0 to 30.3 | 5 to 31 | 2 to 8 | 1 | 0 | 148.6 to 198.1 | 99.6 to 112.5 |
 | A22 | Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger | task3 | 10/10 | 6.56 | 5.04 to 7.28 | 2.24 | 15.0 to 26.0 | 11 to 99 | 1 to 2 | 1 | 0 | 188.2 to 260.6 | 80.2 to 114.8 |
 | A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task3 | 10/10 | 1.92 | 1.34 to 2.53 | 1.19 | 12.8 to 29.4 | 2 to 34 | 1 to 3 | 1 | 0 to 1 | 38.1 to 94.9 | 110.1 to 245.3 |
+| A24 | Opus 5.5 low main, Codex GPT-6 Luna, tiered | task3 | 10/10 | 1.43 | 0.99 to 1.89 | 0.91 | 16.0 to 28.6 | 7 to 40 | 2 to 4 | 1 | 0 to 1 | 52.7 to 103.8 | 111.5 to 245.4 |
+| A25 | Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | task3 | 10/10 | 7.19 | 4.34 to 9.36 | 5.02 | 18.9 to 138.8 | 5 to 39 | 1 to 3 | 1 to 2 | 0 to 2 | 43.3 to 113.3 | 224.8 to 255.6 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A23 0.23, A16 0.37, A11 0.39, A14
-0.41, A12 0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A10 0.85, A13
-0.87, A9 0.88, A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with asterisked runs not
-rerun (A6, A8, A15, A17) carry rounds lost to the pack defect or the wait ceiling.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A24 0.17, A23 0.23, A16 0.37, A11
+0.39, A14 0.41, A12 0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A25
+0.84, A10 0.85, A13 0.87, A9 0.88, A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with
+asterisked runs not rerun (A6, A8, A15, A17) carry rounds lost to the pack defect or the
+wait ceiling.
 
 Notes:
 
@@ -147,9 +150,21 @@ Notes:
   directing headless Codex subagents, the implementer on GPT-6.1 Sol and the small
   implementer and tester on GPT-6 Luna, all at high effort, with A14's tiered delegation
   text. It ran ten repetitions on four slots and passed all ten in one round at 1.92 USD
-  per pass, 0.23 of A1 and the cheapest arm on the task, against A14's 0.41 (3.47 USD);
+  per pass, 0.23 of A1, against A14's 0.41 (3.47 USD);
   Codex is 1.04 per run (54 percent). Its Opus main context peaked at 38K to 95K tokens
   and its runs took 13 to 29 minutes.
+- A24 and A25 (added 2026-10-20) keep A23's orchestrator, delegation text and roster and
+  change only the Codex models. A24 runs every subagent on GPT-6 Luna; A25 is A23 on the
+  previous generation, the implementer on GPT-5.6 Sol and the small implementer and tester
+  on GPT-5.6 Luna, all at high effort. Both passed all ten runs. A24 is the cheapest arm
+  on the task at 1.43 USD per pass (0.17 of A1), all in one round; Codex is 0.24 per run.
+  A25 costs 7.19 USD (0.84 of A1), with Codex 6.25 per run (87 percent), against 8.41 for
+  conservative Sonnet 5 delegation (A7) and 14.88 for eager (A6); rep 1 needed a second
+  round for the default copy table entry. A25 rep 9 first ended as a Codex error when a
+  GPT-5.6 Luna tester call stopped at its output-token limit; the rerun passed and the
+  original is superseded. A25 rep 10 polled the Codex subagent with a `pgrep -f` loop that
+  matched its own shell, against the arm's instructions, and waited out the two-hour Bash
+  timeout (139 minutes); without it A25 runs took 19 to 34 minutes.
 - A16 and A17 both qualify for Task 4 under the task gate: no run failed and none reached
   the final round.
 - \* Round counts and spend of these arms include runs that lost rounds to a defect outside

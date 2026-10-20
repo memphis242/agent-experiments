@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="1260.0" viewBox="0 0 1130 1260.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="1348.0" viewBox="0 0 1130 1348.0" role="img" aria-label="Task 1: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 1: wall time per run</title>
-<rect x="8" y="8" width="1114" height="1244.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1114" height="1332.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 1: wall time per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">220 runs across 22 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">240 runs across 24 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
 <circle cx="41.0" cy="96.0" r="5" fill="#10b981"/>
-<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol</text>
-<circle cx="187.8" cy="96.0" r="5" fill="#fbbf24"/>
-<text x="198.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
-<circle cx="264.2" cy="96.0" r="5" fill="#a78bfa"/>
-<text x="275.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5</text>
-<circle cx="353.4" cy="96.0" r="5" fill="#60a5fa"/>
-<text x="364.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5</text>
-<circle cx="455.4" cy="96.0" r="5" fill="#2dd4bf"/>
-<text x="466.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5</text>
-<circle cx="544.6" cy="96.0" r="5" fill="#fb923c"/>
-<text x="555.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6</text>
-<circle cx="646.6" cy="96.0" r="5" fill="#f87171"/>
-<text x="657.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Haiku 5.5</text>
-<circle cx="774.2" cy="96.0" r="5" fill="#4ade80"/>
-<text x="785.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
-<circle cx="869.8" cy="96.0" r="5" fill="#f472b6"/>
-<text x="880.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
-<circle cx="41.0" cy="118.0" r="5" fill="#9ca3af"/>
-<text x="52.0" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
-<circle cx="162.2" cy="118.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
-<text x="173.2" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
+<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex</text>
+<circle cx="111.0" cy="96.0" r="5" fill="#fbbf24"/>
+<text x="122.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
+<circle cx="187.4" cy="96.0" r="5" fill="#a78bfa"/>
+<text x="198.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5</text>
+<circle cx="276.6" cy="96.0" r="5" fill="#60a5fa"/>
+<text x="287.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5</text>
+<circle cx="378.6" cy="96.0" r="5" fill="#2dd4bf"/>
+<text x="389.6" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5</text>
+<circle cx="467.8" cy="96.0" r="5" fill="#fb923c"/>
+<text x="478.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6</text>
+<circle cx="569.8" cy="96.0" r="5" fill="#f87171"/>
+<text x="580.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Haiku 5.5</text>
+<circle cx="697.4" cy="96.0" r="5" fill="#4ade80"/>
+<text x="708.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Haiku 5.5</text>
+<circle cx="793.0" cy="96.0" r="5" fill="#f472b6"/>
+<text x="804.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
+<circle cx="927.0" cy="96.0" r="5" fill="#9ca3af"/>
+<text x="938.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
+<circle cx="41.0" cy="118.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
+<text x="52.0" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
 <rect x="28" y="144.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="232.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="320.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
@@ -37,293 +37,288 @@
 <rect x="28" y="848.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="936.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="1024.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="144.0" x2="456.0" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
-<line x1="542.3" y1="144.0" x2="542.3" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="542.3" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">5 min</text>
-<line x1="628.7" y1="144.0" x2="628.7" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="628.7" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">10 min</text>
-<line x1="715.0" y1="144.0" x2="715.0" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="715.0" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">15 min</text>
-<line x1="801.3" y1="144.0" x2="801.3" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="801.3" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
-<line x1="887.7" y1="144.0" x2="887.7" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="887.7" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">25 min</text>
-<line x1="974.0" y1="144.0" x2="974.0" y2="1112.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="1132.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">30 min</text>
-<line x1="456.0" y1="1112.0" x2="974.0" y2="1112.0" stroke="#484f58" stroke-width="1"/>
+<rect x="28" y="1112.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
+<line x1="456.0" y1="144.0" x2="456.0" y2="1200.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="1220.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
+<line x1="628.7" y1="144.0" x2="628.7" y2="1200.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="628.7" y="1220.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">50 min</text>
+<line x1="801.3" y1="144.0" x2="801.3" y2="1200.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="801.3" y="1220.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">100 min</text>
+<line x1="974.0" y1="144.0" x2="974.0" y2="1200.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="1220.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">150 min</text>
+<line x1="456.0" y1="1200.0" x2="974.0" y2="1200.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="163.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="163.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="177.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="520.8" y="158.0" width="57.3" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
-<circle cx="528.8" cy="166.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="530.7" cy="161.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="537.9" cy="170.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="548.0" cy="159.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="549.0" cy="173.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="552.1" cy="163.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="556.7" cy="168.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="558.8" cy="160.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="564.6" cy="171.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="570.0" cy="166.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<line x1="550.6" y1="155.0" x2="550.6" y2="177.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="586.0" y="170.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.2 to 6.6</text>
+<rect x="462.6" y="158.0" width="24.3" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
+<circle cx="470.6" cy="166.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="470.9" cy="161.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="472.4" cy="170.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="474.4" cy="159.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="474.6" cy="173.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="475.2" cy="163.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="476.1" cy="168.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="476.6" cy="160.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="477.7" cy="171.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="478.8" cy="166.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<line x1="474.9" y1="155.0" x2="474.9" y2="177.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="494.8" y="170.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.2 to 6.6</text>
 <text x="36.0" y="207.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A2</text>
 <text x="78.0" y="207.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, eager, high</text>
 <text x="78.0" y="221.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="528.8" y="202.0" width="127.8" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
-<circle cx="536.8" cy="210.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="558.0" cy="205.8" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="569.4" cy="214.2" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="570.7" cy="203.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="608.6" cy="217.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="614.0" cy="207.9" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="626.0" cy="212.1" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="626.4" cy="204.4" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="642.0" cy="215.6" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<circle cx="648.6" cy="210.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
-<line x1="611.3" y1="199.0" x2="611.3" y2="221.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="664.6" y="214.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 11.2</text>
+<rect x="464.2" y="202.0" width="38.4" height="16" rx="8.0" fill="#a78bfa" fill-opacity="0.34"/>
+<circle cx="472.2" cy="210.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="476.4" cy="205.8" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="478.7" cy="214.2" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="478.9" cy="203.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="486.5" cy="217.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="487.6" cy="207.9" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="490.0" cy="212.1" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="490.1" cy="204.4" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="493.2" cy="215.6" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<circle cx="494.5" cy="210.0" r="4.6" fill="#a78bfa" fill-opacity="0.92"/>
+<line x1="487.1" y1="199.0" x2="487.1" y2="221.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="510.5" y="214.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 11.2</text>
 <text x="36.0" y="251.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A3</text>
 <text x="78.0" y="251.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 subagents, conservative, high</text>
 <text x="78.0" y="265.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="517.9" y="246.0" width="64.4" height="16" rx="8.0" fill="#d1c3fc" fill-opacity="0.34"/>
-<circle cx="525.9" cy="254.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="532.8" cy="249.8" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="534.4" cy="258.2" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="538.9" cy="247.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="540.2" cy="261.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="547.1" cy="251.9" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="550.0" cy="256.1" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="551.3" cy="248.4" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="559.7" cy="259.6" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<circle cx="574.4" cy="254.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
-<line x1="543.6" y1="243.0" x2="543.6" y2="265.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="590.4" y="258.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.1 to 6.9</text>
+<rect x="462.0" y="246.0" width="25.7" height="16" rx="8.0" fill="#d1c3fc" fill-opacity="0.34"/>
+<circle cx="470.0" cy="254.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="471.4" cy="249.8" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="471.7" cy="258.2" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="472.6" cy="247.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="472.8" cy="261.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="474.2" cy="251.9" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="474.8" cy="256.1" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="475.1" cy="248.4" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="476.7" cy="259.6" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<circle cx="479.7" cy="254.0" r="4.6" fill="#d1c3fc" fill-opacity="0.92"/>
+<line x1="473.5" y1="243.0" x2="473.5" y2="265.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="495.7" y="258.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.1 to 6.9</text>
 <text x="36.0" y="295.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A4</text>
 <text x="78.0" y="295.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, eager, high</text>
 <text x="78.0" y="309.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="534.4" y="290.0" width="87.6" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
-<circle cx="542.4" cy="298.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="546.2" cy="293.8" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="559.0" cy="302.2" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="577.0" cy="291.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="581.3" cy="305.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="589.0" cy="295.9" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="602.5" cy="300.1" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="608.8" cy="292.4" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="608.9" cy="303.6" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<circle cx="614.0" cy="298.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
-<line x1="585.2" y1="287.0" x2="585.2" y2="309.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="630.0" y="302.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.0 to 9.1</text>
+<rect x="465.3" y="290.0" width="30.3" height="16" rx="8.0" fill="#60a5fa" fill-opacity="0.34"/>
+<circle cx="473.3" cy="298.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="474.0" cy="293.8" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="476.6" cy="302.2" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="480.2" cy="291.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="481.1" cy="305.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="482.6" cy="295.9" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="485.3" cy="300.1" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="486.6" cy="292.4" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="486.6" cy="303.6" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<circle cx="487.6" cy="298.0" r="4.6" fill="#60a5fa" fill-opacity="0.92"/>
+<line x1="481.8" y1="287.0" x2="481.8" y2="309.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="503.6" y="302.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.0 to 9.1</text>
 <text x="36.0" y="339.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A5</text>
 <text x="78.0" y="339.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 subagents, conservative, high</text>
 <text x="78.0" y="353.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="528.5" y="334.0" width="90.4" height="16" rx="8.0" fill="#acd0fc" fill-opacity="0.34"/>
-<circle cx="536.5" cy="342.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="539.0" cy="337.8" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="540.2" cy="346.2" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="542.7" cy="335.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="542.9" cy="349.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="543.0" cy="339.9" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="543.8" cy="344.1" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="544.2" cy="336.4" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="550.2" cy="347.6" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<circle cx="610.9" cy="342.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
-<line x1="543.0" y1="331.0" x2="543.0" y2="353.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="626.9" y="346.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 9.0</text>
+<rect x="464.1" y="334.0" width="30.9" height="16" rx="8.0" fill="#acd0fc" fill-opacity="0.34"/>
+<circle cx="472.1" cy="342.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="472.6" cy="337.8" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="472.8" cy="346.2" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="473.3" cy="335.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="473.4" cy="349.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="473.4" cy="339.9" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="473.6" cy="344.1" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="473.6" cy="336.4" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="474.8" cy="347.6" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<circle cx="487.0" cy="342.0" r="4.6" fill="#acd0fc" fill-opacity="0.92"/>
+<line x1="473.4" y1="331.0" x2="473.4" y2="353.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="503.0" y="346.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.7 to 9.0</text>
 <text x="36.0" y="383.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A6</text>
 <text x="78.0" y="383.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, eager, high</text>
 <text x="78.0" y="397.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="569.1" y="378.0" width="269.2" height="16" rx="8.0" fill="#2dd4bf" fill-opacity="0.34"/>
-<circle cx="577.1" cy="386.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="595.5" cy="381.8" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="605.3" cy="390.2" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="612.1" cy="379.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="617.1" cy="393.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="618.3" cy="383.9" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="624.5" cy="388.1" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="660.4" cy="380.4" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="674.2" cy="391.6" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<circle cx="830.3" cy="386.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
-<line x1="617.7" y1="375.0" x2="617.7" y2="397.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="846.3" y="390.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 21.7</text>
+<rect x="472.2" y="378.0" width="66.6" height="16" rx="8.0" fill="#2dd4bf" fill-opacity="0.34"/>
+<circle cx="480.2" cy="386.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="483.9" cy="381.8" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="485.9" cy="390.2" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="487.2" cy="379.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="488.2" cy="393.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="488.5" cy="383.9" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="489.7" cy="388.1" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="496.9" cy="380.4" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="499.6" cy="391.6" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<circle cx="530.9" cy="386.0" r="4.6" fill="#2dd4bf" fill-opacity="0.92"/>
+<line x1="488.3" y1="375.0" x2="488.3" y2="397.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="546.9" y="390.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 21.7</text>
 <text x="36.0" y="427.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A7</text>
 <text x="78.0" y="427.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5 subagents, conservative, high</text>
 <text x="78.0" y="441.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="523.9" y="422.0" width="48.8" height="16" rx="8.0" fill="#92e9de" fill-opacity="0.34"/>
-<circle cx="531.9" cy="430.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="536.6" cy="425.8" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="536.9" cy="434.2" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="539.0" cy="423.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="543.3" cy="437.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="544.2" cy="427.9" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="546.2" cy="432.1" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="547.2" cy="424.4" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="554.8" cy="435.6" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<circle cx="564.7" cy="430.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
-<line x1="543.7" y1="419.0" x2="543.7" y2="441.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="580.7" y="434.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 6.3</text>
+<rect x="463.2" y="422.0" width="22.6" height="16" rx="8.0" fill="#92e9de" fill-opacity="0.34"/>
+<circle cx="471.2" cy="430.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="472.1" cy="425.8" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="472.2" cy="434.2" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="472.6" cy="423.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="473.5" cy="437.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="473.6" cy="427.9" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="474.0" cy="432.1" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="474.2" cy="424.4" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="475.8" cy="435.6" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<circle cx="477.7" cy="430.0" r="4.6" fill="#92e9de" fill-opacity="0.92"/>
+<line x1="473.5" y1="419.0" x2="473.5" y2="441.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="493.7" y="434.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 6.3</text>
 <text x="36.0" y="471.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A8</text>
 <text x="78.0" y="471.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, eager, high</text>
 <text x="78.0" y="485.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="633.9" y="466.0" width="272.2" height="16" rx="8.0" fill="#fb923c" fill-opacity="0.34"/>
-<circle cx="641.9" cy="474.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="660.3" cy="469.8" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="667.5" cy="478.2" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="714.4" cy="467.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="730.7" cy="481.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="767.3" cy="471.9" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="774.9" cy="476.1" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="775.7" cy="468.4" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="818.1" cy="479.6" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<circle cx="898.2" cy="474.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
-<line x1="749.0" y1="463.0" x2="749.0" y2="485.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="914.2" y="478.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.8 to 25.6</text>
+<rect x="485.2" y="466.0" width="67.2" height="16" rx="8.0" fill="#fb923c" fill-opacity="0.34"/>
+<circle cx="493.2" cy="474.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="496.9" cy="469.8" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="498.3" cy="478.2" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="507.7" cy="467.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="510.9" cy="481.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="518.3" cy="471.9" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="519.8" cy="476.1" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="519.9" cy="468.4" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="528.4" cy="479.6" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<circle cx="544.4" cy="474.0" r="4.6" fill="#fb923c" fill-opacity="0.92"/>
+<line x1="514.6" y1="463.0" x2="514.6" y2="485.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="560.4" y="478.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.8 to 25.6</text>
 <text x="36.0" y="515.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A9</text>
 <text x="78.0" y="515.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 4.6 subagents, conservative, high</text>
 <text x="78.0" y="529.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="526.3" y="510.0" width="40.9" height="16" rx="8.0" fill="#fdc69a" fill-opacity="0.34"/>
-<circle cx="534.3" cy="518.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="535.1" cy="513.8" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="540.3" cy="522.2" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="543.6" cy="511.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="548.2" cy="525.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="548.7" cy="515.9" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="548.9" cy="520.1" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="551.8" cy="512.4" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="553.2" cy="523.6" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<circle cx="559.2" cy="518.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
-<line x1="548.4" y1="507.0" x2="548.4" y2="529.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="575.2" y="522.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.5 to 6.0</text>
+<rect x="463.7" y="510.0" width="21.0" height="16" rx="8.0" fill="#fdc69a" fill-opacity="0.34"/>
+<circle cx="471.7" cy="518.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="471.8" cy="513.8" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="472.9" cy="522.2" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="473.5" cy="511.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="474.4" cy="525.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="474.5" cy="515.9" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="474.6" cy="520.1" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="475.2" cy="512.4" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="475.4" cy="523.6" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<circle cx="476.6" cy="518.0" r="4.6" fill="#fdc69a" fill-opacity="0.92"/>
+<line x1="474.5" y1="507.0" x2="474.5" y2="529.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="492.6" y="522.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.5 to 6.0</text>
 <text x="36.0" y="559.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A10</text>
 <text x="78.0" y="559.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5.5, xhigh</text>
 <text x="78.0" y="573.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="568.1" y="554.0" width="97.4" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
-<circle cx="576.1" cy="562.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="585.7" cy="557.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="587.1" cy="566.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="587.2" cy="555.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="592.5" cy="569.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="593.5" cy="559.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="593.8" cy="564.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="600.4" cy="556.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="620.0" cy="567.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="657.5" cy="562.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<line x1="593.0" y1="551.0" x2="593.0" y2="573.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="673.5" y="566.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 11.7</text>
+<rect x="472.0" y="554.0" width="32.3" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
+<circle cx="480.0" cy="562.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="481.9" cy="557.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="482.2" cy="566.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="482.2" cy="555.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="483.3" cy="569.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="483.5" cy="559.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="483.6" cy="564.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="484.9" cy="556.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="488.8" cy="567.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="496.3" cy="562.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<line x1="483.4" y1="551.0" x2="483.4" y2="573.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="512.3" y="566.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.0 to 11.7</text>
 <text x="36.0" y="603.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A11</text>
 <text x="78.0" y="603.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Sonnet 5.5 main, Haiku 5.5 implementer and tester, high</text>
 <text x="78.0" y="617.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="475.3" y="598.0" width="98.8" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
-<circle cx="483.3" cy="606.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="498.0" cy="601.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="499.6" cy="610.2" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="500.9" cy="599.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="502.5" cy="613.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="503.9" cy="603.9" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="506.0" cy="608.1" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="511.7" cy="600.4" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="536.1" cy="611.6" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<circle cx="566.1" cy="606.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
-<line x1="503.2" y1="595.0" x2="503.2" y2="617.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="582.1" y="610.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">1.6 to 6.4</text>
+<rect x="453.5" y="598.0" width="32.6" height="16" rx="8.0" fill="#4ade80" fill-opacity="0.34"/>
+<circle cx="461.5" cy="606.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="464.4" cy="601.8" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="464.7" cy="610.2" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="465.0" cy="599.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="465.3" cy="613.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="465.6" cy="603.9" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="466.0" cy="608.1" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="467.1" cy="600.4" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="472.0" cy="611.6" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<circle cx="478.0" cy="606.0" r="4.6" fill="#4ade80" fill-opacity="0.92"/>
+<line x1="465.4" y1="595.0" x2="465.4" y2="617.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="494.0" y="610.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">1.6 to 6.4</text>
 <text x="36.0" y="647.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A12</text>
 <text x="78.0" y="647.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5.5, high</text>
 <text x="78.0" y="661.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="495.4" y="642.0" width="125.6" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
-<circle cx="503.4" cy="650.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="507.2" cy="645.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="507.7" cy="654.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="508.3" cy="643.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="508.7" cy="657.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="510.6" cy="647.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="510.9" cy="652.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="511.8" cy="644.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="513.8" cy="655.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<circle cx="613.0" cy="650.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
-<line x1="509.6" y1="639.0" x2="509.6" y2="661.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="629.0" y="654.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.7 to 9.1</text>
+<rect x="457.5" y="642.0" width="37.9" height="16" rx="8.0" fill="#f472b6" fill-opacity="0.34"/>
+<circle cx="465.5" cy="650.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="466.2" cy="645.8" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="466.3" cy="654.2" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="466.5" cy="643.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="466.5" cy="657.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="466.9" cy="647.9" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="467.0" cy="652.1" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="467.2" cy="644.4" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="467.6" cy="655.6" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<circle cx="487.4" cy="650.0" r="4.6" fill="#f472b6" fill-opacity="0.92"/>
+<line x1="466.7" y1="639.0" x2="466.7" y2="661.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="503.4" y="654.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.7 to 9.1</text>
 <text x="36.0" y="691.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A13</text>
 <text x="78.0" y="691.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, medium</text>
 <text x="78.0" y="705.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="496.8" y="686.0" width="53.9" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
-<circle cx="504.8" cy="694.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="507.2" cy="689.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="510.4" cy="698.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="515.5" cy="687.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="528.8" cy="701.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="533.2" cy="691.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="538.7" cy="696.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="539.1" cy="688.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="539.2" cy="699.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<circle cx="542.7" cy="694.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
-<line x1="531.0" y1="683.0" x2="531.0" y2="705.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="558.7" y="698.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.8 to 5.0</text>
+<rect x="457.8" y="686.0" width="23.6" height="16" rx="8.0" fill="#9ca3af" fill-opacity="0.34"/>
+<circle cx="465.8" cy="694.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="466.2" cy="689.8" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="466.9" cy="698.2" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="467.9" cy="687.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="470.6" cy="701.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="471.4" cy="691.9" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="472.5" cy="696.1" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="472.6" cy="688.4" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="472.6" cy="699.6" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<circle cx="473.3" cy="694.0" r="4.6" fill="#9ca3af" fill-opacity="0.92"/>
+<line x1="471.0" y1="683.0" x2="471.0" y2="705.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="489.3" y="698.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.8 to 5.0</text>
 <text x="36.0" y="735.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A14</text>
 <text x="78.0" y="735.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
 <text x="78.0" y="749.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="510.9" y="730.0" width="99.6" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
-<circle cx="518.9" cy="738.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="522.2" cy="733.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="526.8" cy="742.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="544.9" cy="731.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="548.5" cy="745.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="550.4" cy="735.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="564.2" cy="740.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="574.1" cy="732.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="593.5" cy="743.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="602.5" cy="738.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="549.5" y1="727.0" x2="549.5" y2="749.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="618.5" y="742.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">3.6 to 8.5</text>
+<rect x="460.6" y="730.0" width="32.7" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<circle cx="468.6" cy="738.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="469.2" cy="733.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="470.2" cy="742.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="473.8" cy="731.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="474.5" cy="745.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="474.9" cy="735.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="477.6" cy="740.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="479.6" cy="732.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="483.5" cy="743.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="485.3" cy="738.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="474.7" y1="727.0" x2="474.7" y2="749.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="501.3" y="742.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">3.6 to 8.5</text>
 <text x="36.0" y="779.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A15</text>
 <text x="78.0" y="779.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 medium main, Sonnet 5.5 high + Haiku 5.5 high, tiered</text>
 <text x="78.0" y="793.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="558.2" y="774.0" width="94.3" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
-<circle cx="566.2" cy="782.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="573.7" cy="777.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="574.0" cy="786.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="575.9" cy="775.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="583.2" cy="789.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="591.8" cy="779.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="593.5" cy="784.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="593.6" cy="776.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="633.4" cy="787.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<circle cx="644.5" cy="782.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
-<line x1="587.5" y1="771.0" x2="587.5" y2="793.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="660.5" y="786.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.4 to 10.9</text>
+<rect x="470.0" y="774.0" width="31.7" height="16" rx="8.0" fill="#fbbf24" fill-opacity="0.34"/>
+<circle cx="478.0" cy="782.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="479.5" cy="777.8" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="479.6" cy="786.2" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="480.0" cy="775.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="481.4" cy="789.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="483.2" cy="779.9" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="483.5" cy="784.1" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="483.5" cy="776.4" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="491.5" cy="787.6" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<circle cx="493.7" cy="782.0" r="4.6" fill="#fbbf24" fill-opacity="0.92"/>
+<line x1="482.3" y1="771.0" x2="482.3" y2="793.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="509.7" y="786.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.4 to 10.9</text>
 <text x="36.0" y="823.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A16</text>
 <text x="78.0" y="823.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, high</text>
 <text x="78.0" y="837.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="541.0" y="818.0" width="120.6" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
-<circle cx="549.0" cy="826.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="552.0" cy="821.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="556.4" cy="830.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="561.8" cy="819.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="564.3" cy="833.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="566.7" cy="823.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="567.7" cy="828.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="579.4" cy="820.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="620.9" cy="831.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="653.6" cy="826.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<line x1="565.5" y1="815.0" x2="565.5" y2="837.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="669.6" y="830.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.4 to 11.4</text>
+<rect x="466.6" y="818.0" width="36.9" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
+<circle cx="474.6" cy="826.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="475.2" cy="821.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="476.1" cy="830.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="477.2" cy="819.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="477.7" cy="833.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="478.1" cy="823.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="478.3" cy="828.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="480.7" cy="820.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="489.0" cy="831.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="495.5" cy="826.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<line x1="477.9" y1="815.0" x2="477.9" y2="837.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="511.5" y="830.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.4 to 11.4</text>
 <text x="36.0" y="867.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A17</text>
 <text x="78.0" y="867.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Haiku 5.5, xhigh</text>
 <text x="78.0" y="881.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="573.2" y="862.0" width="123.1" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
-<circle cx="581.2" cy="870.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="606.3" cy="865.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="615.0" cy="874.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="617.2" cy="863.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="621.8" cy="877.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="627.8" cy="867.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="631.4" cy="872.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="631.8" cy="864.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="632.1" cy="875.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<circle cx="688.2" cy="870.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
-<line x1="624.8" y1="859.0" x2="624.8" y2="881.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="704.2" y="874.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.3 to 13.5</text>
+<rect x="473.0" y="862.0" width="37.4" height="16" rx="8.0" fill="#f87171" fill-opacity="0.34"/>
+<circle cx="481.0" cy="870.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="486.1" cy="865.8" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="487.8" cy="874.2" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="488.2" cy="863.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="489.2" cy="877.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="490.4" cy="867.9" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="491.1" cy="872.1" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="491.2" cy="864.4" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="491.2" cy="875.6" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<circle cx="502.4" cy="870.0" r="4.6" fill="#f87171" fill-opacity="0.92"/>
+<line x1="489.8" y1="859.0" x2="489.8" y2="881.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="518.4" y="874.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">7.3 to 13.5</text>
 <text x="36.0" y="911.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A18</text>
 <text x="78.0" y="911.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Sonnet 5, medium</text>
 <text x="78.0" y="925.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -337,53 +332,85 @@
 <text x="36.0" y="999.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A21</text>
 <text x="78.0" y="999.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager</text>
 <text x="78.0" y="1013.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="556.2" y="994.0" width="176.3" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
-<circle cx="564.2" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="573.5" cy="997.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="582.2" cy="1006.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="604.8" cy="995.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="612.7" cy="1009.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="634.1" cy="999.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="667.6" cy="1004.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="671.6" cy="996.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="690.6" cy="1007.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="724.5" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<line x1="623.4" y1="991.0" x2="623.4" y2="1013.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="740.5" y="1006.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.3 to 15.5</text>
+<rect x="469.6" y="994.0" width="48.1" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="477.6" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="479.5" cy="997.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="481.2" cy="1006.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="485.8" cy="995.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="487.3" cy="1009.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="491.6" cy="999.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="498.3" cy="1004.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="499.1" cy="996.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="502.9" cy="1007.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="509.7" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="489.5" y1="991.0" x2="489.5" y2="1013.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="525.7" y="1006.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.3 to 15.5</text>
 <text x="36.0" y="1043.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A22</text>
 <text x="78.0" y="1043.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger</text>
 <text x="78.0" y="1057.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="536.8" y="1038.0" width="51.4" height="16" rx="8.0" fill="#83dbbd" fill-opacity="0.34"/>
-<circle cx="544.8" cy="1046.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="552.6" cy="1041.8" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="556.3" cy="1050.2" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="559.9" cy="1039.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="562.1" cy="1053.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="563.1" cy="1043.9" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="564.7" cy="1048.1" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="571.4" cy="1040.4" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="578.6" cy="1051.6" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<circle cx="580.2" cy="1046.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
-<line x1="562.6" y1="1035.0" x2="562.6" y2="1057.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="596.2" y="1050.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.1 to 7.2</text>
+<rect x="465.8" y="1038.0" width="23.1" height="16" rx="8.0" fill="#83dbbd" fill-opacity="0.34"/>
+<circle cx="473.8" cy="1046.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="475.3" cy="1041.8" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="476.1" cy="1050.2" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="476.8" cy="1039.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="477.2" cy="1053.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="477.4" cy="1043.9" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="477.7" cy="1048.1" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="479.1" cy="1040.4" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="480.5" cy="1051.6" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<circle cx="480.8" cy="1046.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
+<line x1="477.3" y1="1035.0" x2="477.3" y2="1057.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="496.8" y="1050.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">5.1 to 7.2</text>
 <text x="36.0" y="1087.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A23</text>
 <text x="78.0" y="1087.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered</text>
 <text x="78.0" y="1101.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="524.1" y="1082.0" width="57.4" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
-<circle cx="532.1" cy="1090.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="533.0" cy="1085.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="538.2" cy="1094.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="544.5" cy="1083.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="546.6" cy="1097.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="552.6" cy="1087.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="553.9" cy="1092.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="555.4" cy="1084.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="560.7" cy="1095.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<circle cx="573.5" cy="1090.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
-<line x1="549.6" y1="1079.0" x2="549.6" y2="1101.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
-<text x="589.5" y="1094.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 6.8</text>
-<text x="36.0" y="1168.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">* Solo Sonnet 5 (A18 at medium, A19 at high effort): 3 of 10 runs in each arm failed all five acceptance rounds on the same check, the MIR count. One hidden test log has</text>
-<text x="36.0" y="1185.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">an MIR line with neither FILE:LINE nor the ' - ' separator; the spec says FILE:LINE may be absent on MIR lines but is silent on the separator, which real ut_assert always</text>
-<text x="36.0" y="1202.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">prints. All six failed runs parsed the separator as required, reported one MIR too few, and kept that parser through four rounds of identical feedback naming the MIR</text>
-<text x="36.0" y="1219.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">requirement. Every run of the other 17 arms (170 runs) passed this check.</text>
+<rect x="463.2" y="1082.0" width="24.3" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="471.2" cy="1090.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="471.4" cy="1085.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="472.4" cy="1094.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="473.7" cy="1083.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="474.1" cy="1097.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="475.3" cy="1087.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="475.6" cy="1092.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="475.9" cy="1084.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="476.9" cy="1095.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="479.5" cy="1090.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="474.7" y1="1079.0" x2="474.7" y2="1101.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="495.5" y="1094.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">4.4 to 6.8</text>
+<text x="36.0" y="1131.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A24</text>
+<text x="78.0" y="1131.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Codex GPT-6 Luna, tiered</text>
+<text x="78.0" y="1145.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="454.8" y="1126.0" width="461.7" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="462.8" cy="1134.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="463.4" cy="1129.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="465.7" cy="1138.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="468.9" cy="1127.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="472.9" cy="1141.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="473.7" cy="1131.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="473.9" cy="1136.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="474.3" cy="1128.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="475.8" cy="1139.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="908.5" cy="1134.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="473.3" y1="1123.0" x2="473.3" y2="1145.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="924.5" y="1138.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">2.0 to 131.0</text>
+<text x="36.0" y="1175.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A25</text>
+<text x="78.0" y="1175.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered</text>
+<text x="78.0" y="1189.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="470.3" y="1170.0" width="25.8" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="478.3" cy="1178.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="478.8" cy="1173.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="480.0" cy="1182.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="480.9" cy="1171.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="481.1" cy="1185.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="481.9" cy="1175.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="482.2" cy="1180.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="484.0" cy="1172.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="484.5" cy="1183.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="488.1" cy="1178.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="481.5" y1="1167.0" x2="481.5" y2="1189.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="504.1" y="1182.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">6.5 to 9.3</text>
+<text x="36.0" y="1256.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">* Solo Sonnet 5 (A18 at medium, A19 at high effort): 3 of 10 runs in each arm failed all five acceptance rounds on the same check, the MIR count. One hidden test log has</text>
+<text x="36.0" y="1273.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">an MIR line with neither FILE:LINE nor the ' - ' separator; the spec says FILE:LINE may be absent on MIR lines but is silent on the separator, which real ut_assert always</text>
+<text x="36.0" y="1290.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">prints. All six failed runs parsed the separator as required, reported one MIR too few, and kept that parser through four rounds of identical feedback naming the MIR</text>
+<text x="36.0" y="1307.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">requirement. Every run of the other 17 arms (170 runs) passed this check.</text>
 </svg>

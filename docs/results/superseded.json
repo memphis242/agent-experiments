@@ -51,5 +51,6 @@
   "dfd2359b": "A2 task4 rep 1: run on the original Task 4 pack, whose stub-vs-real-cFS defects decided pass/fail; Task 4 is redone from scratch on the corrected pack",
   "e77f9343": "A1 task4 rep 2: run on the original Task 4 pack, whose stub-vs-real-cFS defects decided pass/fail; Task 4 is redone from scratch on the corrected pack",
   "ee0e6aeb": "A11 task4 rep 2: run on the original Task 4 pack, whose stub-vs-real-cFS defects decided pass/fail; Task 4 is redone from scratch on the corrected pack",
-  "f6294287": "A11 task4 rep 1: run on the original Task 4 pack, whose stub-vs-real-cFS defects decided pass/fail; Task 4 is redone from scratch on the corrected pack"
+  "f6294287": "A11 task4 rep 1: run on the original Task 4 pack, whose stub-vs-real-cFS defects decided pass/fail; Task 4 is redone from scratch on the corrected pack",
+  "21c8623e": "A25 task3 rep 9: ended as codex_error when a GPT-5.6 Luna tester call stopped at max_output_tokens; rerun as f5f1f391"
 }
