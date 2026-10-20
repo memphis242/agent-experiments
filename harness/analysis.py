@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import arms
+import claude_calls
 import codex
 import cost
 import transcript
@@ -121,15 +122,20 @@ def exec_usage_reconciliation(record: dict[str, Any], requests: Sequence[cost.Re
 
 def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Sequence[Path],
                   resume_indices: Sequence[int], gaps_path: Path, seed: int,
-                  definition_models: dict[str, str], codex_home: Path | None = None) -> None:
+                  definition_models: dict[str, str], codex_home: Path | None = None,
+                  subagent_home: Path | None = None, claude_dir: Path | None = None) -> None:
     """Recompute cost, behavior, validation, and totals in place; failures go to analysis_error.
 
     With codex_home (a Codex-subagent arm), the headless Codex subagents' requests join the
     Claude requests as subagent requests, and their calls count as spawns. For a Codex-main
-    arm there are no Claude transcripts (mains and sub_dirs are empty): the Codex session logs
-    in codex_home hold the main agent's requests, and the CLI's own cost figures do not exist."""
+    arm there are no Claude Code main transcripts (mains and sub_dirs are empty): the Codex session
+    logs in codex_home hold the main agent's requests, and the CLI's own cost figures do not exist.
+    The subagents of a Codex-main arm are separate sessions: Codex sessions in subagent_home (their
+    own CODEX_HOME), or Claude Code sessions recorded under claude_dir by claude-agent."""
     arm = arms.get_arm(record["arm"])
     assert (codex_home is not None) == arm.uses_codex
+    assert (subagent_home is not None) == (arm.codex_main and arm.codex)
+    assert (claude_dir is not None) == arm.claude_agents
     assert not arm.codex_main or not (mains or sub_dirs)
     main_turns: int | None = None
     try:
@@ -143,8 +149,16 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         claude_requests = cost.load_requests(list(mains), list(sub_dirs))
         if arm.codex_main:
             assert not claude_requests
-            requests = codex.load_requests(codex_home, "main")
-            main_turns = len(requests)
+            main_requests = codex.load_requests(codex_home, "main")
+            main_turns = len(main_requests)
+            if subagent_home is not None:
+                agent_requests = codex.load_requests(subagent_home, "subagent")
+            elif claude_dir is not None:
+                agent_requests = claude_calls.load_requests(claude_dir)
+                claude_requests = agent_requests
+            else:
+                agent_requests = ()
+            requests = main_requests + agent_requests
         else:
             requests = claude_requests + (codex.load_requests(codex_home) if codex_home is not None else ())
         pauses = cost.sample_pauses(resume_indices, gaps, seed) if resume_indices and gaps else {}
@@ -156,10 +170,21 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         data["billed_transcript_usd"] = transcript_billed
         if arm.codex_main:
             data["billed_basis"] = "codex_rollout"
-            reconciliation = data["exec_usage_reconciliation"] = exec_usage_reconciliation(record, requests)
+            reconciliation = data["exec_usage_reconciliation"] = exec_usage_reconciliation(record, main_requests)
             if any(v > 0 for v in reconciliation["diff"].values()):
                 warnings.append(f"codex exec reported more usage than the session logs hold ({reconciliation['diff']}); "
                                 "billed cost omits those requests")
+            if claude_dir is not None:
+                # Requests a Claude subagent call made without transcribing them count as billed subagent spend.
+                gap = claude_calls.untranscribed(claude_dir)
+                billed = data["scenarios"]["billed"]
+                for model, found in gap.items():
+                    billed["by_model"][model] = round(billed["by_model"].get(model, 0.0) + found["usd"], 6)
+                added = sum(found["usd"] for found in gap.values())
+                billed["by_source"]["subagent"] = round(billed["by_source"]["subagent"] + added, 6)
+                billed["total_usd"] = round(billed["total_usd"] + added, 6)
+                data["untranscribed"] = gap
+                data["billed_basis"] = "codex_rollout+claude_model_usage"
         elif usage := session_model_usage(record):
             mu = cost.billed_from_model_usage(report, usage, arm.main_model)
             data["scenarios"]["billed"]["total_usd"] = round(mu["total_usd"], 6)
@@ -191,7 +216,7 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                 warnings.append(f"Codex session log(s) cut off mid-line, last line ignored: {summary['truncated_logs']}")
             behavior["compaction_events"] += summary["compaction_events"]
             if arm.codex_main:
-                assert summary["calls"] == 0, "a Codex main agent starts no codex-agent calls"
+                assert summary["calls"] == 0, "a Codex main agent starts no codex-agent calls in its own home"
                 codex_violations = codex.validate_main(summary, codex.read_rollouts(codex_home), arm.main_model,
                                                        arm.main_effort, record["session_ids"])
             else:
@@ -203,13 +228,34 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                 behavior["subagent_spawns_by_type"] = dict(sorted(by_type.items()))
                 codex_violations = codex.validate(codex_home, summary, {n: arm.model_for(n) for n in arm.agents},
                                                   arm.subagent_effort)
+        agent_violations: list[dict[str, Any]] = []
+        if subagent_home is not None:
+            sub = behavior["codex_subagents"] = codex.summarize(subagent_home)
+            if sub["unpriced_usage_records"]:
+                warnings.append(f"{sub['unpriced_usage_records']} Codex subagent usage record(s) without a response "
+                                "id left unpriced")
+            if sub["truncated_logs"]:
+                warnings.append(f"Codex subagent session log(s) cut off mid-line, last line ignored: {sub['truncated_logs']}")
+            agent_violations = codex.validate(subagent_home, sub, {n: arm.model_for(n) for n in arm.agents},
+                                              arm.subagent_effort)
+        elif claude_dir is not None:
+            sub = behavior["claude_agents"] = claude_calls.summarize(claude_dir)
+            agent_violations = claude_calls.validate(
+                claude_dir, sub, {n: arm.model_for(n) for n in arm.agents}, arm.subagent_effort,
+                [*arms.DENIED_TOOLS, "Agent"])
+        if subagent_home is not None or claude_dir is not None:
+            behavior["subagent_spawn_calls"] = (codex.spawn_calls(sub) if subagent_home is not None
+                                                else claude_calls.spawn_calls(sub))
+            behavior["subagent_spawns"] = sub["calls"]
+            behavior["subagent_spawns_by_type"] = dict(sub["calls_by_agent"])
+            behavior["compaction_events"] += sub["compaction_events"]
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None or arm.codex else [])
         violations = transcript.validate_models(list(mains), list(sub_dirs), arm.main_model,
                                                 arm.claude_subagent_models, arms.effort_map(arm), forbidden,
                                                 {a: arm.model_for(a) for a in arm.agents} if arm.multi_model else None)
-        violations += ttl_violations + codex_violations
+        violations += ttl_violations + codex_violations + agent_violations
         inventory = [{**{k: v for k, v in i.items() if k != "path"},
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]

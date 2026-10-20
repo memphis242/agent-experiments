@@ -97,6 +97,7 @@ FOOTNOTE_TOP = 12               # tick labels to the first footnote baseline
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     # (marker substring of the description, family label, saturated colour)
     ("solo Codex GPT-", "Solo Codex", "#4f46e5"),  # before "Codex GPT-", which is the Codex-subagent family
+    ("Codex GPT-6.1 Sol low main", "Codex main", "#c026d3"),  # a delegating Codex main agent, likewise
     ("Codex GPT-", "Codex", "#10b981"),
     ("tiered", "Tiered", "#fbbf24"),
     ("Opus 5.5 subagents", "Opus 5.5", "#a78bfa"),

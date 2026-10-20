@@ -403,19 +403,26 @@ FAKE_CODEX_MAIN = textwrap.dedent(r"""
         print(json.dumps({"type": "error", "message": "You've hit your usage limit."}))
         print(json.dumps({"type": "turn.failed", "error": {"message": "You've hit your usage limit."}}))
         sys.exit(1)
+    def setting(key):
+        return next(a.split('"')[1] for a in argv if a.startswith(key + "="))
     log = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{thread}.jsonl"
     log.parent.mkdir(parents=True, exist_ok=True)
     n = sum(1 for l in log.open() if "token_usage_record" in l) if log.exists() else 0
     entries = [] if resume else [{"timestamp": "2026-10-19T13:49:16.832Z", "type": "session_meta",
                                   "payload": {"id": thread}}]
     entries += [{"timestamp": "2026-10-19T13:49:18.823Z", "type": "turn_context",
-                 "payload": {"model": "gpt-6.1-sol", "effort": "high"}},
+                 "payload": {"model": setting("model"), "effort": setting("model_reasoning_effort")}},
                 {"timestamp": "2026-10-19T13:49:22.113Z", "type": "token_usage_record",
                  "payload": {"response_id": f"resp_{n}", "usage": {
                      "input_tokens": 1000 * (n + 1), "cached_input_tokens": 500 * n, "cache_write_input_tokens": 0,
                      "output_tokens": 100, "reasoning_output_tokens": 10, "total_tokens": 1100 * (n + 1)}}}]
     with log.open("a") as f:
         f.write("".join(json.dumps(e) + "\n" for e in entries))
+    if "DELEGATE" in task:  # start a subagent the way the shell tool would
+        import subprocess
+        sub = subprocess.run(["claude-agent", "implementer"], input="LIMIT" if "LIMIT" in task else "build it",
+                             text=True, capture_output=True)
+        Path("agent-report.txt").write_text(f"{sub.returncode}|{sub.stdout}|{sub.stderr}")
     if resume:
         Path("done").write_text("x")
     print(json.dumps({"type": "thread.started", "thread_id": thread}))
@@ -434,6 +441,43 @@ FAKE_PACK = textwrap.dedent("""\
     """)
 
 MAIN_MODEL, MAIN_EFFORT = "gpt-6.1-sol", "high"
+
+
+def make_world(test, root, prompt, arm="A26", claude_bin=None):
+    """A template, task, acceptance pack, fake codex, and generated `arm` root under `root`, with
+    codex.prepare_home replaced by one that only creates the homes; returns run.py's arguments."""
+    template = root / "template"
+    template.mkdir()
+    subprocess.run(["git", "init", "-q", str(template)], check=True)
+    (template / "README").write_text("x")
+    subprocess.run(["git", "-C", str(template), "add", "."], check=True)
+    subprocess.run(["git", "-C", str(template), "-c", "user.name=t", "-c", "user.email=t@t",
+                    "commit", "-qm", "init"], check=True)
+    tasks = root / "tasks" / "t1"
+    (tasks / "acceptance").mkdir(parents=True)
+    (tasks / "spec.md").write_text("spec")
+    (tasks / "prompt.md").write_text(prompt)
+    (tasks / "acceptance" / "run.sh").write_text(FAKE_PACK)
+    fake = root / "fake-codex"
+    fake.write_text(FAKE_CODEX_MAIN)
+    fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+    arms.generate_arm(arm, root / "arms")
+
+    def fake_prepare(run_dir, codex_config, repo, base_env, subagent_config=None):
+        test.assertTrue(arms.get_arm(arm).codex_main)
+        test.assertNotIn("settings.json", {p.name for p in codex_config.parent.iterdir()})  # no Claude Code configuration
+        codex.home_for(run_dir).mkdir()
+        if subagent_config is not None:
+            codex.subagent_home_for(codex.home_for(run_dir)).mkdir()
+        return {"codex_bin": str(fake), "codex_version": "fake"}
+
+    patcher = mock.patch.object(codex, "prepare_home", fake_prepare)
+    patcher.start()
+    test.addCleanup(patcher.stop)
+    argv = ["--arm", arm, "--task", "t1", "--rep", "1", "--template", str(template),
+            "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
+            "--tasks-dir", str(root / "tasks"), "--gaps", str(root / "missing.json"), "--no-netns"]
+    return argv + (["--claude-bin", str(claude_bin)] if claude_bin else [])
 
 
 class CodexMainTest(unittest.TestCase):
@@ -524,34 +568,7 @@ class CodexMainTest(unittest.TestCase):
             self.assertEqual(codex.summarize(home)["compaction_events"], 1)
 
     def make_world(self, root, prompt):
-        template = root / "template"
-        template.mkdir()
-        subprocess.run(["git", "init", "-q", str(template)], check=True)
-        (template / "README").write_text("x")
-        subprocess.run(["git", "-C", str(template), "add", "."], check=True)
-        subprocess.run(["git", "-C", str(template), "-c", "user.name=t", "-c", "user.email=t@t",
-                        "commit", "-qm", "init"], check=True)
-        tasks = root / "tasks" / "t1"
-        (tasks / "acceptance").mkdir(parents=True)
-        (tasks / "spec.md").write_text("spec")
-        (tasks / "prompt.md").write_text(prompt)
-        (tasks / "acceptance" / "run.sh").write_text(FAKE_PACK)
-        fake = root / "fake-codex"
-        fake.write_text(FAKE_CODEX_MAIN)
-        fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
-        arms.generate_arm("A26", root / "arms")
-
-        def fake_prepare(run_dir, codex_config, repo, base_env):
-            self.assertEqual({p.name for p in codex_config.parent.iterdir()}, {"codex"})  # no Claude configuration
-            codex.home_for(run_dir).mkdir()
-            return {"codex_bin": str(fake), "codex_version": "fake"}
-
-        patcher = mock.patch.object(codex, "prepare_home", fake_prepare)
-        patcher.start()
-        self.addCleanup(patcher.stop)
-        return ["--arm", "A26", "--task", "t1", "--rep", "1", "--template", str(template),
-                "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
-                "--tasks-dir", str(root / "tasks"), "--gaps", str(root / "missing.json"), "--no-netns"]
+        return make_world(self, root, prompt)
 
     def invocations(self, run_dir):
         lines = (codex.home_for(run_dir) / "fake-invocations.jsonl").read_text().splitlines()
@@ -590,6 +607,22 @@ class CodexMainTest(unittest.TestCase):
             self.assertEqual(rec["cost"]["exec_usage_reconciliation"]["diff"]["input_tokens"], 0)
             self.assertTrue(rec["validation"]["ok"], rec["validation"])
             self.assertFalse((run_dir / "transcripts").exists())
+
+    def test_codex_main_with_codex_subagents_keeps_their_home_apart(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):
+            os.environ.pop(run.TOKEN_ENV, None)
+            root = Path(tmp)
+            self.assertEqual(run.main(make_world(self, root, "Do the task.", arm="A30")), 0)
+            (run_dir,) = [p for p in (root / "runs").iterdir() if p.is_dir()]
+            rec = json.loads((run_dir / "run.json").read_text())
+            self.assertEqual(rec["status"], "completed")
+            self.assertEqual(rec["behavior"]["codex_subagents"]["calls"], 0)
+            self.assertEqual(rec["behavior"]["subagent_spawns"], 0)
+            self.assertTrue(rec["validation"]["ok"], rec["validation"])
+            env = json.loads((codex.home_for(run_dir) / "fake-invocations.jsonl").read_text().splitlines()[0])["env"]
+            self.assertEqual(env["CODEX_HOME"], str(codex.home_for(run_dir)))  # the shell's CODEX_HOME is set by config
+            self.assertEqual(env["PATH"].split(":")[0], str(run_dir / "config" / "codex" / "bin"))
+            self.assertNotIn("CODEX_AGENT_DEPTH", env)
 
     def test_codex_usage_limit_is_a_usage_limit_run(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):

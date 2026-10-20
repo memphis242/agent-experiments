@@ -84,6 +84,9 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A27": "solo Codex GPT-6 Luna, high effort",
     "A28": "solo Codex GPT-5.6 Sol, high effort",
     "A29": "solo Codex GPT-5.6 Luna, high effort",
+    "A30": "Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered",
+    "A31": "Codex GPT-6.1 Sol low main, Opus 5.5 + Haiku 5.5 subagents, tiered",
+    "A32": "Codex GPT-6.1 Sol low main, Haiku 5.5 subagents, tiered",
 }
 
 

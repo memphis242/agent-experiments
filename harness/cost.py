@@ -230,6 +230,16 @@ def load_requests(main_paths: Path | Sequence[Path],
     return tuple(requests)
 
 
+def load_subagent_files(paths: Sequence[Path]) -> tuple[Request, ...]:
+    """Deduplicated subagent requests from standalone transcripts (the sessions of headless
+    Claude Code subagents), in the order given."""
+    seen: set[str] = set()
+    requests: list[Request] = []
+    for path in paths:
+        requests.extend(_load_file(path, "subagent", seen))
+    return tuple(requests)
+
+
 def main_request_count(main_paths: Path | Sequence[Path]) -> int:
     return sum(1 for r in load_requests(main_paths) if r.source == "main")
 

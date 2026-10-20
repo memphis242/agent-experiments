@@ -37,6 +37,9 @@ EQUIVALENT_RUN_CODES: frozenset[str] = frozenset({
     # bd8d6a3 (A24 and A25 results): the current change adds arms whose main agent is a Codex
     # session; the config roots and run path of the Claude-main arms (A1 to A25) are unchanged.
     "24b431b3cd96e59e4b5f497bbc5b5fa0ff697e727dc0e512fc46355569b77fa8",
+    # f32398a (solo Codex arms A26 to A29): the current change adds Codex main agents with subagents
+    # (A30 to A32); the config roots and run path of A1 to A29 are unchanged.
+    "6fc39d62d7a475b1af3de15e48764bbacea1c51e193da5431c35a23fd91c4eed",
 })
 
 

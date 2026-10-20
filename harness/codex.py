@@ -39,6 +39,8 @@ USER_AUTH = Path("~/.codex/auth.json").expanduser()
 HOST_VISIBLE: tuple[Path, ...] = (Path("~/.codex/packages").expanduser(),)
 RUNTIME_FILE = "agent-runtime.json"  # read by codex-agent: the Codex binary this run is pinned to
 PROMPT_INPUT_FILE = "codex-prompt-input.json"
+SUBAGENT_PROMPT_INPUT_FILE = "codex-prompt-input-subagents.json"
+SUBAGENT_HOME_DIR = "subagents"  # inside CODEX_HOME: the Codex subagents' own CODEX_HOME for a Codex main agent
 # Prompt sections that must not reach an agent: bundled skills, multi-agent
 # collaboration, connected apps and plugins.
 FORBIDDEN_PROMPT_MARKERS: tuple[str, ...] = ("<skills_instructions>", "<multi_agent_role>", "<multi_agent_mode>",
@@ -61,6 +63,11 @@ class CodexError(Exception):
 
 def home_for(run_dir: Path) -> Path:
     return run_dir / HOME_DIR
+
+
+def subagent_home_for(home: Path) -> Path:
+    """The Codex subagents' CODEX_HOME of a Codex main agent whose CODEX_HOME is `home`."""
+    return home / SUBAGENT_HOME_DIR
 
 
 def _capture(cmd: Sequence[str], cwd: Path, env: dict[str, str]) -> str:
@@ -189,23 +196,15 @@ def sweep_stale_logins(runs_dir: Path) -> list[str]:
     return swept
 
 
-def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[str, str]) -> dict[str, Any]:
-    """Create <run>/codex-home from the arm's codex/ dir, pin the Codex binary, check the
-    feature states, disable Codex's bundled skills, check the model-visible prompt, validate
-    the final config strictly, and install a copy of the user's Codex login.
-
-    The prompt check renders exactly what a Codex agent's first request carries apart from
-    its role (a subagent), run id (the main agent), and task, saves it as codex-prompt-input.json
-    in the run dir, and fails
-    unless the working agreement is present and no skills, multi-agent, app, or plugin
-    section is. The login is copied last, and not at all when Codex would refresh it
-    within RUN_MARGIN. Returns provenance for run.json."""
-    home = home_for(run_dir)
-    home.mkdir()
-    codex_bin = str(resolve_codex_bin())
+def _build_home(home: Path, source: Path, run_dir: Path, repo: Path, base_env: dict[str, str], codex_bin: str,
+                prompt_file: str, extra_config: str = "") -> dict[str, Any]:
+    """Fill an existing CODEX_HOME from `source` (a dir with config.toml and AGENTS.md): pin the
+    Codex binary, check the feature states, disable the bundled skills, append `extra_config`, check
+    the model-visible prompt (saved as `prompt_file` in the run dir), and validate the final config
+    strictly. Returns the feature states and the prompt's provenance."""
     (home / RUNTIME_FILE).write_text(json.dumps({"codex_bin": codex_bin}, indent=2) + "\n", encoding="utf-8")
-    shutil.copyfile(codex_config / "config.toml", home / "config.toml")
-    shutil.copyfile(codex_config / "AGENTS.md", home / "AGENTS.md")
+    shutil.copyfile(source / "config.toml", home / "config.toml")
+    shutil.copyfile(source / "AGENTS.md", home / "AGENTS.md")
     env = {**base_env, "CODEX_HOME": str(home)}
     states = _feature_states(_capture([codex_bin, "features", "list"], repo, env))
     wanted = tomllib.loads((home / "config.toml").read_text(encoding="utf-8")).get("features", {})
@@ -218,19 +217,53 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
     with (home / "config.toml").open("a", encoding="utf-8") as config:
         for path in skills:
             config.write(f'\n[[skills.config]]\npath = {json.dumps(str(path))}\nenabled = false\n')
+        config.write(extra_config)
     rendered = _capture(render, repo, env)
-    (run_dir / PROMPT_INPUT_FILE).write_text(rendered, encoding="utf-8")
-    texts = _prompt_texts(rendered)
-    joined = "\n".join(t for _, t in texts)
+    (run_dir / prompt_file).write_text(rendered, encoding="utf-8")
+    joined = "\n".join(t for _, t in _prompt_texts(rendered))
     present = [m for m in FORBIDDEN_PROMPT_MARKERS if m in joined]
     if present:
-        raise CodexError(f"the Codex prompt still carries {present}; see {run_dir / PROMPT_INPUT_FILE}")
-    agreement = (codex_config / "AGENTS.md").read_text(encoding="utf-8").strip()
+        raise CodexError(f"the Codex prompt still carries {present}; see {run_dir / prompt_file}")
+    agreement = (source / "AGENTS.md").read_text(encoding="utf-8").strip()
     if agreement not in joined:
-        raise CodexError(f"the Codex prompt lacks the working agreement; see {run_dir / PROMPT_INPUT_FILE}")
+        raise CodexError(f"the Codex prompt lacks the working agreement; see {run_dir / prompt_file}")
     if f"<cwd>{repo.resolve()}</cwd>" not in joined:
-        raise CodexError(f"the Codex prompt does not place the agent in {repo}; see {run_dir / PROMPT_INPUT_FILE}")
+        raise CodexError(f"the Codex prompt does not place the agent in {repo}; see {run_dir / prompt_file}")
     check_strict_config(codex_bin, repo, env)
+    return {"states": states, "skills": len(skills), "prompt_sha256": hashlib.sha256(rendered.encode()).hexdigest()}
+
+
+def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[str, str],
+                 subagent_config: Path | None = None) -> dict[str, Any]:
+    """Create <run>/codex-home from the arm's codex/ dir, pin the Codex binary, check the
+    feature states, disable Codex's bundled skills, check the model-visible prompt, validate
+    the final config strictly, and install a copy of the user's Codex login.
+
+    The prompt check renders exactly what a Codex agent's first request carries apart from
+    its role (a subagent), run id (the main agent), and task, saves it as codex-prompt-input.json
+    in the run dir, and fails unless the arm's AGENTS.md is present and no skills, multi-agent,
+    app, or plugin section is. The login is copied last, and not at all when Codex would refresh it
+    within RUN_MARGIN.
+
+    With subagent_config (a Codex main agent with Codex subagents), the subagents get their own
+    CODEX_HOME inside the main one, built and checked the same way from that dir (so that their global
+    AGENTS.md is the plain working agreement, not the main agent's), and the main agent's shell
+    commands see it as CODEX_HOME (shell_environment_policy.set) while the main agent itself runs on
+    its own. The subagent home shares the main home's login through a symlink. Returns provenance
+    for run.json."""
+    home = home_for(run_dir)
+    home.mkdir()
+    codex_bin = str(resolve_codex_bin())
+    sub_home = subagent_home_for(home) if subagent_config is not None else None
+    extra = (f"\n[shell_environment_policy.set]\nCODEX_HOME = {json.dumps(str(sub_home))}\n"
+             if sub_home is not None else "")
+    main = _build_home(home, codex_config, run_dir, repo, base_env, codex_bin, PROMPT_INPUT_FILE, extra)
+    sub = None
+    if sub_home is not None:
+        assert subagent_config is not None
+        sub_home.mkdir()
+        sub = _build_home(sub_home, subagent_config, run_dir, repo, base_env, codex_bin, SUBAGENT_PROMPT_INPUT_FILE)
+    states = main["states"]
     version = _capture([codex_bin, "--version"], repo, base_env).strip()
     if not USER_AUTH.is_file():
         raise CodexError(f"no Codex login at {USER_AUTH}; run `codex login`")
@@ -249,11 +282,16 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
         shutil.copyfile(USER_AUTH, target)
         target.chmod(0o600)
         installed = hashlib.sha256(target.read_bytes()).hexdigest()
+    if sub_home is not None:
+        (sub_home / AUTH_FILE).symlink_to(Path("..") / AUTH_FILE)
     enabled = sorted(name for name, on in states.items() if on)
-    return {"codex_version": version, "codex_bin": codex_bin, "features_enabled": enabled,
-            "skills_disabled": len(skills),
-            "prompt_input_sha256": hashlib.sha256(rendered.encode()).hexdigest(),
+    info = {"codex_version": version, "codex_bin": codex_bin, "features_enabled": enabled,
+            "skills_disabled": main["skills"], "prompt_input_sha256": main["prompt_sha256"],
             "auth_sha256": installed, "login_refresh_point": point.isoformat(), "stale_logins_swept": swept}
+    if sub is not None:
+        info.update(subagent_home=str(sub_home), subagent_skills_disabled=sub["skills"],
+                    subagent_prompt_input_sha256=sub["prompt_sha256"])
+    return info
 
 
 def check_strict_config(codex_bin: str, repo: Path, env: dict[str, str]) -> None:

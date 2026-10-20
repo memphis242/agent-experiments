@@ -154,6 +154,50 @@ usage, which `cost.exec_usage_reconciliation` compares with the log. The cache
 write TTL scenarios coincide with billed, since Codex has no TTL split and no
 pauses are simulated.
 
+A30 to A32 give a Codex GPT-6.1 Sol main agent (low effort) the tiered delegation
+of A14, A15 and A24, with subagents at high effort. A30's subagents are headless
+Codex sessions on GPT-6 Luna (the roster of A24, through the same `codex-agent`);
+A31's are headless Claude Code sessions, the implementer on Opus 5.5 and the
+small-implementer and tester on Haiku 5.5 (the inverse of A23); A32's are Claude
+Code sessions on Haiku 5.5 throughout (the inverse of A24). The main agent's
+AGENTS.md is what the matching Claude main agent's CLAUDE.md is (the working
+agreement and the tiered paragraph) followed by the subagents section, rewritten
+for Codex's shell tool: it starts a subagent with `codex-agent` or `claude-agent`
+(the task on standard input, the report on standard output), waits for it in the
+foreground, and runs several at once with `&` and a `wait` in the same shell
+command, never polling with `pgrep`, `ps` or a loop. Codex's shell tool has no
+per-command kill timeout: a command that outlives a call keeps running as a
+session that the model polls, the code cell yielding after 30 s and the `wait`
+tool honouring yield times of at least ten minutes. Empty polls of a session
+are capped by `background_terminal_max_timeout` (five minutes by default, 15 s
+when set to 15000, as tried), which the main agent's config sets to two hours.
+
+A30's subagents have a CODEX_HOME of their own, `codex-home/subagents/` (shared
+login by symlink), so that their global AGENTS.md is the plain working agreement
+(as in A21 to A25) rather than the main agent's, and so that main and subagent
+rollouts are told apart by directory: the main agent's shell commands see that
+directory as CODEX_HOME through `shell_environment_policy.set`, which is how the
+unchanged `codex-agent` finds the subagents' configuration. A31 and A32's
+`claude-agent` (`harness/claude_agent.py`) runs `claude -p` with the agent's
+model, its role as an appended system prompt, `--tools` limited to the agent's
+definition, the Agent tool and the denied tools denied, and bypassPermissions,
+in a CLAUDE_CONFIG_DIR of the run (`config/claude/`) whose settings.json gives the
+agent's effort and the 5-minute cache TTL of a Claude Code subagent, and whose
+CLAUDE.md is the working agreement. It differs from a native Claude Code subagent
+in keeping Claude Code's full default system prompt (the role is appended, not
+substituted) and in being a session of its own with its own transcript. The
+Claude login reaches it through a file in the namespace's private `/dev/shm`
+(written by the namespace wrapper from a variable it then removes, mode 600), so
+the Codex main agent's environment never holds it, Codex's shell tool would
+withhold a variable named like a secret anyway, and nothing is on disk; the main
+agent can read the file if it looks for it. A Claude usage limit in a
+`claude-agent` call ends the run as `usage_limit`, any other failed call as
+`claude_error`, after the round and before acceptance. Costs: the main agent from
+its Codex session log (source main), each Codex subagent from the subagents'
+home, each Claude call from its transcript (source subagent, Claude prices and
+cache TTLs as recorded) plus the tokens the call's own `modelUsage` holds beyond
+its transcript.
+
 Codex usage is priced at OpenAI's standard API rates for GPT-6.1 Sol (USD per
 million tokens: input 2.00, cached input 0.10, cache write 2.50, output 10.00;
 above 272K input tokens 4.00, 0.20, 5.00 and 15.00, applied per request, since

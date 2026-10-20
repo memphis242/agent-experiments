@@ -194,6 +194,34 @@ def scan_new_lines(path: Path, start_line: int, patterns: Sequence[str] = LEAK_P
     return hits, total
 
 
+def tool_use_counts(path: Path) -> Counter[str]:
+    """Tool calls by tool name in one transcript, each tool_use block counted once."""
+    seen: set[str] = set()
+    counts: Counter[str] = Counter()
+    for entry in iter_entries(path):
+        for block in _tool_uses(entry):
+            block_id = block.get("id")
+            if isinstance(block_id, str):
+                if block_id in seen:
+                    continue
+                seen.add(block_id)
+            counts[str(block.get("name"))] += 1
+    return counts
+
+
+def compaction_count(path: Path) -> int:
+    """Compaction boundaries in one transcript, each counted once."""
+    seen: set[str] = set()
+    count = 0
+    for entry in iter_entries(path):
+        if entry.get("type") == "system" and entry.get("subtype") == "compact_boundary":
+            uuid = str(entry.get("uuid") or "")
+            if not uuid or uuid not in seen:
+                seen.add(uuid)
+                count += 1
+    return count
+
+
 def summarize_behavior(main_paths: Sequence[Path], subagent_dirs: Sequence[Path]) -> dict[str, object]:
     """Counts of tool calls, subagent spawns, and compaction events.
 

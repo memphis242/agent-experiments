@@ -50,7 +50,8 @@ class ArmsTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_all_roots(self):
-        self.assertEqual(sorted(p.name for p in self.base.iterdir()), sorted(EXPECTED | CODEX_MAIN))
+        self.assertEqual(sorted(p.name for p in self.base.iterdir()),
+                         sorted(EXPECTED | CODEX_MAIN | {"A30": "", "A31": "", "A32": ""}))
 
     def test_settings_and_models(self):
         for arm, sub_model in EXPECTED.items():
@@ -193,13 +194,79 @@ class ArmsTest(unittest.TestCase):
             arms.ArmSpec("X", None, None, main_model=arms.OPUS_55, main_harness="codex")
         with self.assertRaises(AssertionError):  # and a Claude main agent a Claude model
             arms.ArmSpec("X", None, None, main_model=arms.GPT_6_LUNA)
-        with self.assertRaises(AssertionError):  # a Codex main agent has no subagents
-            arms.ArmSpec("X", arms.GPT_6_LUNA, "eager", main_model=arms.GPT_61_SOL, main_harness="codex",
-                         subagent_harness="codex")
+        with self.assertRaises(AssertionError):  # no subagents, so no per-agent models
+            arms.ArmSpec("X", None, None, main_model=arms.GPT_61_SOL, main_harness="codex",
+                         agent_models=(("tester", arms.GPT_6_LUNA),))
         with self.assertRaises(AssertionError):
             arms.ArmSpec("X", None, None, main_model=arms.GPT_61_SOL, main_harness="gemini")
         with self.assertRaises(AssertionError):  # Claude-side files exist only for a Claude main agent
             arms.build_settings(spec)
+
+    def test_codex_main_delegating_roots(self):
+        """A Codex main agent's AGENTS.md is what the matching Claude main agent's CLAUDE.md is, up to
+        the subagents section, which is written for Codex's shell tool."""
+        for arm, claude_arm in (("A30", "A24"), ("A31", "A14"), ("A32", "A14")):
+            text = (self.base / arm / "codex" / "AGENTS.md").read_text()
+            head, _, section = text.partition("\n\n## Subagents\n")
+            self.assertEqual(head.rstrip(), (self.base / claude_arm / "CLAUDE.md").read_text().split("\n\n## Subagents")[0].rstrip())
+            self.assertIn("Delegate implementation, not thinking.", head)
+            self.assertIn("`wait` for all of them in that same command", section)
+            self.assertIn("no `pgrep`, `ps` or polling loop", section)
+            for claude_only in ("run_in_background", "Bash timeout", "notified"):
+                self.assertNotIn(claude_only, section)
+            self.assertNotIn("{{", text)
+            self.assertTrue(arms.ARMS[arm].codex_main and arms.ARMS[arm].command_subagents)
+            self.assertEqual(arms.ARMS[arm].main_effort, "low")
+            self.assertEqual(arms.ARMS[arm].subagent_effort, "high")
+        self.assertIn("run_in_background", (self.base / "A24" / "CLAUDE.md").read_text())  # unchanged for A24
+
+    def test_a30_codex_subagents_have_their_own_home_inputs(self):
+        codex = self.base / "A30" / "codex"
+        self.assertEqual(sorted(p.name for p in (self.base / "A30").iterdir()), ["codex"])
+        self.assertTrue((codex / "bin" / "codex-agent").stat().st_mode & 0o111)
+        self.assertEqual((codex / "bin" / "codex-agent").read_bytes(), arms.CODEX_AGENT_SCRIPT.read_bytes())
+        self.assertEqual((codex / "subagent" / "AGENTS.md").read_text(), arms.working_agreement())
+        self.assertIn('model = "gpt-6-luna"', (codex / "subagent" / "config.toml").read_text())
+        main = (codex / "config.toml").read_text()
+        self.assertIn('model = "gpt-6.1-sol"', main)
+        self.assertIn('model_reasoning_effort = "low"', main)
+        self.assertIn("background_terminal_max_timeout = 7200000", main)
+        self.assertLess(main.index("background_terminal_max_timeout"), main.index("[agents]"))
+        self.assertNotIn("background_terminal_max_timeout", (self.base / "A26" / "codex" / "config.toml").read_text())
+        roster = json.loads((codex / "agent.json").read_text())
+        self.assertEqual({n: (a["model"], a["effort"]) for n, a in roster["agents"].items()},
+                         {n: ("gpt-6-luna", "high") for n in arms.TIERED_AGENTS})
+        text = (codex / "AGENTS.md").read_text()
+        self.assertIn("OpenAI's GPT-6 Luna at high reasoning effort", text)
+
+    def test_claude_agent_arms(self):
+        for arm, models in (("A31", {"implementer": "claude-opus-5-5", "small-implementer": "claude-haiku-5-5",
+                                     "tester": "claude-haiku-5-5"}),
+                            ("A32", {n: "claude-haiku-5-5" for n in arms.TIERED_AGENTS})):
+            root = self.base / arm
+            self.assertEqual(sorted(p.name for p in root.iterdir()), ["claude", "codex"])
+            self.assertEqual(sorted(p.name for p in (root / "codex").iterdir()), ["AGENTS.md", "config.toml"])
+            claude = root / "claude"
+            launcher = claude / "bin" / "claude-agent"
+            self.assertTrue(launcher.stat().st_mode & 0o111)
+            self.assertEqual(launcher.read_bytes(), arms.CLAUDE_AGENT_SCRIPT.read_bytes())
+            roster = json.loads((claude / "agent.json").read_text())["agents"]
+            self.assertEqual({n: a["model"] for n, a in roster.items()}, models)
+            self.assertEqual({a["effort"] for a in roster.values()}, {"high"})
+            self.assertEqual(roster["tester"]["tools"], ["Read", "Edit", "Write", "Grep", "Glob", "Bash"])
+            settings = json.loads((claude / "settings.json").read_text())
+            self.assertEqual(settings["modelSettings"], {m: {"effortLevel": "high"} for m in set(models.values())})
+            self.assertEqual(settings["permissions"]["deny"], ["Agent", *arms.DENIED_TOOLS])
+            self.assertEqual(settings["promptCacheTtl"], "5m")
+            self.assertEqual((claude / "CLAUDE.md").read_text(), arms.working_agreement())
+            for name in arms.TIERED_AGENTS:
+                self.assertEqual((claude / "roles" / f"{name}.md").read_text(),
+                                 arms._split_agent_template(name)[1])
+            text = (root / "codex" / "AGENTS.md").read_text()
+            self.assertIn("headless Claude Code sessions", text)
+            self.assertIn("`claude-agent`", text)
+        self.assertIn("Anthropic's Claude Haiku 5.5 at high effort", (self.base / "A32" / "codex" / "AGENTS.md").read_text())
+        self.assertIn("- implementer (Claude Opus 5.5): ", (self.base / "A31" / "codex" / "AGENTS.md").read_text())
 
     def test_unknown_arm(self):
         with self.assertRaises(arms.ArmError):

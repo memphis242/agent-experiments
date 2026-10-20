@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Sequence
 
 import analysis
+import arms
 import codex
 import run
 import transcript
@@ -53,8 +54,12 @@ def reanalyze_run(run_dir: Path, gaps_path: Path) -> tuple[float | None, float |
     sub_dirs = [transcripts / m.stem / "subagents" for m in mains]
     definition_models = (record.get("behavior") or {}).get("agent_definition_models", {})
     codex_home = (codex.home_for(run_dir) if codex_main or record.get("subagent_harness") == "codex" else None)
+    arm = arms.get_arm(record["arm"])
+    subagent_home = codex.subagent_home_for(codex_home) if codex_home and arm.codex_main and arm.codex else None
+    claude_dir = run_dir / "config" / arms.CLAUDE_DIR if arm.claude_agents else None
     analysis.update_record(record, mains, sub_dirs, record.get("resume_request_indices", []),
-                           gaps_path, (record.get("cost") or {}).get("seed", 0), definition_models, codex_home)
+                           gaps_path, (record.get("cost") or {}).get("seed", 0), definition_models, codex_home,
+                           subagent_home, claude_dir)
     record["reanalyzed_with"] = run.harness_git()[0]
     run.write_json_atomic(path, record)
     return before, (record.get("totals") or {}).get("billed_usd")

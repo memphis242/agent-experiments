@@ -49,6 +49,8 @@ class FamilyTest(unittest.TestCase):
             "Haiku 5.5 subagents, eager": "Haiku 5.5",
             "Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager": "Codex",
             "solo Codex GPT-6.1 Sol, high effort": "Solo Codex",
+            "Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered": "Codex main",
+            "Codex GPT-6.1 Sol low main, Haiku 5.5 subagents, tiered": "Codex main",
             "A12": "Other",
         }
         for description, family in cases.items():
@@ -71,6 +73,8 @@ class LabelTest(unittest.TestCase):
             "A13": "solo Opus 5.5, medium",
             "A14": "Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered",
             "A26": "solo Codex GPT-6.1 Sol, high",
+            "A31": "Codex GPT-6.1 Sol low main, Opus 5.5 high + Haiku 5.5 high subagents, tiered",
+            "A32": "Codex GPT-6.1 Sol low main, Haiku 5.5 high subagents, tiered",
         }
         for arm, label in cases.items():
             self.assertEqual(charts.chart_label(arm, aggregate.ARM_DESCRIPTIONS[arm]), label, arm)
