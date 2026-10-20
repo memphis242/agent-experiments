@@ -75,7 +75,7 @@ def cache_ttl_report(requests: Sequence[cost.Request], expected_main: str,
 
     A request mismatches when it writes cache with the TTL other than the one expected for
     its thread kind. Requests whose usage carried no 1h/5m split are counted as unsplit and
-    never judged. Reported, never acted on."""
+    never judged. The caller decides whether mismatches invalidate the run."""
     ttls = {"1h": "cache_write_1h_tokens", "5m": "cache_write_5m_tokens"}
     expected = {"main": expected_main, "subagent": expected_subagent}
     assert set(expected.values()) <= set(ttls)
@@ -110,8 +110,10 @@ def exec_usage_reconciliation(record: dict[str, Any], requests: Sequence[cost.Re
     last: dict[str, dict[str, Any]] = {}
     for r in record["rounds"]:
         reported = r.get("codex_cli") or {}
-        if reported.get("session_id"):
-            last[reported["session_id"]] = reported.get("usage") or {}
+        if reported.get("turns_completed") == 0:
+            continue
+        if reported.get("session_id") and isinstance(reported.get("usage"), dict):
+            last[reported["session_id"]] = reported["usage"]
     exec_usage = {key: sum(usage.get(key) or 0 for usage in last.values()) for key in codex.USAGE_KEYS}
     logged = {"input_tokens": sum(cost.context_tokens(r) for r in requests),
               "cached_input_tokens": sum(r.cache_read_tokens for r in requests),
@@ -138,6 +140,9 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
     assert (claude_dir is not None) == arm.claude_agents
     assert not arm.codex_main or not (mains or sub_dirs)
     main_turns: int | None = None
+    incomplete: list[str] = []
+    if arm.codex_main:
+        record.update(cost=None, validation=None)
     try:
         gaps: tuple[float, ...] | None = None
         warnings: list[str] = []
@@ -161,41 +166,6 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             requests = main_requests + agent_requests
         else:
             requests = claude_requests + (codex.load_requests(codex_home) if codex_home is not None else ())
-        pauses = cost.sample_pauses(resume_indices, gaps, seed) if resume_indices and gaps else {}
-        report = cost.compute_cost(requests, pauses)
-        data = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO, "seed": seed,
-                "scenarios_note": CODEX_MAIN_NOTE if arm.codex_main else HYPOTHETICAL_NOTE,
-                "reconciliation": {} if arm.codex_main else reconcile(record, claude_requests)}
-        transcript_billed = data["scenarios"]["billed"]["total_usd"]
-        data["billed_transcript_usd"] = transcript_billed
-        if arm.codex_main:
-            data["billed_basis"] = "codex_rollout"
-            reconciliation = data["exec_usage_reconciliation"] = exec_usage_reconciliation(record, main_requests)
-            if any(v > 0 for v in reconciliation["diff"].values()):
-                warnings.append(f"codex exec reported more usage than the session logs hold ({reconciliation['diff']}); "
-                                "billed cost omits those requests")
-            if claude_dir is not None:
-                # Requests a Claude subagent call made without transcribing them count as billed subagent spend.
-                gap = claude_calls.untranscribed(claude_dir)
-                billed = data["scenarios"]["billed"]
-                for model, found in gap.items():
-                    billed["by_model"][model] = round(billed["by_model"].get(model, 0.0) + found["usd"], 6)
-                added = sum(found["usd"] for found in gap.values())
-                billed["by_source"]["subagent"] = round(billed["by_source"]["subagent"] + added, 6)
-                billed["total_usd"] = round(billed["total_usd"] + added, 6)
-                data["untranscribed"] = gap
-                data["billed_basis"] = "codex_rollout+claude_model_usage"
-        elif usage := session_model_usage(record):
-            mu = cost.billed_from_model_usage(report, usage, arm.main_model)
-            data["scenarios"]["billed"]["total_usd"] = round(mu["total_usd"], 6)
-            data["scenarios"]["billed"]["by_model"] = {k: round(v, 6) for k, v in sorted(mu["by_model"].items())}
-            data["untranscribed"] = mu["untranscribed"]
-            data["billed_basis"] = "cli_model_usage"
-        else:
-            data["billed_basis"] = "transcript"
-            warnings.append("CLI modelUsage missing; billed cost is transcript-only and omits compaction requests")
-        data["warnings"] = warnings
-        record["cost"] = data
         behavior = transcript.summarize_behavior(list(mains), list(sub_dirs))
         behavior["agent_definition_models"] = definition_models
         peaks = cost.context_peaks(requests)
@@ -209,6 +179,8 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             assert arm.uses_codex
             summary = codex.summarize(codex_home)
             behavior["codex"] = summary
+            if arm.codex_main and (summary["unpriced_usage_records"] or summary["truncated_logs"]):
+                incomplete.append("Codex main session logs contain unpriced or truncated records")
             if summary["unpriced_usage_records"]:
                 warnings.append(f"{summary['unpriced_usage_records']} Codex usage record(s) without a response id "
                                 "left unpriced")
@@ -231,6 +203,8 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         agent_violations: list[dict[str, Any]] = []
         if subagent_home is not None:
             sub = behavior["codex_subagents"] = codex.summarize(subagent_home)
+            if sub["unpriced_usage_records"] or sub["truncated_logs"]:
+                incomplete.append("Codex subagent session logs contain unpriced or truncated records")
             if sub["unpriced_usage_records"]:
                 warnings.append(f"{sub['unpriced_usage_records']} Codex subagent usage record(s) without a response "
                                 "id left unpriced")
@@ -260,11 +234,56 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                       "max_context": peaks["by_thread"].get(Path(str(i["path"])).stem)}
                      for i in transcript.subagent_inventory(list(sub_dirs))]
         record["validation"] = {"ok": not violations, "violations": violations, "subagents": inventory}
+        pauses = cost.sample_pauses(resume_indices, gaps, seed) if resume_indices and gaps else {}
+        report = cost.compute_cost(requests, pauses)
+        data = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO, "seed": seed,
+                "scenarios_note": CODEX_MAIN_NOTE if arm.codex_main else HYPOTHETICAL_NOTE,
+                "reconciliation": {} if arm.codex_main else reconcile(record, claude_requests)}
+        transcript_billed = data["scenarios"]["billed"]["total_usd"]
+        data["billed_transcript_usd"] = transcript_billed
+        if arm.codex_main:
+            data["billed_basis"] = "codex_rollout"
+            reconciliation = data["exec_usage_reconciliation"] = exec_usage_reconciliation(record, main_requests)
+            if any(v > 0 for v in reconciliation["diff"].values()):
+                incomplete.append(f"codex exec reported more usage than the session logs hold ({reconciliation['diff']}); "
+                                  "request tiers are unknown, billed accounting is incomplete")
+            if claude_dir is not None:
+                # Requests a Claude subagent call made without transcribing them count as billed subagent spend.
+                gap, issues = claude_calls.accounting(claude_dir, cache_ttl=arms.SUBAGENT_PROMPT_CACHE_TTL)
+                incomplete.extend(issues)
+                billed = data["scenarios"]["billed"]
+                for model, found in gap.items():
+                    billed["by_model"][model] = round(billed["by_model"].get(model, 0.0) + found["usd"], 6)
+                added = sum(found["usd"] for found in gap.values())
+                billed["by_source"]["subagent"] = round(billed["by_source"]["subagent"] + added, 6)
+                billed["total_usd"] = round(billed["total_usd"] + added, 6)
+                data["untranscribed"] = gap
+                data["billed_basis"] = "codex_rollout+claude_model_usage"
+        elif usage := session_model_usage(record):
+            mu = cost.billed_from_model_usage(report, usage, arm.main_model)
+            data["scenarios"]["billed"]["total_usd"] = round(mu["total_usd"], 6)
+            data["scenarios"]["billed"]["by_model"] = {k: round(v, 6) for k, v in sorted(mu["by_model"].items())}
+            data["untranscribed"] = mu["untranscribed"]
+            data["billed_basis"] = "cli_model_usage"
+        else:
+            data["billed_basis"] = "transcript"
+            warnings.append("CLI modelUsage missing; billed cost is transcript-only and omits compaction requests")
+        data["warnings"] = warnings
+        record["cost"] = data
         record["analysis_error"] = None
     except (cost.CostError, transcript.TranscriptError, OSError) as exc:
         record["analysis_error"] = str(exc)
+        if arm.codex_main:
+            incomplete.append(str(exc))
+    if arm.codex_main:
+        record["accounting_incomplete"] = bool(incomplete)
+        record["accounting_issues"] = incomplete
+        if record.get("cost") is not None:
+            record["cost"]["accounting_incomplete"] = bool(incomplete)
     rounds = record["rounds"]
     billed = ((record.get("cost") or {}).get("scenarios", {}).get(cost.PRIMARY_SCENARIO, {}).get("total_usd"))
+    if arm.codex_main and incomplete:
+        billed = None
     cli = [(r.get("cli") or {}).get("total_cost_usd") for r in rounds]
     # Without a Claude CLI there is no reported cost, turn count, or API time; a Codex main
     # agent's turns are its model requests in the session logs.

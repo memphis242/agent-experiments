@@ -7,6 +7,7 @@ import tempfile
 import textwrap
 import base64
 import signal
+import shutil
 import time
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -389,13 +390,30 @@ class CodexRunWiringTest(unittest.TestCase):
 # session log Codex would, prints the --json events, and leaves done in the repo on a resumed round.
 FAKE_CODEX_MAIN = textwrap.dedent(r"""
     #!/usr/bin/env python3
-    import json, os, sys
+    import json, os, sys, tomllib
     from pathlib import Path
     argv = sys.argv[1:]
-    task = sys.stdin.read()
+    if argv == ["--version"]:
+        print("fake-codex 1")
+        sys.exit(0)
     home = Path(os.environ["CODEX_HOME"])
+    if argv == ["features", "list"]:
+        config = tomllib.loads((home / "config.toml").read_text())
+        for name, enabled in config.get("features", {}).items():
+            print(name, "stable", str(enabled).lower())
+        sys.exit(0)
+    if argv == ["debug", "prompt-input"]:
+        print(json.dumps([{"role": "developer", "content": [{"text":
+            (home / "AGENTS.md").read_text() + f"<cwd>{Path.cwd()}</cwd>"}]}]))
+        sys.exit(0)
+    task = sys.stdin.read()
+    if not task:
+        print("No prompt provided")
+        sys.exit(0)
     resume = argv[1] == "resume"
     thread = argv[argv.index("-") - 1] if resume else "@THREAD@"
+    if os.environ.get("CODEX_AGENT_DEPTH"):
+        thread = "11111111-2222-3333-4444-555555555555"
     with (home / "fake-invocations.jsonl").open("a") as f:
         f.write(json.dumps({"argv": argv, "task": task, "cwd": os.getcwd(), "env": dict(os.environ)}) + "\n")
     if "FAIL" in task:
@@ -420,8 +438,14 @@ FAKE_CODEX_MAIN = textwrap.dedent(r"""
         f.write("".join(json.dumps(e) + "\n" for e in entries))
     if "DELEGATE" in task:  # start a subagent the way the shell tool would
         import subprocess
-        sub = subprocess.run(["claude-agent", "implementer"], input="LIMIT" if "LIMIT" in task else "build it",
-                             text=True, capture_output=True)
+        if "CODEX" in task:
+            config = tomllib.loads((home / "config.toml").read_text())
+            shell_env = {**os.environ, **config.get("shell_environment_policy", {}).get("set", {})}
+            sub = subprocess.run(["sh", "-c", "codex-agent tester"], input="build it",
+                                 env=shell_env, text=True, capture_output=True)
+        else:
+            sub = subprocess.run(["claude-agent", "implementer"], input="LIMIT" if "LIMIT" in task else "build it",
+                                 text=True, capture_output=True)
         Path("agent-report.txt").write_text(f"{sub.returncode}|{sub.stdout}|{sub.stderr}")
     if resume:
         Path("done").write_text("x")
@@ -608,21 +632,70 @@ class CodexMainTest(unittest.TestCase):
             self.assertTrue(rec["validation"]["ok"], rec["validation"])
             self.assertFalse((run_dir / "transcripts").exists())
 
+    def delegation_world(self, root, netns=False):
+        arm = arms.generate_arm("A30", root / "arms")
+        run_dir = root / "runs" / "review"
+        repo = run_dir / "repo"
+        repo.mkdir(parents=True)
+        run.copy_arm_root(arm, run_dir / "config", claude_files=False)
+        fake = run_dir / "config" / "fake-codex"
+        fake.write_text(FAKE_CODEX_MAIN)
+        fake.chmod(0o755)
+        pack = root / "tasks" / "t1" / "acceptance"
+        pack.mkdir(parents=True)
+        (pack / "run.sh").write_text(FAKE_PACK)
+        cfg = run.RunConfig("A30", "t1", 1, None, root / "template", root / "runs", root / "arms",
+                            root / "tasks", root / "missing", 2, 60.0, 60.0, 0, "unused", "t1", netns)
+        runner = run.Runner(cfg, "review", run_dir)
+        runner.record = {"arm": "A30", "rounds": [], "session_ids": [], "passed": False}
+        auth = root / "synthetic-auth.json"
+        auth.write_text(fake_auth(datetime.now(timezone.utc).isoformat(), datetime.now(timezone.utc) + timedelta(days=10)))
+        for name, value in (("USER_AUTH", auth), ("AUTH_LOCK", root / ".auth-lock")):
+            patcher = mock.patch.object(codex, name, value)
+            patcher.start()
+            self.addCleanup(patcher.stop)
+        with mock.patch.object(codex, "resolve_codex_bin", return_value=fake):
+            runner.prepare_codex()
+        self.addCleanup(runner.release_codex)
+        return runner
+
+    def check_delegation(self, runner):
+        runner.run("DELEGATE CODEX the work.")
+        rec = runner.record
+        self.assertEqual(rec["status"], "completed", rec.get("error"))
+        self.assertEqual(rec["behavior"]["codex_subagents"]["calls"], 1)
+        self.assertEqual(rec["behavior"]["subagent_spawns"], 1)
+        self.assertTrue(rec["validation"]["ok"], rec["validation"])
+        self.assertGreater(rec["cost"]["scenarios"]["billed"]["by_model"]["gpt-6-luna"], 0)
+        [sub] = [json.loads(line) for line in (runner.subagent_home / "fake-invocations.jsonl").read_text().splitlines()]
+        self.assertEqual(sub["env"]["CODEX_HOME"], str(runner.subagent_home))
+        self.assertEqual(sub["env"]["CODEX_AGENT_DEPTH"], "1")
+        self.assertTrue((runner.repo / "agent-report.txt").read_text().startswith("0|"))
+        for round_no in (1, 2):
+            self.assertTrue((runner.run_dir / f"codex-main-round{round_no}.last.txt").read_text().strip())
+
     def test_codex_main_with_codex_subagents_keeps_their_home_apart(self):
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):
-            os.environ.pop(run.TOKEN_ENV, None)
-            root = Path(tmp)
-            self.assertEqual(run.main(make_world(self, root, "Do the task.", arm="A30")), 0)
-            (run_dir,) = [p for p in (root / "runs").iterdir() if p.is_dir()]
-            rec = json.loads((run_dir / "run.json").read_text())
-            self.assertEqual(rec["status"], "completed")
-            self.assertEqual(rec["behavior"]["codex_subagents"]["calls"], 0)
-            self.assertEqual(rec["behavior"]["subagent_spawns"], 0)
-            self.assertTrue(rec["validation"]["ok"], rec["validation"])
-            env = json.loads((codex.home_for(run_dir) / "fake-invocations.jsonl").read_text().splitlines()[0])["env"]
-            self.assertEqual(env["CODEX_HOME"], str(codex.home_for(run_dir)))  # the shell's CODEX_HOME is set by config
-            self.assertEqual(env["PATH"].split(":")[0], str(run_dir / "config" / "codex" / "bin"))
-            self.assertNotIn("CODEX_AGENT_DEPTH", env)
+        with tempfile.TemporaryDirectory() as tmp:
+            self.check_delegation(self.delegation_world(Path(tmp)))
+
+    def test_namespace_codex_delegation_and_final_output_smoke(self):
+        if not shutil.which("unshare"):
+            self.skipTest("unshare is unavailable")
+        probe = subprocess.run(["unshare", "-Urnm", "true"], capture_output=True, text=True)
+        if probe.returncode:
+            self.skipTest("user/mount/network namespaces unavailable: " + probe.stderr.strip())
+        with tempfile.TemporaryDirectory() as tmp:
+            runner = self.delegation_world(Path(tmp), netns=True)
+            wrap = run.wrap_netns
+
+            def offline_wrap(cmd, **kwargs):
+                return wrap(cmd, **{**kwargs, "dns_forward": False})
+
+            # This smoke test creates isolated namespaces without network forwarding or DNS traffic.
+            with mock.patch.object(run, "PASTA_PREFIX", ("unshare", "-Urn", "--")), \
+                    mock.patch.object(codex, "HOST_VISIBLE", ()), \
+                    mock.patch.object(run, "wrap_netns", side_effect=offline_wrap):
+                self.check_delegation(runner)
 
     def test_codex_usage_limit_is_a_usage_limit_run(self):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):

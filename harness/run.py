@@ -86,7 +86,7 @@ EXIT_USAGE_LIMIT = 3
 USAGE_LIMIT_RE = re.compile(r"usage limit|rate limit|exceeded|\b429\b|hit your\b[^.\n]*\blimit", re.IGNORECASE)
 SCHEMA_VERSION = 2
 STATUSES = ("running", "completed", "usage_limit", "codex_error", "claude_error", "infra_error", "cli_error",
-            "interrupted", "error")
+            "interrupted", "error", "accounting_error", "validation_error")
 
 
 class RunError(Exception):
@@ -623,33 +623,46 @@ class Runner:
         message on standard input. Raises UsageLimit or RunError when the round started no thread."""
         assert self.codex_main and self.codex_bin is not None and self.codex_home is not None
         arm = arms.get_arm(self.cfg.arm)
-        last_message = self.run_dir / f"codex-main-round{round_no}.last.txt"
+        last_message = self.codex_home / f"codex-main-round{round_no}.last.txt"
         cmd = codex.main_command(self.codex_bin, arm.main_model, arm.main_effort,
                                  codex_developer_instructions(self.run_id), last_message.resolve(),
                                  self.repo.resolve(), thread_id)
         bin_dirs = ([self.arm_root / arms.CODEX_DIR / "bin"] if arm.codex else []) \
             + ([self.arm_root / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else [])
         login_file: Path | None = None
-        if self.claude_dir is None:
-            env, credentials = codex_main_env(self.codex_home, bin_dirs=bin_dirs), False
-        elif self.cfg.netns:  # wrap_netns hands the login to the namespace's private /dev/shm
-            env = codex_main_env(self.codex_home, bin_dirs=bin_dirs, credentials_file=CREDENTIALS_FILE)
-            env[CREDENTIALS_SOURCE_ENV] = os.environ[TOKEN_ENV]
-            credentials = True
-        else:  # debugging without namespaces: a private file on the host's /dev/shm for this round
-            login_file = Path(f"/dev/shm/.claude-agent-credentials-{self.run_id}")
-            env, credentials = codex_main_env(self.codex_home, bin_dirs=bin_dirs, credentials_file=str(login_file)), False
-            fd = os.open(login_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-            with os.fdopen(fd, "w") as handle:
-                handle.write(os.environ[TOKEN_ENV])
+        login_owned = False
         try:
+            if self.claude_dir is None:
+                env, credentials = codex_main_env(self.codex_home, bin_dirs=bin_dirs), False
+            elif self.cfg.netns:  # wrap_netns hands the login to the namespace's private /dev/shm
+                env = codex_main_env(self.codex_home, bin_dirs=bin_dirs, credentials_file=CREDENTIALS_FILE)
+                env[CREDENTIALS_SOURCE_ENV] = os.environ[TOKEN_ENV]
+                credentials = True
+            else:  # debugging without namespaces: a private file on the host's /dev/shm for this round
+                login_file = Path(f"/dev/shm/.claude-agent-credentials-{self.run_id}")
+                env, credentials = codex_main_env(self.codex_home, bin_dirs=bin_dirs, credentials_file=str(login_file)), False
+                fd = os.open(login_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                login_owned = True
+                try:
+                    handle = os.fdopen(fd, "w")
+                except BaseException:
+                    os.close(fd)
+                    raise
+                with handle:
+                    handle.write(os.environ[TOKEN_ENV])
             done = self.execute(cmd, env, round_no, "codex", self.codex_bin, stdin=message, credentials=credentials)
         finally:
-            if login_file is not None:
+            if login_owned:
+                assert login_file is not None
                 login_file.unlink(missing_ok=True)
         (self.run_dir / f"codex-main-round{round_no}.events.jsonl").write_text(done.stdout, encoding="utf-8")
         (self.run_dir / f"codex-main-round{round_no}.stderr.txt").write_text(done.stderr, encoding="utf-8")
         result = codex.main_round_result(done.stdout, done.stderr, done.returncode, last_message)
+        if last_message.is_file():
+            try:
+                shutil.copy2(last_message, self.run_dir / last_message.name)
+            except OSError as exc:
+                result.update(is_error=True, result=f"cannot archive Codex final message {last_message}: {exc}")
         if result["session_id"] is None:
             text = f"codex started no thread in round {round_no} (exit {done.returncode}): {result['result'] or 'no output'}"
             raise (UsageLimit if result["_usage_limit"] else RunError)(text)
@@ -714,7 +727,7 @@ class Runner:
         self.record["leak_check"] = list(self.leak_hits)
 
     def analyze(self, round_no: int) -> None:
-        """Refresh cost, behavior, validation, and totals; failures are recorded, not fatal."""
+        """Refresh cost, behavior, validation, and totals; record failures for the completion gate."""
         try:
             mains, sub_dirs = self.transcripts()
             if not self.codex_main:
@@ -722,6 +735,12 @@ class Runner:
             self.scan_leaks(mains, sub_dirs, round_no)
         except (transcript.TranscriptError, OSError) as exc:
             self.record["analysis_error"] = str(exc)
+            if self.codex_main:
+                self.record.update(accounting_incomplete=True, accounting_issues=[str(exc)], validation=None)
+                if self.record.get("cost") is not None:
+                    self.record["cost"]["accounting_incomplete"] = True
+                if self.record.get("totals") is not None:
+                    self.record["totals"]["billed_usd"] = None
             return
         analysis.update_record(self.record, mains, sub_dirs, self.resume_indices, self.cfg.gaps_path,
                                self.cfg.seed, arms.agent_models(self.arm_root), self.codex_home,
@@ -761,6 +780,8 @@ class Runner:
                 self.session_ids.append(session_id)
             self.record["rounds"].append(entry)
             self.record["rounds_used"] = round_no
+            if self.codex_main:
+                self.record["session_ids"] = list(self.session_ids)
             self.analyze(round_no)
             self.save()
             if result.get("is_error") or result["_exit_code"] != 0:
@@ -770,6 +791,15 @@ class Runner:
                 return
             if self.codex_invalidated(round_no):
                 return
+            if self.codex_main:
+                if self.record.get("analysis_error") or self.record.get("accounting_incomplete"):
+                    self.record.update(status="accounting_error", error=self.record.get("analysis_error") or
+                                       "; ".join(self.record["accounting_issues"]))
+                    return
+                validation = self.record.get("validation")
+                if not validation or not validation["ok"]:
+                    self.record.update(status="validation_error", error=f"round {round_no}: model/tool validation failed")
+                    return
             # The next resume's first request is the one after those seen so far.
             next_index = self.main_request_count()
             feedback: str | None = None

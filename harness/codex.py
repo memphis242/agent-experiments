@@ -390,6 +390,8 @@ def read_rollout(path: Path) -> Rollout:
             out.compacted_events += 1
         elif kind == "response_item" and payload.get("type") in ("function_call", "custom_tool_call"):
             out.tools[str(payload.get("name"))] += 1
+        elif kind == "response_item" and payload.get("type") == "web_search_call":
+            out.tools["web_search"] += 1
         elif kind == "token_usage_record" and isinstance(payload.get("usage"), dict):
             key = str(payload.get("response_id") or "")
             if not key:
@@ -543,7 +545,7 @@ def spawn_calls(summary: dict[str, Any]) -> list[dict[str, Any]]:
 def validate(home: Path, summary: dict[str, Any], agent_models: Mapping[str, str],
              effort: str) -> list[dict[str, Any]]:
     """Violations: a Codex turn on another model or effort, a failed or unfinished call, a call
-    whose session log is missing, or a session no codex-agent call started (reported, never acted on).
+    whose session log is missing, or a session no codex-agent call started.
     A turn must run on the model of the agent whose call started its session; a session
     no call claimed may run on any of the arm's agent models."""
     assert agent_models
@@ -618,7 +620,7 @@ def parse_exec_events(stdout: str) -> dict[str, Any]:
     rounds included), how many turns completed or failed, and the error messages.
     Lines that are not JSON objects are ignored."""
     thread: str | None = None
-    usage = {key: 0 for key in USAGE_KEYS}
+    usage: dict[str, int] | None = None
     completed = failed = 0
     errors: list[str] = []
     for line in stdout.splitlines():
@@ -633,8 +635,8 @@ def parse_exec_events(stdout: str) -> dict[str, Any]:
             thread = str(event["thread_id"])
         elif kind == "turn.completed":
             completed += 1
-            reported = event.get("usage") if isinstance(event.get("usage"), dict) else {}
-            usage = {key: _usage_int(reported, key) for key in USAGE_KEYS}
+            if isinstance(event.get("usage"), dict):
+                usage = {key: _usage_int(event["usage"], key) for key in USAGE_KEYS}
         elif kind in ("error", "turn.failed"):
             if kind == "turn.failed":
                 failed += 1
@@ -650,15 +652,23 @@ def main_round_result(stdout: str, stderr: str, exit_code: int, last_message: Pa
     result (the final message, or the failure detail of a failed round), _exit_code, and
     _usage_limit, plus usage, turns_completed, and errors.
 
-    A round failed when Codex exited non-zero or a turn failed; error events alone are
-    warnings. A failed round hit the usage limit when its errors or stderr say so."""
+    Success requires a completed turn and a readable, nonempty final message. Error events
+    alone are warnings. A failed round hit the usage limit when its errors or stderr say so."""
     events = parse_exec_events(stdout)
-    failed = exit_code != 0 or events["turns_failed"] > 0
     detail = "; ".join(events["errors"][-3:]) or stderr.strip()[-600:]
+    output_error = ""
     try:
         final = last_message.read_text(encoding="utf-8")
-    except OSError:
+    except (OSError, UnicodeError) as exc:
         final = ""
+        output_error = f"cannot read Codex final message {last_message}: {exc}"
+    if not events["turns_completed"]:
+        detail = detail or "Codex stream ended without a completed turn"
+    if not final.strip():
+        detail = detail or output_error or f"Codex final message {last_message} is empty"
+    failed = exit_code != 0 or events["turns_failed"] > 0 or not events["turns_completed"] or not final.strip()
+    if failed and not detail:
+        detail = f"Codex failed (exit {exit_code})"
     limited = failed and bool(USAGE_LIMIT_RE.search("\n".join(events["errors"]) + "\n" + stderr))
     return {"session_id": events["thread_id"], "usage": events["usage"],
             "turns_completed": events["turns_completed"], "errors": events["errors"],
@@ -668,7 +678,7 @@ def main_round_result(stdout: str, stderr: str, exit_code: int, last_message: Pa
 
 def validate_main(summary: dict[str, Any], rollouts: Sequence[Rollout], model: str, effort: str,
                   thread_ids: Sequence[str]) -> list[dict[str, Any]]:
-    """Violations for a Codex main agent (reported, never acted on): a turn on another model or
+    """Violations for a Codex main agent: a turn on another model or
     effort, a forbidden tool, a recorded thread without a session log, or a session log of a thread
     the rounds did not report."""
     found: Counter[tuple[str, str, str]] = Counter()

@@ -1,10 +1,12 @@
 import json
 import os
+import signal
 import stat
 import subprocess
 import sys
 import tempfile
 import textwrap
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -36,7 +38,7 @@ FAKE_CLAUDE = textwrap.dedent(r"""
         print(json.dumps({"type": "result", "is_error": True, "session_id": "s0", "result": "Claude AI usage limit reached|1792000000"}))
         sys.exit(1)
     model = sys.argv[sys.argv.index("--model") + 1]
-    sid = str(uuid.uuid4())
+    sid = sys.argv[sys.argv.index("--session-id") + 1]
     project = cfg / "projects" / re.sub(r"[^A-Za-z0-9]", "-", os.getcwd())
     project.mkdir(parents=True, exist_ok=True)
     usage = {"input_tokens": 150000, "output_tokens": 100, "cache_read_input_tokens": 0, "cache_creation_input_tokens": 0}
@@ -44,6 +46,9 @@ FAKE_CLAUDE = textwrap.dedent(r"""
         "type": "assistant", "timestamp": "2026-10-17T10:00:00Z", "effort": "high",
         "message": {"id": "msg_" + sid, "model": model, "usage": usage,
                     "content": [{"type": "tool_use", "id": "tu1", "name": "Bash", "input": {}}]}}) + "\n")
+    if "INTERRUPT" in task:
+        import time
+        time.sleep(30)
     print(json.dumps({"type": "result", "session_id": sid, "is_error": False, "result": "report from " + model,
                       "total_cost_usd": 0.1, "num_turns": 2, "duration_ms": 5,
                       "modelUsage": {model: {"inputTokens": 150000, "outputTokens": 300, "cacheReadInputTokens": 0,
@@ -134,6 +139,38 @@ class ClaudeAgentLauncherTest(unittest.TestCase):
         call_json = next((self.claude / "agent-calls").iterdir()) / "call.json"
         call_json.write_text(json.dumps({**call, "usage_limit": False}))
         self.assertEqual(claude_calls.run_outcome(claude_calls.summarize(self.claude))[0], "claude_error")
+
+    def test_launch_failure_is_finalized_and_invalidates_run(self):
+        (self.claude / "agent-runtime.json").write_text(json.dumps({"claude_bin": str(self.base / "missing")}))
+        done = self.launch("implementer")
+        self.assertEqual(done.returncode, 1)
+        [call] = claude_calls.call_records(self.claude)
+        self.assertTrue(call["failed"] and call["launch_failed"])
+        self.assertIsNotNone(call["ended_epoch"])
+        self.assertTrue(call["session_id"])
+        self.assertEqual(claude_calls.run_outcome(claude_calls.summarize(self.claude))[0], "claude_error")
+
+    def test_interrupted_launcher_recovers_transcript_using_persisted_session(self):
+        child = subprocess.Popen([sys.executable, str(self.claude / "bin" / "claude-agent"), "implementer", "INTERRUPT"],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=self.env, cwd=self.base / "repo")
+        try:
+            deadline = time.monotonic() + 10
+            while not list((self.claude / "projects").glob("*/*.jsonl")) and time.monotonic() < deadline:
+                time.sleep(0.02)
+            self.assertTrue(list((self.claude / "projects").glob("*/*.jsonl")))
+            child.kill()
+            child.communicate(timeout=10)
+            [call] = claude_calls.call_records(self.claude)
+            self.assertNotIn("ended_epoch", call)
+            self.assertTrue(call["session_id"])
+            [request] = claude_calls.load_requests(self.claude)
+            self.assertEqual(request.input_tokens, 150000)
+            self.assertTrue(claude_calls.accounting_issues(self.claude))
+            self.assertEqual(claude_calls.run_outcome(claude_calls.summarize(self.claude))[0], "claude_error")
+        finally:
+            if child.poll() is None:
+                child.kill()
+            child.communicate(timeout=10)
 
     def test_validation_flags_wrong_model_effort_and_denied_tools(self):
         self.assertEqual(self.launch("implementer").returncode, 0)

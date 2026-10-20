@@ -25,6 +25,7 @@ import signal
 import subprocess
 import sys
 import time
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -101,13 +102,14 @@ def main(argv: list[str]) -> int:
     call_dir.mkdir(parents=True)
     (call_dir / "task.txt").write_text(task, encoding="utf-8")
     model, effort, tools = str(agents[name]["model"]), str(agents[name]["effort"]), list(agents[name]["tools"])
+    session_id = str(uuid.uuid4())
     cmd = [claude_bin, "-p", "--model", model, "--permission-mode", "bypassPermissions",
            "--permission-prompts", "none", "--output-format", "json", "--append-system-prompt", role,
-           "--disallowedTools", "Agent", "--tools", ",".join(tools)]
+           "--disallowedTools", "Agent", "--tools", ",".join(tools), "--session-id", session_id]
     env = {k: os.environ[k] for k in ENV_ALLOWLIST if k in os.environ}
     env.update({"CLAUDE_CONFIG_DIR": str(here), TOKEN_ENV: token, NESTING_ENV: "1", "DISABLE_AUTOUPDATER": "1"})
     record = {"agent": name, "model": model, "effort": effort, "tools": tools, "cwd": os.getcwd(),
-              "started_epoch": started, "argv": cmd}
+              "started_epoch": started, "argv": cmd, "session_id": session_id}
     (call_dir / "call.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
     with (call_dir / "stdout.json").open("wb") as out, (call_dir / "stderr.txt").open("wb") as errors:
@@ -115,6 +117,9 @@ def main(argv: list[str]) -> int:
             child = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=out, stderr=errors, env=env,
                                      preexec_fn=die_with_parent)
         except OSError as exc:
+            record.update(ended_epoch=time.time(), exit_code=None, failed=True, launch_failed=True,
+                          error=f"cannot start {claude_bin}: {exc}")
+            (call_dir / "call.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
             return fail(f"cannot start {claude_bin}: {exc}")
 
         stopped: list[int] = []
@@ -138,7 +143,7 @@ def main(argv: list[str]) -> int:
     failed = code != 0 or bool(result.get("is_error")) or not report.strip()
     stderr_text = (call_dir / "stderr.txt").read_text(errors="replace")
     usage_limit = failed and bool(USAGE_LIMIT_RE.search(report + "\n" + stderr_text))
-    record.update(ended_epoch=time.time(), exit_code=code, session_id=result.get("session_id"),
+    record.update(ended_epoch=time.time(), exit_code=code, session_id=result.get("session_id") or session_id,
                   is_error=bool(result.get("is_error")), failed=failed, usage_limit=usage_limit,
                   total_cost_usd=result.get("total_cost_usd"), num_turns=result.get("num_turns"),
                   duration_ms=result.get("duration_ms"), model_usage=result.get("modelUsage"),

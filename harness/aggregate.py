@@ -54,7 +54,7 @@ def drop_superseded(runs: list[dict[str, Any]], path: Path | None, tool: str) ->
 
 def scenario_cost(run: dict[str, Any], scenario: str) -> float | None:
     report = run.get("cost")
-    if not report:
+    if not report or run.get("accounting_incomplete") or report.get("accounting_incomplete"):
         return None
     return report["scenarios"].get(scenario, {}).get("total_usd")
 
@@ -143,9 +143,11 @@ def render(runs: Sequence[dict[str, Any]], scenario: str, tasks: Sequence[str] |
         "|-----|-------------|------|----------------:|-------------------:|-----------------:|----------------:|-----------------:|--------------:|-------:|-------:|------------:|-------------------------:|-----------------------------:|",
     ]
     for (arm, task), group in sorted(groups.items()):
-        passes = sum(1 for r in group if r.get("status") == "completed" and r.get("passed"))
+        passes = sum(1 for r in group if r.get("status") == "completed" and r.get("passed")
+                     and not r.get("accounting_incomplete") and not (r.get("cost") or {}).get("accounting_incomplete"))
         costs = [c for c in (scenario_cost(r, scenario) for r in group) if c is not None]
-        per_pass = f"{sum(costs) / passes:.2f}" if passes else "-"
+        incomplete = any(r.get("accounting_incomplete") or (r.get("cost") or {}).get("accounting_incomplete") for r in group)
+        per_pass = f"{sum(costs) / passes:.2f}" if passes and not incomplete else "-"
         totals = [(r.get("totals") or {}) for r in group]
         behaviors = [(r.get("behavior") or {}) for r in group]
         lines.append(
@@ -162,6 +164,9 @@ def render(runs: Sequence[dict[str, Any]], scenario: str, tasks: Sequence[str] |
         lines.append("| - | - | - | 0/0 | - | - | - | - | - | - | - | - | - | - |")
     shown = [r for g in groups.values() for r in g]
     problems = [f"run {r['_dir']}: analysis_error: {r['analysis_error']}" for r in shown if r.get("analysis_error")]
+    problems += [f"run {r['_dir']}: accounting incomplete; spend per pass withheld: "
+                 + "; ".join(r.get("accounting_issues") or ["complete billed spend unavailable"])
+                 for r in shown if r.get("accounting_incomplete") or (r.get("cost") or {}).get("accounting_incomplete")]
     problems += hash_warnings(runs)
     drops = Counter(r["arm"] for r in shown if (r.get("behavior") or {}).get("cache_ttl_drop") is True)
     if drops:

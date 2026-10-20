@@ -8,6 +8,7 @@ denied tool, the way codex.py does for Codex sessions.
 from __future__ import annotations
 
 import json
+import math
 from collections import Counter
 from pathlib import Path
 from typing import Any, Mapping, Sequence
@@ -17,6 +18,8 @@ import transcript
 from transcript import TranscriptError
 
 CALLS_DIR = "agent-calls"
+MODEL_USAGE_FIELDS = (("input", "inputTokens"), ("output", "outputTokens"), ("cache_read", "cacheReadInputTokens"),
+                      ("cache_creation", "cacheCreationInputTokens"))
 
 
 def call_records(claude_dir: Path) -> list[dict[str, Any]]:
@@ -34,7 +37,7 @@ def call_records(claude_dir: Path) -> list[dict[str, Any]]:
 
 
 def call_transcript(claude_dir: Path, call: Mapping[str, Any]) -> Path | None:
-    """The session transcript of a finished call, or None when it reported no session or left none."""
+    """The persisted session's transcript, including calls interrupted before their final report."""
     session = call.get("session_id")
     if not session:
         return None
@@ -45,9 +48,10 @@ def call_transcript(claude_dir: Path, call: Mapping[str, Any]) -> Path | None:
 
 
 def transcript_paths(claude_dir: Path) -> list[Path]:
-    """The calls' transcripts in call order."""
-    found = (call_transcript(claude_dir, c) for c in call_records(claude_dir))
-    return [p for p in found if p is not None]
+    """Associated and orphan session transcripts, each counted once."""
+    found = [call_transcript(claude_dir, c) for c in call_records(claude_dir)]
+    return list(dict.fromkeys([p for p in found if p is not None]
+                              + sorted((claude_dir / "projects").glob("*/*.jsonl"))))
 
 
 def load_requests(claude_dir: Path) -> tuple[cost.Request, ...]:
@@ -94,11 +98,12 @@ def run_outcome(summary: Mapping[str, Any]) -> tuple[str, str] | None:
     ("usage_limit"), or a call that failed ("claude_error"); None otherwise. Such a run measured
     the main agent working around a missing subagent, so it is rerun rather than reported."""
     def detail(call: Mapping[str, Any]) -> str:
-        return f"{call['call_id']} (exit {call['exit_code']})"
+        state = "unfinished" if call["unfinished"] else f"exit {call['exit_code']}"
+        return f"{call['call_id']} ({state})"
     limited = [c for c in summary["per_call"] if c["usage_limit"]]
     if limited:
         return "usage_limit", "Claude usage limit reached in a subagent call: " + detail(limited[0])
-    failed = [c for c in summary["per_call"] if c["failed"]]
+    failed = [c for c in summary["per_call"] if c["failed"] or c["unfinished"]]
     if failed:
         return "claude_error", f"{len(failed)} Claude subagent call(s) failed: " + "; ".join(map(detail, failed[:3]))
     return None
@@ -113,7 +118,7 @@ def spawn_calls(summary: Mapping[str, Any]) -> list[dict[str, Any]]:
 def validate(claude_dir: Path, summary: Mapping[str, Any], agent_models: Mapping[str, str], effort: str,
              forbidden_tools: Sequence[str]) -> list[dict[str, Any]]:
     """Violations: a call on another model or effort or using a forbidden tool, a failed or unfinished
-    call, or a finished call without a transcript (reported, never acted on)."""
+    call, or a finished call without a transcript."""
     assert agent_models
     found: Counter[tuple[str, str, str]] = Counter()
     calls = {c["call_id"]: c for c in call_records(claude_dir)}
@@ -143,20 +148,96 @@ def leak_scan_files(claude_dir: Path) -> list[Path]:
 
 
 def untranscribed(claude_dir: Path) -> dict[str, dict[str, Any]]:
-    """Per model, the tokens and USD that the calls' own `modelUsage` totals hold beyond their
-    transcripts (requests Claude Code makes without transcribing them, such as compaction summaries
-    and small helper calls), priced as cost.billed_from_model_usage does."""
+    """Known billed gaps beyond transcripts; uncertain tier attribution is reported separately."""
+    return accounting(claude_dir)[0]
+
+
+def accounting_issues(claude_dir: Path) -> list[str]:
+    """Reasons Claude spend cannot be reconstructed exactly."""
+    return accounting(claude_dir)[1]
+
+
+def accounting(claude_dir: Path, *, cache_ttl: str = "5m") -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Per-model billed gaps and reasons the combined transcript/modelUsage account is incomplete.
+
+    A model's reported costUSD is authoritative. Without it, cumulative input bounds can prove
+    all omitted requests used the short tier; larger tiered gaps remain unpriced. Subagent cache
+    writes without request-level TTL evidence use the supplied subagent cache policy.
+    """
+    assert cache_ttl in ("5m", "1h")
     total: dict[str, dict[str, Any]] = {}
+    issues: list[str] = []
+    associated: set[Path] = set()
     for call in call_records(claude_dir):
         path = call_transcript(claude_dir, call)
+        if path is not None:
+            if path in associated:
+                issues.append(f"Claude transcript {path.name} belongs to multiple calls")
+                continue
+            associated.add(path)
         usage = call.get("model_usage")
-        if path is None or not isinstance(usage, dict) or not usage:
+        if call.get("launch_failed"):
             continue
-        report = cost.compute_cost(cost.load_subagent_files([path]))
-        gap = cost.billed_from_model_usage(report, usage, str(call.get("model")))["untranscribed"]
-        for model, found in gap.items():
+        if call.get("ended_epoch") is None or not isinstance(usage, dict) or not usage:
+            issues.append(f"Claude call {call['call_id']} has no final modelUsage; untranscribed spend is unknown")
+        if not isinstance(usage, dict) or not usage:
+            continue
+        requests = cost.load_subagent_files([path]) if path else ()
+        report = cost.compute_cost(requests)
+        normalized: dict[str, dict[str, float]] = {}
+        for raw_model, counts in usage.items():
+            if not isinstance(raw_model, str) or not isinstance(counts, dict):
+                raise cost.CostError(f"Claude call {call['call_id']}: invalid modelUsage entry")
+            model = raw_model.split("[", 1)[0]
+            acc = normalized.setdefault(model, {name: 0.0 for name, _ in MODEL_USAGE_FIELDS})
+            for name, key in MODEL_USAGE_FIELDS:
+                value = counts.get(key, 0)
+                if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0 or int(value) != value:
+                    raise cost.CostError(f"Claude call {call['call_id']}: invalid {key} for {model}")
+                acc[name] += value
+        missing = {r.model.split("[", 1)[0] for r in requests} - normalized.keys()
+        if missing:
+            issues.append(f"Claude call {call['call_id']}: modelUsage omits transcript models {sorted(missing)}")
+        for model, counts in normalized.items():
+            matching = [r for r in requests if r.model.split("[", 1)[0] == model]
+            have = {"input": sum(r.input_tokens for r in matching),
+                    "output": sum(r.output_tokens for r in matching),
+                    "cache_read": sum(r.cache_read_tokens for r in matching),
+                    "cache_creation": sum(r.cache_write_5m_tokens + r.cache_write_1h_tokens for r in matching)}
+            gap = {key: counts[key] - have[key] for key in counts}
+            usd = 0.0
+            if any(value < 0 for value in gap.values()):
+                issues.append(f"Claude call {call['call_id']} modelUsage is smaller than its transcript for {model}")
+            elif any(gap.values()):
+                attributed = [v.get("costUSD") for k, v in usage.items() if k.split("[", 1)[0] == model]
+                if attributed and all(isinstance(v, (int, float)) and math.isfinite(v) and v >= 0 for v in attributed):
+                    logged = sum(v for k, v in report.scenarios["billed"].by_model.items()
+                                 if k.split("[", 1)[0] == model)
+                    usd = sum(attributed) - logged
+                    if usd < 0:
+                        issues.append(f"Claude call {call['call_id']} costUSD is smaller than transcript cost for {model}")
+                        usd = 0.0
+                else:
+                    pricing = cost.pricing_for(model)
+                    context_bound = counts["input"] + counts["cache_read"] + counts["cache_creation"]
+                    if pricing.long_card is not None and context_bound > pricing.long_threshold:
+                        issues.append(f"Claude call {call['call_id']}: unknown request tiers for untranscribed {model} usage")
+                    else:
+                        # Every omitted request fits within the cumulative input bound.
+                        assert pricing.long_card is None or context_bound <= pricing.long_threshold
+                        usd = cost.request_cost(cost.Request(
+                            message_id=f"{call['call_id']}-untranscribed-{model}", model=model,
+                            source="subagent", main_index=None, timestamp=0.0,
+                            input_tokens=int(gap["input"]), output_tokens=int(gap["output"]),
+                            cache_read_tokens=int(gap["cache_read"]),
+                            cache_write_5m_tokens=int(gap["cache_creation"]) if cache_ttl == "5m" else 0,
+                            cache_write_1h_tokens=int(gap["cache_creation"]) if cache_ttl == "1h" else 0), "billed")
             acc = total.setdefault(model, {"tokens": {}, "usd": 0.0})
-            acc["usd"] += float(found["usd"])
-            for key, value in found["tokens"].items():
+            acc["usd"] = round(acc["usd"] + usd, 6)
+            for key, value in gap.items():
                 acc["tokens"][key] = acc["tokens"].get(key, 0) + int(value)
-    return total
+    orphans = set(transcript_paths(claude_dir)) - associated
+    if orphans:
+        issues.append("Unassociated Claude transcripts are priced, but their final usage is unavailable: "
+                      + ", ".join(sorted(p.name for p in orphans)))
+    return total, issues
