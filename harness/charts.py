@@ -96,7 +96,7 @@ FOOTNOTE_TOP = 12               # tick labels to the first footnote baseline
 # Subagent model family -> saturated colour. Order matters: first matching marker wins.
 FAMILIES: tuple[tuple[str, str, str], ...] = (
     # (marker substring of the description, family label, saturated colour)
-    ("Codex GPT-6.1 Sol", "Codex GPT-6.1 Sol", "#10b981"),
+    ("Codex GPT-", "Codex", "#10b981"),
     ("tiered", "Tiered", "#fbbf24"),
     ("Opus 5.5 subagents", "Opus 5.5", "#a78bfa"),
     ("Sonnet 5.5 subagents", "Sonnet 5.5", "#60a5fa"),

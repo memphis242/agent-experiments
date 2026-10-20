@@ -30,10 +30,13 @@ HAIKU_55 = "claude-haiku-5-5"
 
 GPT_61_SOL = "gpt-6.1-sol"
 GPT_6_LUNA = "gpt-6-luna"
+GPT_56_SOL = "gpt-5.6-sol"
+GPT_56_LUNA = "gpt-5.6-luna"
 
 KNOWN_MODELS: frozenset[str] = frozenset({OPUS_55, SONNET_55, SONNET_5, SONNET_46, HAIKU_55})
 # Models a headless Codex subagent may run on, with their display names.
-CODEX_MODELS: Mapping[str, str] = MappingProxyType({GPT_61_SOL: "GPT-6.1 Sol", GPT_6_LUNA: "GPT-6 Luna"})
+CODEX_MODELS: Mapping[str, str] = MappingProxyType({GPT_61_SOL: "GPT-6.1 Sol", GPT_6_LUNA: "GPT-6 Luna",
+                                                     GPT_56_SOL: "GPT-5.6 Sol", GPT_56_LUNA: "GPT-5.6 Luna"})
 SUBAGENT_HARNESSES: tuple[str, ...] = ("claude", "codex")
 EFFORT_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
 
@@ -137,6 +140,7 @@ TIERED_AGENTS: tuple[str, ...] = ("implementer", "small-implementer", "tester")
 TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", HAIKU_55), ("tester", HAIKU_55))
 CODEX_ROLES_AGENTS: tuple[str, ...] = ("implementer", "tester", "debugger")
 CODEX_TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", GPT_6_LUNA), ("tester", GPT_6_LUNA))
+CODEX_56_TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", GPT_56_LUNA), ("tester", GPT_56_LUNA))
 
 ARMS: Mapping[str, ArmSpec] = MappingProxyType({
     a.arm_id: a for a in (
@@ -165,6 +169,8 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A23", GPT_61_SOL, "tiered", main_effort="low", agents=TIERED_AGENTS,
                 agent_models=CODEX_TIERED_MODELS, subagent_harness="codex"),
         ArmSpec("A24", GPT_6_LUNA, "tiered", main_effort="low", agents=TIERED_AGENTS, subagent_harness="codex"),
+        ArmSpec("A25", GPT_56_SOL, "tiered", main_effort="low", agents=TIERED_AGENTS,
+                agent_models=CODEX_56_TIERED_MODELS, subagent_harness="codex"),
     )
 })
 

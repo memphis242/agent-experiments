@@ -97,10 +97,14 @@ PRICING: Mapping[str, ModelPricing] = MappingProxyType({
     # tokens the request is priced at 2x for input and 1.5x for output. Reasoning tokens are output.
     "gpt-6.1-sol": ModelPricing(ModelPrice(2.00, 0.10, 2.50, 2.50, 10.00),
                                 272_000, ModelPrice(4.00, 0.20, 5.00, 5.00, 15.00)),
-    # Same tier and conventions (developers.openai.com/api/docs/pricing, 2026-10-20); above 272K
-    # input tokens input is 2x and output 1.5x.
+    # Same tier and conventions for the models below (developers.openai.com/api/docs/pricing,
+    # 2026-10-20); above 272K input tokens input is 2x and output 1.5x.
     "gpt-6-luna": ModelPricing(ModelPrice(0.10, 0.01, 0.125, 0.125, 0.50),
                                272_000, ModelPrice(0.20, 0.02, 0.25, 0.25, 0.75)),
+    "gpt-5.6-sol": ModelPricing(ModelPrice(4.00, 0.40, 5.00, 5.00, 20.00),
+                                272_000, ModelPrice(8.00, 0.80, 10.00, 10.00, 30.00)),
+    "gpt-5.6-luna": ModelPricing(ModelPrice(0.20, 0.02, 0.25, 0.25, 1.20),
+                                 272_000, ModelPrice(0.40, 0.04, 0.50, 0.50, 1.80)),
 })
 
 

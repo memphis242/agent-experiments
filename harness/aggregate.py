@@ -79,6 +79,7 @@ ARM_DESCRIPTIONS: dict[str, str] = {
     "A22": "Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger",
     "A23": "Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered",
     "A24": "Opus 5.5 low main, Codex GPT-6 Luna, tiered",
+    "A25": "Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered",
 }
 
 

@@ -33,6 +33,11 @@ class LunaPricingTest(unittest.TestCase):
         long = cost.price_for("gpt-6-luna", 300_000)
         self.assertEqual((long.input, long.cache_read, long.output), (0.20, 0.02, 0.75))
 
+    def test_gpt_56_cards(self):
+        sol, luna = cost.price_for("gpt-5.6-sol", 100_000), cost.price_for("gpt-5.6-luna", 300_000)
+        self.assertEqual((sol.input, sol.cache_read, sol.output), (4.00, 0.40, 20.00))
+        self.assertEqual((luna.input, luna.cache_read, luna.output), (0.40, 0.04, 1.80))
+
 
 class CostTest(unittest.TestCase):
     def setUp(self):

@@ -20,16 +20,18 @@ EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": 
             "A11": "claude-haiku-5-5", "A12": None, "A13": None, "A14": "claude-sonnet-5-5",
             "A15": "claude-sonnet-5-5", "A16": None, "A17": None,
             "A18": None, "A19": None, "A20": None, "A21": "gpt-6.1-sol", "A22": "gpt-6.1-sol",
-            "A23": "gpt-6.1-sol", "A24": "gpt-6-luna"}
+            "A23": "gpt-6.1-sol", "A24": "gpt-6-luna", "A25": "gpt-5.6-sol"}
 CODEX_AGENTS = {"A21": sorted(arms.SUBAGENT_NAMES), "A22": ["debugger", "implementer", "tester"],
                 "A23": ["implementer", "small-implementer", "tester"],
-                "A24": ["implementer", "small-implementer", "tester"]}
+                "A24": ["implementer", "small-implementer", "tester"],
+                "A25": ["implementer", "small-implementer", "tester"]}
 MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high"),
         "A13": ("claude-opus-5-5", "medium"), "A14": ("claude-opus-5-5", "low"),
         "A15": ("claude-opus-5-5", "medium"), "A16": ("claude-haiku-5-5", "high"),
         "A17": ("claude-haiku-5-5", "xhigh"), "A18": ("claude-sonnet-5", "medium"),
         "A19": ("claude-sonnet-5", "high"), "A20": ("claude-sonnet-4-6", "high"),
-        "A23": ("claude-opus-5-5", "low"), "A24": ("claude-opus-5-5", "low")}
+        "A23": ("claude-opus-5-5", "low"), "A24": ("claude-opus-5-5", "low"),
+        "A25": ("claude-opus-5-5", "low")}
 ROLES = ("Delegate selectively. Do exploration, planning, design decisions, debugging, review, and "
          "integration yourself.")
 TIERED = "Delegate implementation, not thinking."
@@ -93,10 +95,10 @@ class ArmsTest(unittest.TestCase):
         self.assertEqual(sorted(p.stem for p in (codex / "roles").glob("*.md")), CODEX_AGENTS[arm])
         roster = json.loads((codex / "agent.json").read_text())
         self.assertEqual((roster["model"], roster["effort"]), (EXPECTED[arm], "high"))
-        luna = {"small-implementer", "tester"} if arm == "A23" else set()
+        small = {"A23": "gpt-6-luna", "A25": "gpt-5.6-luna"}.get(arm, EXPECTED[arm])
         for name, agent in roster["agents"].items():
             self.assertEqual((agent["model"], agent["effort"]),
-                             ("gpt-6-luna" if name in luna else EXPECTED[arm], "high"))
+                             (small if name in ("small-implementer", "tester") else EXPECTED[arm], "high"))
         self.assertEqual({n for n, a in roster["agents"].items() if a["read_only"]},
                          {"explorer", "reviewer"} & set(CODEX_AGENTS[arm]))
         config = (codex / "config.toml").read_text()
@@ -110,10 +112,10 @@ class ArmsTest(unittest.TestCase):
         self.assertEqual(launcher.read_bytes(), arms.CODEX_AGENT_SCRIPT.read_bytes())
         text = (root / "CLAUDE.md").read_text()
         self.assertIn("## Subagents", text)
-        if arm == "A23":
-            self.assertNotIn("GPT-6.1 Sol at high", text)
-            self.assertIn("- implementer (GPT-6.1 Sol): ", text)
-            self.assertIn("- tester (GPT-6 Luna): ", text)
+        if arm in ("A23", "A25"):
+            self.assertNotIn(" Sol at high", text)
+            self.assertIn(f"- implementer ({arms.CODEX_MODELS[EXPECTED[arm]]}): ", text)
+            self.assertIn(f"- tester ({arms.CODEX_MODELS[small]}): ", text)
             return
         self.assertIn(f"{arms.CODEX_MODELS[EXPECTED[arm]]} at high reasoning effort", text)
         for name in CODEX_AGENTS[arm]:
