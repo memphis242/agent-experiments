@@ -6,5 +6,11 @@
   "d78a28d2": "A21 task1 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as d5370706)",
   "020d8055": "A21 task2 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as bf4627ed)",
   "6a951429": "A22 task2 rep 1: Codex pilot on the delegation text before the no-polling instruction (rerun as 517bdf6d)",
-  "4326636d": "A22 task1 rep 1: Codex pilot stopped in a self-matching pgrep loop before the no-polling instruction (rerun as 9de06c6c)"
+  "4326636d": "A22 task1 rep 1: Codex pilot stopped in a self-matching pgrep loop before the no-polling instruction (rerun as 9de06c6c)",
+  "5f0aa93f": "A6 task3 rep 1: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as 8c2b42cd",
+  "708bb929": "A8 task3 rep 1: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as d766e24a",
+  "5f3bc7f2": "A10 task3 rep 4: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as a2a8a986",
+  "48593815": "A11 task3 rep 3: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 865b9c71",
+  "42e2df75": "A12 task3 rep 1: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 2eec045d",
+  "1b191f23": "A14 task3 rep 2: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as 61865ddd"
 }
