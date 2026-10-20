@@ -22,7 +22,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterator, Sequence
+from typing import Any, Iterator, Mapping, Sequence
 
 import cost
 from transcript import TranscriptError, parse_timestamp
@@ -495,15 +495,24 @@ def spawn_calls(summary: dict[str, Any]) -> list[dict[str, Any]]:
              "timestamp": c["started_epoch"], "harness": "codex"} for c in summary["per_call"]]
 
 
-def validate(home: Path, summary: dict[str, Any], model: str, effort: str) -> list[dict[str, Any]]:
+def validate(home: Path, summary: dict[str, Any], agent_models: Mapping[str, str],
+             effort: str) -> list[dict[str, Any]]:
     """Violations: a Codex turn on another model or effort, a failed or unfinished call, a call
-    whose session log is missing, or a session no codex-agent call started (reported, never acted on)."""
+    whose session log is missing, or a session no codex-agent call started (reported, never acted on).
+    A turn must run on the model of the agent whose call started its session; a session
+    no call claimed may run on any of the arm's agent models."""
+    assert agent_models
     found: Counter[tuple[str, str, str]] = Counter()
     rollouts = read_rollouts(home)
+    agent_of_thread = {str(c["thread_id"]): str(c["agent"]) for c in summary["per_call"]}
+    arm_models = sorted(set(agent_models.values()))
     for rollout in rollouts:
+        agent = agent_of_thread.get(rollout.thread)
+        allowed = [agent_models[agent]] if agent in agent_models else arm_models
+        expected = " or ".join(allowed)
         for got_model, got_effort in rollout.turn_contexts:
-            if got_model != model:
-                found[("model", model, got_model)] += 1
+            if got_model not in allowed:
+                found[("model", expected, got_model)] += 1
             if got_effort != effort:
                 found[("effort", effort, got_effort)] += 1
     logged = {r.thread for r in rollouts}

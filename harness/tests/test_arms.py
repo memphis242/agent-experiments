@@ -19,13 +19,16 @@ EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": 
             "A8": "claude-sonnet-4-6", "A9": "claude-sonnet-4-6", "A10": None,
             "A11": "claude-haiku-5-5", "A12": None, "A13": None, "A14": "claude-sonnet-5-5",
             "A15": "claude-sonnet-5-5", "A16": None, "A17": None,
-            "A18": None, "A19": None, "A20": None, "A21": "gpt-6.1-sol", "A22": "gpt-6.1-sol"}
-CODEX_AGENTS = {"A21": sorted(arms.SUBAGENT_NAMES), "A22": ["debugger", "implementer", "tester"]}
+            "A18": None, "A19": None, "A20": None, "A21": "gpt-6.1-sol", "A22": "gpt-6.1-sol",
+            "A23": "gpt-6.1-sol"}
+CODEX_AGENTS = {"A21": sorted(arms.SUBAGENT_NAMES), "A22": ["debugger", "implementer", "tester"],
+                "A23": ["implementer", "small-implementer", "tester"]}
 MAIN = {"A10": ("claude-sonnet-5-5", "xhigh"), "A11": ("claude-sonnet-5-5", "high"), "A12": ("claude-sonnet-5-5", "high"),
         "A13": ("claude-opus-5-5", "medium"), "A14": ("claude-opus-5-5", "low"),
         "A15": ("claude-opus-5-5", "medium"), "A16": ("claude-haiku-5-5", "high"),
         "A17": ("claude-haiku-5-5", "xhigh"), "A18": ("claude-sonnet-5", "medium"),
-        "A19": ("claude-sonnet-5", "high"), "A20": ("claude-sonnet-4-6", "high")}
+        "A19": ("claude-sonnet-5", "high"), "A20": ("claude-sonnet-4-6", "high"),
+        "A23": ("claude-opus-5-5", "low")}
 ROLES = ("Delegate selectively. Do exploration, planning, design decisions, debugging, review, and "
          "integration yourself.")
 TIERED = "Delegate implementation, not thinking."
@@ -83,12 +86,16 @@ class ArmsTest(unittest.TestCase):
     def assert_codex(self, arm, root, s):
         self.assertIn("Agent", s["permissions"]["deny"])
         self.assertEqual(s["env"], {"BASH_MAX_TIMEOUT_MS": "7200000"})
-        self.assertEqual(s["modelSettings"], {"claude-opus-5-5": {"effortLevel": "high"}})
+        self.assertEqual(s["modelSettings"], {s["model"]: {"effortLevel": s["effortLevel"]}})
         self.assertFalse((root / "agents").exists())
         codex = root / "codex"
         self.assertEqual(sorted(p.stem for p in (codex / "roles").glob("*.md")), CODEX_AGENTS[arm])
         roster = json.loads((codex / "agent.json").read_text())
         self.assertEqual((roster["model"], roster["effort"]), ("gpt-6.1-sol", "high"))
+        luna = {"small-implementer", "tester"} if arm == "A23" else set()
+        for name, agent in roster["agents"].items():
+            self.assertEqual((agent["model"], agent["effort"]),
+                             ("gpt-6-luna" if name in luna else "gpt-6.1-sol", "high"))
         self.assertEqual({n for n, a in roster["agents"].items() if a["read_only"]},
                          {"explorer", "reviewer"} & set(CODEX_AGENTS[arm]))
         config = (codex / "config.toml").read_text()
@@ -102,6 +109,11 @@ class ArmsTest(unittest.TestCase):
         self.assertEqual(launcher.read_bytes(), arms.CODEX_AGENT_SCRIPT.read_bytes())
         text = (root / "CLAUDE.md").read_text()
         self.assertIn("## Subagents", text)
+        if arm == "A23":
+            self.assertNotIn("GPT-6.1 Sol at high", text)
+            self.assertIn("- implementer (GPT-6.1 Sol): ", text)
+            self.assertIn("- tester (GPT-6 Luna): ", text)
+            return
         self.assertIn("GPT-6.1 Sol at high reasoning effort", text)
         for name in CODEX_AGENTS[arm]:
             self.assertIn(f"- {name}: ", text)
@@ -143,6 +155,11 @@ class ArmsTest(unittest.TestCase):
         self.assertEqual(arms.ARMS["A21"].claude_subagent_models, frozenset())
         with self.assertRaises(AssertionError):  # a Codex arm runs a Codex model
             arms.ArmSpec("X", arms.SONNET_55, "eager", subagent_harness="codex")
+        with self.assertRaises(AssertionError):  # per-agent overrides on a Codex arm are Codex models too
+            arms.ArmSpec("X", arms.GPT_61_SOL, "tiered", agents=arms.TIERED_AGENTS,
+                         agent_models=arms.TIERED_MODELS, subagent_harness="codex")
+        self.assertEqual(dict(arms.effort_map(arms.ARMS["A23"])), {"claude-opus-5-5": "low"})
+        self.assertEqual(arms.ARMS["A23"].subagent_models, {arms.GPT_61_SOL, arms.GPT_6_LUNA})
         with self.assertRaises(AssertionError):  # and a Claude arm a Claude model
             arms.ArmSpec("X", arms.GPT_61_SOL, "eager")
 

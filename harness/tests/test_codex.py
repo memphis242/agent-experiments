@@ -37,6 +37,10 @@ FAKE_CODEX = textwrap.dedent('''\
     ''' % THREAD)
 
 
+SOL_ONLY = {"implementer": "gpt-6.1-sol", "tester": "gpt-6.1-sol"}
+TIERED = {"implementer": "gpt-6.1-sol", "tester": "gpt-6-luna"}
+
+
 def rollout_lines(model="gpt-6.1-sol", effort="high"):
     def usage(inp, cached, out):
         return {"input_tokens": inp, "cached_input_tokens": cached, "cache_write_input_tokens": 0,
@@ -101,6 +105,19 @@ class CodexAgentLauncherTest(unittest.TestCase):
         self.assertEqual((call["agent"], call["exit_code"], call["thread_id"], call["failed"]),
                          ("implementer", 0, THREAD, False))
 
+    def test_agent_runs_on_its_own_model(self):
+        tiered = Path(self.tmp.name) / "tiered"
+        arms.generate_arm("A23", tiered)
+        launcher = tiered / "A23" / "codex" / "bin" / "codex-agent"
+        done = subprocess.run([sys.executable, str(launcher), "tester"], input="t", text=True, capture_output=True,
+                              env=self.env, cwd=self.tmp.name, timeout=60)
+        self.assertEqual(done.returncode, 0, done.stderr)
+        argv = self.invocation()["argv"]
+        self.assertIn('model="gpt-6-luna"', argv)
+        self.assertIn('model_reasoning_effort="high"', argv)
+        [call] = codex.call_records(self.home)
+        self.assertEqual(call["model"], "gpt-6-luna")
+
     def test_read_only_agents_get_the_read_only_sandbox(self):
         self.assertEqual(self.launch("reviewer").returncode, 0)
         argv = self.invocation()["argv"]
@@ -120,7 +137,7 @@ class CodexAgentLauncherTest(unittest.TestCase):
         self.assertTrue(call["failed"] and call["usage_limit"])
         summary = codex.summarize(self.home)
         self.assertTrue(summary["usage_limit"])
-        kinds = [v["kind"] for v in codex.validate(self.home, summary, "gpt-6.1-sol", "high")]
+        kinds = [v["kind"] for v in codex.validate(self.home, summary, SOL_ONLY, "high")]
         self.assertEqual(kinds, ["codex_call_failed"])
 
 
@@ -152,16 +169,16 @@ class CodexAgentLauncherTest(unittest.TestCase):
 
 
 class CodexLogTest(unittest.TestCase):
-    def write_home(self, lines):
+    def write_home(self, lines, agent="implementer"):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         home = Path(tmp.name)
         path = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{THREAD}.jsonl"
         path.parent.mkdir(parents=True)
         path.write_text("".join(json.dumps(l) + "\n" for l in lines))
-        call = home / "agent-calls" / "c1-implementer"
+        call = home / "agent-calls" / f"c1-{agent}"
         call.mkdir(parents=True)
-        (call / "call.json").write_text(json.dumps({"agent": "implementer", "started_epoch": 100.0,
+        (call / "call.json").write_text(json.dumps({"agent": agent, "started_epoch": 100.0,
                                                     "ended_epoch": 160.0, "exit_code": 0, "failed": False,
                                                     "thread_id": THREAD, "usage_limit": False}))
         return home
@@ -185,15 +202,23 @@ class CodexLogTest(unittest.TestCase):
         self.assertEqual(summary["per_call"][0]["wall_s"], 60.0)
         self.assertEqual(summary["per_call"][0]["first_input_tokens"], 7452)
         self.assertEqual(summary["rate_limit_used_percent_max"], 8.0)
-        self.assertEqual(codex.validate(home, summary, "gpt-6.1-sol", "high"), [])
+        self.assertEqual(codex.validate(home, summary, SOL_ONLY, "high"), [])
         [spawn] = codex.spawn_calls(summary)
         self.assertEqual((spawn["subagent_type"], spawn["timestamp"]), ("implementer", 100.0))
 
     def test_wrong_model_or_effort_is_a_violation(self):
         home = self.write_home(rollout_lines(model="gpt-6.1-astra", effort="medium"))
-        kinds = sorted(v["kind"] for v in codex.validate(home, codex.summarize(home), "gpt-6.1-sol", "high"))
+        kinds = sorted(v["kind"] for v in codex.validate(home, codex.summarize(home), SOL_ONLY, "high"))
         self.assertEqual(kinds, ["effort", "model"])
 
+
+    def test_each_turn_is_checked_against_its_agents_model(self):
+        luna = self.write_home(rollout_lines(model="gpt-6-luna"), agent="tester")
+        self.assertEqual(codex.validate(luna, codex.summarize(luna), TIERED, "high"), [])
+        wrong = self.write_home(rollout_lines(model="gpt-6-luna"), agent="implementer")
+        [violation] = codex.validate(wrong, codex.summarize(wrong), TIERED, "high")
+        self.assertEqual((violation["kind"], violation["expected"], violation["observed"]),
+                         ("model", "gpt-6.1-sol", "gpt-6-luna"))
 
     def test_truncated_last_line_is_tolerated_but_not_elsewhere(self):
         home = self.write_home(rollout_lines())
@@ -213,7 +238,7 @@ class CodexLogTest(unittest.TestCase):
         (home / "agent-calls" / "c1-implementer").rmdir()
         summary = codex.summarize(home)
         self.assertEqual(summary["compaction_events"], 1)
-        kinds = [v["kind"] for v in codex.validate(home, summary, "gpt-6.1-sol", "high")]
+        kinds = [v["kind"] for v in codex.validate(home, summary, SOL_ONLY, "high")]
         self.assertEqual(kinds, ["codex_session_without_call"])
 
 

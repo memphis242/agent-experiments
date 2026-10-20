@@ -159,7 +159,8 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                 by_type[agent] = by_type.get(agent, 0) + n
             behavior["subagent_spawns_by_type"] = dict(sorted(by_type.items()))
             behavior["compaction_events"] += summary["compaction_events"]
-            codex_violations = codex.validate(codex_home, summary, arm.subagent_model, arm.subagent_effort)
+            codex_violations = codex.validate(codex_home, summary, {n: arm.model_for(n) for n in arm.agents},
+                                              arm.subagent_effort)
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None or arm.codex else [])

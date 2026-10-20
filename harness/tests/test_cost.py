@@ -26,6 +26,14 @@ OPUS, SONNET46 = "claude-opus-5-5", "claude-sonnet-4-6"
 AGENT_USE = {"type": "tool_use", "id": "t1", "name": "Agent", "input": {"subagent_type": "explorer"}}
 
 
+class LunaPricingTest(unittest.TestCase):
+    def test_short_and_long_context_cards(self):
+        short = cost.price_for("gpt-6-luna", 100_000)
+        self.assertEqual((short.input, short.cache_read, short.output), (0.10, 0.01, 0.50))
+        long = cost.price_for("gpt-6-luna", 300_000)
+        self.assertEqual((long.input, long.cache_read, long.output), (0.20, 0.02, 0.75))
+
+
 class CostTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()

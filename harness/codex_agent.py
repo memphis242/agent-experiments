@@ -4,7 +4,7 @@
 Usage: codex-agent AGENT [TASK]   (the task is read from standard input when omitted or "-")
 
 Installed by harness/arms.py as <config>/codex/bin/codex-agent of a Codex arm.
-The roster and role prompts sit next to it (../agent.json, ../roles/<agent>.md);
+The roster and role prompts sit next to it (../agent.json, which gives each agent's model and effort, and ../roles/<agent>.md);
 Codex state lives in $CODEX_HOME, which the harness prepares for each run. Each
 call is recorded under $CODEX_HOME/agent-calls/<call id>/ (task, Codex event
 stream, stderr, final message, and call.json) for the harness's analysis.
@@ -107,15 +107,17 @@ def main(argv: list[str]) -> int:
     (call_dir / "task.txt").write_text(task, encoding="utf-8")
     last_message = call_dir / "last-message.txt"
     read_only = bool(agents[name]["read_only"])
+    model, effort = str(agents[name]["model"]), str(agents[name]["effort"])
     cmd = [codex_bin, "exec", "--json", "--strict-config", "-C", os.getcwd(), "-o", str(last_message),
+           "-c", f"model={toml_string(model)}", "-c", f"model_reasoning_effort={toml_string(effort)}",
            "-c", f"developer_instructions={toml_string(role)}"]
     if read_only:
         cmd += ["--sandbox", "read-only"]
     cmd.append("-")
     env = {k: v for k, v in os.environ.items() if not k.startswith(DROPPED_ENV_PREFIXES)}
     env[NESTING_ENV] = "1"
-    record = {"agent": name, "read_only": read_only, "cwd": os.getcwd(), "started_epoch": started,
-              "argv": cmd[:-1]}
+    record = {"agent": name, "model": model, "effort": effort, "read_only": read_only, "cwd": os.getcwd(),
+              "started_epoch": started, "argv": cmd[:-1]}
     (call_dir / "call.json").write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
 
     with (call_dir / "events.jsonl").open("wb") as events, (call_dir / "stderr.txt").open("wb") as errors:

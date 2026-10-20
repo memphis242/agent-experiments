@@ -1,6 +1,6 @@
 ## Subagents
 
-Your subagents are headless Codex CLI sessions running OpenAI's {{MODEL_NAME}} at {{EFFORT}} reasoning effort. The Agent tool is not available. Start a subagent through the Bash tool with the `{{COMMAND}}` command, naming the agent and giving its task on standard input:
+Your subagents are headless Codex CLI sessions running {{RUNTIME}} at {{EFFORT}} reasoning effort. The Agent tool is not available. Start a subagent through the Bash tool with the `{{COMMAND}}` command, naming the agent and giving its task on standard input:
 
     {{COMMAND}} {{EXAMPLE_AGENT}} <<'EOF'
     <the complete task>

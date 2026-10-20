@@ -29,10 +29,11 @@ SONNET_46 = "claude-sonnet-4-6"
 HAIKU_55 = "claude-haiku-5-5"
 
 GPT_61_SOL = "gpt-6.1-sol"
+GPT_6_LUNA = "gpt-6-luna"
 
 KNOWN_MODELS: frozenset[str] = frozenset({OPUS_55, SONNET_55, SONNET_5, SONNET_46, HAIKU_55})
 # Models a headless Codex subagent may run on, with their display names.
-CODEX_MODELS: Mapping[str, str] = MappingProxyType({GPT_61_SOL: "GPT-6.1 Sol"})
+CODEX_MODELS: Mapping[str, str] = MappingProxyType({GPT_61_SOL: "GPT-6.1 Sol", GPT_6_LUNA: "GPT-6 Luna"})
 SUBAGENT_HARNESSES: tuple[str, ...] = ("claude", "codex")
 EFFORT_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
 
@@ -83,7 +84,7 @@ class ArmSpec:
         assert self.main_model in KNOWN_MODELS
         assert self.subagent_harness in SUBAGENT_HARNESSES
         if self.subagent_harness == "codex":
-            assert self.subagent_model in CODEX_MODELS and not self.agent_models
+            assert self.subagent_model in CODEX_MODELS
         else:
             assert self.subagent_model is None or self.subagent_model in KNOWN_MODELS
         assert self.main_effort in EFFORT_LEVELS and self.subagent_effort in EFFORT_LEVELS
@@ -91,7 +92,8 @@ class ArmSpec:
         overridden = [name for name, _ in self.agent_models]
         assert len(set(overridden)) == len(overridden) and set(overridden) <= set(self.agents)
         assert not self.agent_models or self.subagent_model is not None
-        assert all(model in KNOWN_MODELS for _, model in self.agent_models)
+        known = CODEX_MODELS if self.subagent_harness == "codex" else KNOWN_MODELS
+        assert all(model in known for _, model in self.agent_models)
         assert all(model != self.main_model or self.subagent_effort == self.main_effort
                    for model in self.subagent_models)
 
@@ -134,6 +136,7 @@ def effort_map(arm: ArmSpec) -> Mapping[str, str]:
 TIERED_AGENTS: tuple[str, ...] = ("implementer", "small-implementer", "tester")
 TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", HAIKU_55), ("tester", HAIKU_55))
 CODEX_ROLES_AGENTS: tuple[str, ...] = ("implementer", "tester", "debugger")
+CODEX_TIERED_MODELS: tuple[tuple[str, str], ...] = (("small-implementer", GPT_6_LUNA), ("tester", GPT_6_LUNA))
 
 ARMS: Mapping[str, ArmSpec] = MappingProxyType({
     a.arm_id: a for a in (
@@ -159,6 +162,8 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A20", None, None, main_model=SONNET_46, main_effort="high"),
         ArmSpec("A21", GPT_61_SOL, "eager", subagent_harness="codex"),
         ArmSpec("A22", GPT_61_SOL, "roles-debugger", agents=CODEX_ROLES_AGENTS, subagent_harness="codex"),
+        ArmSpec("A23", GPT_61_SOL, "tiered", main_effort="low", agents=TIERED_AGENTS,
+                agent_models=CODEX_TIERED_MODELS, subagent_harness="codex"),
     )
 })
 
@@ -256,8 +261,15 @@ def build_codex_section(arm: ArmSpec) -> str:
     """The CLAUDE.md section that tells the main agent how to start Codex subagents."""
     assert arm.codex and arm.subagent_model is not None
     template = _read_template("codex-subagents.md")
-    roster = "\n".join(f"- {name}: {_split_agent_template(name)[0]['description']}" for name in arm.agents)
-    text = (template.replace("{{MODEL_NAME}}", CODEX_MODELS[arm.subagent_model])
+
+    def roster_line(name: str) -> str:
+        label = f" ({CODEX_MODELS[arm.model_for(name)]})" if arm.multi_model else ""
+        return f"- {name}{label}: {_split_agent_template(name)[0]['description']}"
+
+    roster = "\n".join(roster_line(name) for name in arm.agents)
+    runtime = ("OpenAI models, each agent on the model named in its entry below," if arm.multi_model
+               else f"OpenAI's {CODEX_MODELS[arm.subagent_model]}")
+    text = (template.replace("{{RUNTIME}}", runtime)
             .replace("{{EFFORT}}", arm.subagent_effort)
             .replace("{{COMMAND}}", CODEX_AGENT_COMMAND)
             .replace("{{EXAMPLE_AGENT}}", "implementer" if "implementer" in arm.agents else arm.agents[0])
@@ -276,7 +288,8 @@ def build_codex_files(arm: ArmSpec) -> dict[str, str]:
     config = (_read_template("codex/config.toml").replace("{{MODEL}}", arm.subagent_model)
               .replace("{{EFFORT}}", arm.subagent_effort))
     assert "{{" not in config
-    roster = {name: {"read_only": codex_role_read_only(name)} for name in arm.agents}
+    roster = {name: {"read_only": codex_role_read_only(name), "model": arm.model_for(name),
+                     "effort": arm.subagent_effort} for name in arm.agents}
     files = {"config.toml": config, "AGENTS.md": working_agreement(),
              "agent.json": json.dumps({"model": arm.subagent_model, "effort": arm.subagent_effort,
                                        "agents": roster}, indent=2) + "\n"}
