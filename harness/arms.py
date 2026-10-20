@@ -164,6 +164,7 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A22", GPT_61_SOL, "roles-debugger", agents=CODEX_ROLES_AGENTS, subagent_harness="codex"),
         ArmSpec("A23", GPT_61_SOL, "tiered", main_effort="low", agents=TIERED_AGENTS,
                 agent_models=CODEX_TIERED_MODELS, subagent_harness="codex"),
+        ArmSpec("A24", GPT_6_LUNA, "tiered", main_effort="low", agents=TIERED_AGENTS, subagent_harness="codex"),
     )
 })
 
