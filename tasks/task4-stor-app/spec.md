@@ -62,10 +62,12 @@ typedef struct
 } STOR_StorageTable_t;
 ```
 
-Validation (table validation function) rejects: empty or unterminated
-roots; zero quotas; `MaxPacketFileBytes` below 1024 or above
-`TelemetryQuotaBytes`; threshold outside 1..100; a used entry with
-`Priority` 0 or `Decimation` 0; duplicate used `MsgId`s.
+Validation (table validation function) rejects exactly these cases and
+accepts every other table: empty or unterminated roots; zero quotas;
+`MaxPacketFileBytes` below 1024 or above `TelemetryQuotaBytes`; threshold
+outside 1..100; a used entry with `Priority` 0 or `Decimation` 0; duplicate
+used `MsgId`s. It may also reject a root too long to form OSAL paths (the
+root plus `/` plus a file name must fit in `OS_MAX_PATH_LEN`).
 
 Default table contents: roots `/cf/stor/tlm` and `/cf/stor/files`,
 `TelemetryQuotaBytes` 262144, `FileQuotaBytes` 1048576,
@@ -77,8 +79,8 @@ decimation 2, `CFE_TIME_HK_TLM_MID` priority 40 decimation 1.
 On table load (initial or update) STOR subscribes to every used entry's
 `MsgId` (with `CFE_SB_Subscribe`, the default message limit), unsubscribes
 from entries no longer present, and resets the runtime copies of priority,
-decimation and threshold to the table values. Use a command pipe depth of
-at least 32. On an update, an entry whose `MsgId` is still present keeps its
+decimation and threshold to the table values. STOR uses a single pipe,
+of depth at least 32, for its commands and the messages it stores. On an update, an entry whose `MsgId` is still present keeps its
 counters, open file and sequence; a removed entry's open file is closed and
 its counters discarded; new entries start at 0. Quotas, `MaxPacketFileBytes`
 and the threshold apply immediately; changing the roots by a table update
@@ -90,8 +92,7 @@ new table is active) at least once per SEND_HK cycle, for example on every
 WAKEUP or in the SEND_HK handler. A table update takes effect no later than
 the second SEND_HK after the table is activated: the housekeeping that
 SEND_HK produces already reflects it. Release the table address
-(`CFE_TBL_ReleaseAddress`) after each use; table services cannot activate an
-update while the address is held.
+(`CFE_TBL_ReleaseAddress`) after each use, as sample_app does.
 
 ## Telemetry and command storage
 
@@ -151,7 +152,7 @@ update while the address is held.
   `PurgeCycles`++ and one event `STOR_PURGE_INF_EID` with the count. If
   nothing can be purged, stop. A purge pass runs after every store, after
   SET_PRIORITY, SET_PURGE_THRESHOLD and CLOSE_FILES, after a table update,
-  and on every WAKEUP.
+  and on every WAKEUP, and at no other time.
 - WAKEUP (1 Hz): table check (if done on WAKEUP), purge pass, then close
   every packet file whose last write is 10 seconds or more ago (a file
   closed this way becomes purgeable at the next pass). Measure idle time

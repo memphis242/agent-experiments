@@ -111,6 +111,9 @@ static uint32 n_checks, n_failed;
 /* Set once STOR stopped responding in this test case: later assertions would only restate that. */
 static int app_hung;
 
+/* Startup failures stop every other check only in the startup case; elsewhere they name the scenario. */
+static bool boot_is_startup_case;
+
 static bool note(bool ok)
 {
     n_checks++;
@@ -1592,7 +1595,7 @@ static bool app_start(void)
     flag_set(&have_pending, 0);
     if (pthread_create(&app_thread, NULL, app_main, NULL) != 0)
     {
-        FAIL("harness", "cannot create the application thread");
+        FAIL("infra", "cannot create the application thread");
         return false;
     }
     app_running = true;
@@ -1980,6 +1983,7 @@ static void Setup(void)
     tbl_update_time = 0;
     now_sec = 1000;
     app_running = false;
+    boot_is_startup_case = false;
     sems_reset();
     if (tx == NULL) tx = calloc(TX_MAX, sizeof(*tx));
     tbl_default(&tbl_active);
@@ -2003,7 +2007,11 @@ static bool boot(const tbl_t *t)
     if (!app_start())
     {
         if (flag_get(&app_hung)) return false;
-        if (count_ev(EID_DIR_ERR, 0) > 0 || !is_dir(TLM_ROOT) || !is_dir(FILE_ROOT))
+        if (!boot_is_startup_case)
+            FAIL("startup-scenario", "STOR_AppMain ended during initialization (events 7/8/9/10/11/12 sent %d/%d/%d/%d/%d/%d times)",
+                 count_ev(EID_PIPE_ERR, 0), count_ev(EID_TBLREG, 0), count_ev(EID_TBLLOAD, 0), count_ev(EID_TBLVAL, 0),
+                 count_ev(EID_SUB_ERR, 0), count_ev(EID_DIR_ERR, 0));
+        else if (count_ev(EID_DIR_ERR, 0) > 0 || !is_dir(TLM_ROOT) || !is_dir(FILE_ROOT))
             FAIL("startup-roots", "STOR_AppMain ended during initialization (STOR_DIR_CREATE_ERR_EID sent %d times; roots present %d/%d)",
                  count_ev(EID_DIR_ERR, 0), is_dir(TLM_ROOT), is_dir(FILE_ROOT));
         else
@@ -2014,6 +2022,11 @@ static bool boot(const tbl_t *t)
     }
     if (!is_dir(TLM_ROOT) || !is_dir(FILE_ROOT))
     {
+        if (!boot_is_startup_case)
+        {
+            FAIL("startup-scenario", "TelemetryRoot " TLM_ROOT " and FileRoot " FILE_ROOT " were not both present after startup");
+            return false;
+        }
         FAIL("startup-roots", "TelemetryRoot " TLM_ROOT " and FileRoot " FILE_ROOT " were not both created at startup");
         return false;
     }
@@ -2121,6 +2134,7 @@ static void Test_StartupAndHousekeeping(void)
 {
     hk_t h;
     int n_ent;
+    boot_is_startup_case = true;
     if (!boot(&tbl_active)) return;
     EXPECT("startup-init-event", count_ev(EID_INIT, 0) == 1 && ev_typed(EID_INIT, EV_INFO, 0),
            "STOR_INIT_INF_EID (1) sent %d times, expected once as INFORMATION", count_ev(EID_INIT, 0));
@@ -2260,8 +2274,6 @@ static void Test_TableValidation(void)
     EXPECT("tbl-accept", vtbl(&t), "32 used entries with Priority and Decimation 255 are rejected");
     t = good; memset(t.b + 144, 0, 8 * MAX_ENT);
     EXPECT("tbl-accept", vtbl(&t), "a table with no used entries is rejected");
-    t = good; memset(t.b + PATH_LEN, 'f', PATH_LEN - 1); t.b[2 * PATH_LEN - 1] = 0;
-    EXPECT("tbl-accept", vtbl(&t), "a FileRoot of 63 characters plus its NUL is rejected");
 }
 
 static void Test_DecimationAndStats(void)
@@ -2433,7 +2445,7 @@ static void Test_SequenceAndScan(void)
     mf_put(FILE_ROOT "/x/y.bin", 700, 3);
     mf_put(FILE_ROOT "/z.bin", 300, 4);
     if (!boot(&t)) return;
-    EXPECT("startup-roots", count_ev(EID_DIR_ERR, 0) == 0, "existing roots raised STOR_DIR_CREATE_ERR_EID (12) %d times",
+    EXPECT("startup-roots-existing", count_ev(EID_DIR_ERR, 0) == 0, "existing roots raised STOR_DIR_CREATE_ERR_EID (12) %d times",
            count_ev(EID_DIR_ERR, 0));
     if (get_hk(&h))
     {
@@ -3198,6 +3210,10 @@ static void Test_IdleClose(void)
                            h.open, n_open_total());
     send_tlm(T_MID_A, 300, 1);
     EXPECT("pkt-no-reopen", mid_files(T_MID_A, idx, 8) == 2, "a packet after the idle close did not start a new file");
+    /* Idle time is cFE time: one WAKEUP after the clock moved on by 10 s closes the file. */
+    now_sec += 10;
+    send_wakeup();
+    if (get_hk(&h)) EXPECT("idle-close", h.open == 0, "%u files open at the first WAKEUP 11 s (by cFE time) after the last write", h.open);
 }
 
 static void Test_WriteFailures(void)
@@ -3290,13 +3306,13 @@ static void run_isolated(void (*body)(void))
     }
     if (pipe(fds) != 0)
     {
-        FAIL("harness", "cannot create a pipe (errno %d)", errno);
+        FAIL("infra", "cannot create a pipe (errno %d)", errno);
         return;
     }
     pid = fork();
     if (pid < 0)
     {
-        FAIL("harness", "cannot fork (errno %d)", errno);
+        FAIL("infra", "cannot fork (errno %d)", errno);
         close(fds[0]);
         close(fds[1]);
         return;
@@ -3551,9 +3567,9 @@ ISOLATED(Test_RefScanFails)
 
 void UtTest_Setup(void)
 {
-    EXPECT("harness", sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes", (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
-    EXPECT("harness", sizeof(CFE_MSG_CommandHeader_t) == CMD_HDR, "command header is %u bytes", (unsigned)sizeof(CFE_MSG_CommandHeader_t));
-    EXPECT("harness", sizeof(CFE_FS_Header_t) == FS_HDR, "file header is %u bytes", (unsigned)sizeof(CFE_FS_Header_t));
+    EXPECT("infra", sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes", (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
+    EXPECT("infra", sizeof(CFE_MSG_CommandHeader_t) == CMD_HDR, "command header is %u bytes", (unsigned)sizeof(CFE_MSG_CommandHeader_t));
+    EXPECT("infra", sizeof(CFE_FS_Header_t) == FS_HDR, "file header is %u bytes", (unsigned)sizeof(CFE_FS_Header_t));
     UtTest_Add(Test_StartupAndHousekeeping_Isolated, Setup, NULL, "Startup and housekeeping");
     UtTest_Add(Test_StartupErrTblReg_Isolated, Setup, NULL, "Startup error: table registration");
     UtTest_Add(Test_StartupErrTblLoad_Isolated, Setup, NULL, "Startup error: table load");

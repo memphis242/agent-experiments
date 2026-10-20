@@ -1,0 +1,14 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -62,6 +62,10 @@
+         STOR_Strnlen(T->FileRoot, STOR_PATH_LEN) == 0 || STOR_Strnlen(T->FileRoot, STOR_PATH_LEN) == STOR_PATH_LEN)
+     {
+         rc = -1;
++    }
++    else if (strlen(T->TelemetryRoot) + 22 >= OS_MAX_PATH_LEN || strlen(T->FileRoot) + 2 >= OS_MAX_PATH_LEN)
++    {
++        rc = -7;
+     }
+     else if (T->TelemetryQuotaBytes == 0 || T->FileQuotaBytes == 0)
+     {

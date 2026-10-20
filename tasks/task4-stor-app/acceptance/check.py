@@ -106,6 +106,7 @@ class Ctx:
         self.pristine_table: bytes | None = None
         self.start_feedback_seen: set[str] = set()
         self.unit_note = ""
+        self.missing_feedback = ""
 
     # -- time budget -------------------------------------------------------------
     def remaining(self) -> float:
@@ -117,6 +118,15 @@ class Ctx:
             raise Fail("the time budget ran out during this check", NOT_VERIFIED_TIME)
         return min(want, left)
 
+    def budget_timeout(self, want: float) -> tuple[float, bool]:
+        """(effective timeout, whether the remaining budget shortened it below `want`)."""
+        eff = self.timeout_for(want)
+        return eff, eff < want
+
+    def budget_ran_out(self, what: str, eff: float) -> Fail:
+        """The outcome when a timeout that the budget had shortened fires: not verified, never a hang verdict."""
+        return Fail(f"{what} was stopped after {eff:.0f} s because the review's time budget ran out", NOT_VERIFIED_TIME)
+
     # -- repository copy and build ---------------------------------------------------
     def copy_tree(self) -> None:
         if self.tree.exists():
@@ -126,12 +136,16 @@ class Ctx:
 
     def run(self, cmd: list[str], timeout: float, env: dict[str, str] | None = None,
             cwd: Path | None = None) -> tuple[int, str, bool]:
-        """(exit status, combined output, timed out); never raises for a slow command."""
+        """(exit status, combined output, timed out); a command that runs past its own timeout is reported as timed
+        out, while one stopped early because the review's budget ran out fails the check as not verified."""
+        eff, shortened = self.budget_timeout(timeout)
         try:
             proc = subprocess.run(cmd, cwd=cwd or self.tree, text=True, errors="replace", capture_output=True,
-                                  timeout=self.timeout_for(timeout), env=env)
+                                  timeout=eff, env=env)
             return proc.returncode, proc.stdout + proc.stderr, False
         except subprocess.TimeoutExpired as exc:
+            if shortened:
+                raise self.budget_ran_out(f"`{' '.join(cmd)}`", eff) from None
             out = exc.stdout or ""
             out = out.decode(errors="replace") if isinstance(out, bytes) else out
             err = exc.stderr or ""
@@ -139,11 +153,15 @@ class Ctx:
             return -1, out + err, True
 
     def sh(self, cmd: list[str], timeout: float, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
-        """Run a command in the tree; a command that exceeds its timeout fails the current check."""
+        """Run a command in the tree; a command that exceeds its timeout fails the current check (as not verified when
+        the review's budget, not the command, ran out)."""
+        eff, shortened = self.budget_timeout(timeout)
         try:
             return subprocess.run(cmd, cwd=self.tree, text=True, errors="replace", capture_output=True,
-                                  timeout=self.timeout_for(timeout), env=env)
+                                  timeout=eff, env=env)
         except subprocess.TimeoutExpired as exc:
+            if shortened:
+                raise self.budget_ran_out(f"`{' '.join(cmd)}`", eff) from None
             out = exc.stdout or ""
             out = out.decode(errors="replace") if isinstance(out, bytes) else out
             raise Fail(f"`{' '.join(cmd)}` did not finish within {timeout:.0f} s; output tail: {out[-1500:]}",
@@ -153,9 +171,19 @@ class Ctx:
         """Configure and build once; later calls only report the stored outcome."""
         if self.build_ok is not None:
             if not self.build_ok:
+                if self.build_log.startswith("missing from the repository"):
+                    raise SharedFail(self.build_log, self.missing_feedback)
                 raise SharedFail("the mission does not configure and build: " + self.build_log[-3000:], BUILD_FEEDBACK)
             return
         self.copy_tree()
+        missing = [rel for rel in ("Makefile", "tools/run_cfs.sh") if not (self.tree / rel).is_file()]
+        if missing:
+            self.build_ok = False
+            self.build_log = "missing from the repository: " + ", ".join(missing)
+            self.missing_feedback = ("The repository must keep the mission's " + " and ".join(missing)
+                                     + ", which building and running cFS need; "
+                                     + ("it is" if len(missing) == 1 else "they are") + " missing.")
+            raise SharedFail(self.build_log, self.missing_feedback)
         rc, log, slow = self.run(["make", "native_std.prep"], 300)
         ok = rc == 0
         if ok:
@@ -264,9 +292,11 @@ def c_app_registered(ctx: Ctx) -> None:
     targets = t / "sample_defs" / "targets.cmake"
     listed = False
     if targets.is_file():
-        for line in targets.read_text(errors="replace").splitlines():
-            code = line.split("#", 1)[0]
-            if "MISSION_GLOBAL_APPLIST" in code and "STATIC" not in code and re.search(r"(?<![\w-])stor(?![\w-])", code):
+        # Whole cmake commands, which may span several lines: list(APPEND MISSION_GLOBAL_APPLIST ...) or
+        # set(MISSION_GLOBAL_APPLIST ...); MISSION_GLOBAL_STATIC_APPLIST is a different list.
+        code = "\n".join(line.split("#", 1)[0] for line in targets.read_text(errors="replace").splitlines())
+        for cmd in re.finditer(r"\b(?:list\s*\(\s*APPEND|set\s*\()\s*MISSION_GLOBAL_APPLIST\b([^)]*)\)", code, re.I):
+            if re.search(r"(?<![\w-])stor(?![\w-])", cmd.group(1)):
                 listed = True
     p.check(listed, "stor is not in MISSION_GLOBAL_APPLIST in sample_defs/targets.cmake",
             "stor must be listed in MISSION_GLOBAL_APPLIST in sample_defs/targets.cmake.")
@@ -281,8 +311,8 @@ def c_app_registered(ctx: Ctx) -> None:
                "sample_defs/tables/sch_lab_table.c must schedule STOR_SEND_HK_MID and STOR_WAKEUP_MID."):
         s = strip_c_comments(sch.read_text(errors="replace"))
         for name, period, what in (("STOR_SEND_HK_MID", 49, "every 4.9 s"), ("STOR_WAKEUP_MID", 10, "every 1.0 s")):
-            # The entry's offset (third field) is free.
-            m = re.search(r"\{\s*CFE_SB_MSGID_WRAP_VALUE\(\s*" + name + r"\s*\)\s*,\s*(\d+)\s*,\s*(\d+)\s*\}", s)
+            # An entry is {MessageID, PacketRate} or {MessageID, PacketRate, FcnCode}; the function code is free.
+            m = re.search(r"\{\s*CFE_SB_MSGID_WRAP_VALUE\(\s*" + name + r"\s*\)\s*,\s*(\d+)\s*(?:,\s*[^,{}]+?\s*)?\}", s)
             behaviour = f"sample_defs/tables/sch_lab_table.c must send {name} {what} (period {period})."
             if p.check(m is not None, f"sch_lab_table.c has no {name} entry", behaviour):
                 p.check(int(m.group(1)) == period, f"sch_lab_table.c {name} period {m.group(1)}, expected {period}",
@@ -369,8 +399,8 @@ def run_unit_tests(ctx: Ctx) -> UnitTests:
         return ctx.unit
     ctx.build()
     ut = UnitTests()
-    ctx.unit = ut
     rc, log, slow = ctx.run(["make", JOBS, "-k", "native_std.runtest"], 900)
+    ctx.unit = ut
     ut.log, ut.timed_out = log, slow
     build = ctx.tree / "build-native_std"
     listing = build / "test-list.json"
@@ -1673,14 +1703,15 @@ assert len({c.check_id for c in CHECKS}) == len(CHECKS)
 assert all(ID_RE.match(c.check_id) for c in CHECKS)
 assert LIVE_CHECKS <= {c.check_id for c in CHECKS}
 
-# Execution order: static checks and the build first, then the live scenarios, then the hidden test.
+# Execution order: static checks and the build first, then the hidden test (the most detailed feedback, so the
+# least likely to be cut short by the time budget), then the live scenarios.
 RUN_ORDER = [
     "app-registered", "build-no-warnings", "unit-tests-pass", "stor-coverage-tests", "coverage-threshold",
-    "default-table-contents",
+    "default-table-contents", "hidden-coverage-test",
     "scheduled-housekeeping", "startup-and-hk", "decimation-and-stats", "packet-file-naming-and-header", "rollover",
     "idle-file-close", "purge-order", "quota-drop", "restart-scan", "set-param-errors", "file-add-list-delete",
     "file-path-rejection", "file-exists-rejection", "file-quota-rejection", "reset-counters", "ccdd-definitions",
-    "ctf-test-passes", "report-present", "hidden-coverage-test",
+    "ctf-test-passes", "report-present",
 ]
 assert sorted(RUN_ORDER) == sorted(c.check_id for c in CHECKS)
 
@@ -1693,7 +1724,8 @@ def run_check(ctx: Ctx, spec: CheckSpec) -> str:
         return ""
     except Fail as first:
         if (spec.check_id not in LIVE_CHECKS or first.feedback == NOT_VERIFIED_TIME
-                or (isinstance(first, SharedFail) and not first.retry)):
+                or (isinstance(first, SharedFail) and not first.retry)
+                or (isinstance(first, SharedFail) and shared_key(first.feedback or "") in ctx.start_feedback_seen)):
             raise
         print(f"[{spec.check_id}] FIRST ATTEMPT FAILED: {first}; retrying once from a fresh cFS", flush=True)
         if ctx.cfs is not None:
@@ -1707,12 +1739,16 @@ def run_check(ctx: Ctx, spec: CheckSpec) -> str:
         return f"passed on the second attempt; first attempt failed: {first}"
 
 
+def shared_key(feedback: str) -> str:
+    """A shared cause's identity: the table a scenario used does not make a startup failure a different one."""
+    return re.sub(r"^With (the default StorageTable|a StorageTable with [^\[]*\[[^\]]*\]), ", "", feedback)
+
+
 def feedback_for(ctx: Ctx, spec: CheckSpec, exc: Fail) -> str:
     fb = exc.feedback or spec.feedback
     if isinstance(exc, SharedFail):
-        # A cause shared by several checks (build, table image, cFS startup) is described once in full; the table
-        # a scenario used does not make a startup failure a different one.
-        key = re.sub(r"^With (the default StorageTable|a StorageTable with [^\[]*\[[^\]]*\]), ", "", fb)
+        # A cause shared by several checks (build, table image, cFS startup) is described once in full.
+        key = shared_key(fb)
         if key in ctx.start_feedback_seen:
             return ("This requirement could not be checked because of a problem described in full in another item: "
                     + (key if len(key) <= 140 else key[:137].rsplit(" ", 1)[0] + " ..."))
@@ -1728,9 +1764,6 @@ def main(argv: list[str]) -> int:
     out = Path(argv[2]).resolve()
     if not repo.is_dir():
         print(f"repository {repo} not found", file=sys.stderr)
-        return 2
-    if not (repo / "Makefile").is_file() or not (repo / "tools" / "run_cfs.sh").is_file():
-        print(f"{repo} is not a cFS mission tree", file=sys.stderr)
         return 2
     for tool in ("make", "cmake", "gcc", "gcov", "git"):
         if shutil.which(tool) is None:

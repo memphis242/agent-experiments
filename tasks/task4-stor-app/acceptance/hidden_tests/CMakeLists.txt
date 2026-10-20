@@ -1,7 +1,7 @@
 # Black-box behaviour test of apps/stor, built next to the application's own unit tests.
 # All application sources are compiled together (internal function names are not relied on);
 # the test drives STOR_AppMain through cFE/OSAL stub models.
-file(GLOB STOR_HIDDEN_SUBJECTS "${PROJECT_SOURCE_DIR}/fsw/src/*.c")
+file(GLOB STOR_HIDDEN_SUBJECTS "${CMAKE_CURRENT_SOURCE_DIR}/../fsw/src/*.c")
 list(FILTER STOR_HIDDEN_SUBJECTS EXCLUDE REGEX ".*eds.*")
 
 add_cfe_coverage_test(stor
