@@ -1,4 +1,4 @@
-# Task 3 results (housekeeping staleness detection), 117 runs, 2026-10-20 (preliminary: two reruns in progress)
+# Task 3 results (housekeeping staleness detection), 117 runs, 2026-10-20
 
 All 117 valid runs passed acceptance. Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the repetitions (five per arm so
@@ -13,8 +13,8 @@ dropped attempts. A16 and A17 run on six slots. Repetitions 4 and up of A1 to A1
 three slots, with up to twelve shortly before a usage-window reset. A1 and A2 have a sixth
 repetition from the start of the extension to ten, which is on hold. The Codex arms (A21,
 A22) ran ten repetitions each on six slots; their cost includes the Codex subagents at
-GPT-6.1 Sol API rates. Eighteen runs that lost rounds to a defect outside their own code
-have been rerun so far (see the footnote); each rerun replaces its original here.
+GPT-6.1 Sol API rates. Twenty runs that lost rounds to a defect outside their own code
+have been rerun (see the footnote); each rerun replaces its original here.
 
 ## Spread across arms
 
@@ -43,15 +43,15 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A13 | solo Opus 5.5, medium effort | task3 | 5/5 | 7.42 | 6.30 to 8.04 | 1.74 | 21.5 to 28.6 | 89 to 129 | 0 | 1 | 0 | 257.5 to 282.4 | - |
 | A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 3.47 | 3.29 to 3.59 | 0.30 | 19.5 to 26.5 | 4 to 17 | 3 | 1 | 0 | 65.1 to 91.5 | 228.3 to 302.2 |
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 4.94 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 28 | 3 to 4 | 1 to 2* | 0 | 139.9 to 158.5 | 230.7 to 250.3 |
-| A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.53 | 2.46 to 5.33 | 2.87 | 22.3 to 38.0 | 144 to 264 | 0 | 1 to 2* | 0 | 407.9 to 565.8 | - |
+| A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.19 | 1.85 to 4.24 | 2.38 | 22.3 to 45.3 | 130 to 232 | 0 | 1 to 2 | 0 | 361.9 to 549.8 | - |
 | A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3* | 0 | 498.3 to 856.0 | - |
 | A21 | Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager | task3 | 10/10 | 5.41 | 4.65 to 6.57 | 1.92 | 17.0 to 30.3 | 5 to 31 | 2 to 8 | 1 | 0 | 148.6 to 198.1 | 99.6 to 112.5 |
 | A22 | Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger | task3 | 10/10 | 6.56 | 5.04 to 7.28 | 2.24 | 15.0 to 26.0 | 11 to 99 | 1 to 2 | 1 | 0 | 188.2 to 260.6 | 80.2 to 114.8 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A11 0.39, A14 0.41, A16 0.41, A12
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.37, A11 0.39, A14 0.41, A12
 0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A10 0.85, A13 0.87, A9 0.88,
 A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with asterisked runs not rerun (A6, A8,
-A15 to A17) carry rounds lost to the pack defect or the wait ceiling.
+A15, A17) carry rounds lost to the pack defect or the wait ceiling.
 
 Notes:
 
@@ -85,7 +85,7 @@ Notes:
   window; no main agent compacted, including solo Haiku runs peaking at 856K.
 - Solo and conservative Opus main agents peaked at 242K to 331K tokens; eager main agents
   at 126K to 251K; eager subagents at 148K to 382K.
-- Second or later acceptance rounds: A6 four runs, A8 three, A15 one, A16 three, A17 five;
+- Second or later acceptance rounds: A6 four runs, A8 three, A15 one, A16 one, A17 five;
   every other run passed on the first round. All are asterisked runs except A16 rep 3's
   rerun, whose round one missed a required entry in the default copy table.
 - The fresh-transition defect: no fresh event (ID 41) when input resumes after a stale
@@ -93,8 +93,8 @@ Notes:
   A12 run, three A11 runs, one A10 run, six A16 runs and five A17 runs, all arms whose main
   agent is Sonnet 5.5 or Haiku 5.5. No run with an Opus 5.5 main agent failed that check on
   its own. Every A10 to A12 and A16 run fixed it from the round-one feedback. On the corrected
-  pack all fifteen reruns of these runs so far passed without that failure: A10 rep 4, A11
-  reps 3 to 5, A12 reps 1 to 5 and A16 reps 2 to 5 (A16 rep 3 needed a second round for a
+  pack all seventeen reruns of these runs passed without that failure: A10 rep 4, A11
+  reps 3 to 5, A12 reps 1 to 5 and A16 reps 2 to 7 (A16 rep 3 needed a second round for a
   different miss, above).
 - A10 to A12 run a Sonnet 5.5 main agent. Solo Sonnet 5.5 at high effort (A12) costs
   0.43 of A1; every original run needed the second round above, and all five reruns passed
@@ -126,10 +126,9 @@ Notes:
 - Haiku 5.5 is billed at five times its base rates for any request whose prompt
   exceeds 100,000 tokens. Costs here apply that rule per request; the Haiku subagents of
   A11, A14 and A15 crossed it in some runs, and every solo Haiku run (A16, A17) did.
-- A16 (solo Haiku 5.5 at high effort) passed all ten runs at 0.41 of A1. Three runs needed
-  a second round (the originals of reps 6 and 7, whose reruns are in progress, for the
-  fresh-transition defect, and the rerun of rep 3), none more than two. Its main context
-  reached 408K to 566K tokens and its runs took 22 to 38 minutes.
+- A16 (solo Haiku 5.5 at high effort) passed all ten runs at 0.37 of A1. One run needed
+  a second round (the rerun of rep 3, above). Its main context
+  reached 362K to 550K tokens and its runs took 22 to 45 minutes.
 - A17 (solo Haiku 5.5 at xhigh effort) passed all ten runs at 0.70 of A1. Five needed more
   than one round, all starting with the fresh-transition defect; four needed a third,
   two because the hidden unit test still failed and two because the round-two fix broke
@@ -151,9 +150,8 @@ Notes:
   reps 1 to 5, A16 reps 2 to 7, A17 reps 3, 4, 7, 8 and 10), and the CLI stopping a background
   subagent at its ten-minute wait ceiling (A6 reps 1 to 5, A8 reps 1, 2, 4 and 5, A11 rep 4,
   A14 reps 2, 4 and 5, A15 rep 4). A re-grade of every round of all 97 runs on the corrected
-  pack changed no other verdict, so the remaining runs stand. Rerun so far: A6 rep 1, A8 rep 1, A10 rep 4,
-  A11 reps 3 to 5, A12 reps 1 to 5, A14 reps 2, 4 and 5 and A16 reps 2 to 5, each in one
-  round except A16 rep 3 (two); A10, A11, A12 and A14 no longer carry an asterisk. A16 reps 6
-  and 7 are being rerun. The owner dropped the remaining reruns (A6 reps 2 to 5, A8 reps 2,
+  pack changed no other verdict, so the remaining runs stand. Rerun: A6 rep 1, A8 rep 1, A10 rep 4,
+  A11 reps 3 to 5, A12 reps 1 to 5, A14 reps 2, 4 and 5 and A16 reps 2 to 7, each in one
+  round except A16 rep 3 (two); A10, A11, A12, A14 and A16 no longer carry an asterisk. The owner dropped the remaining reruns (A6 reps 2 to 5, A8 reps 2,
   4 and 5, A15 rep 4 and A17's five) for the weekly usage budget, so those arms keep the
   asterisk. The originals are listed in [superseded.json](superseded.json).
