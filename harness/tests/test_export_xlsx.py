@@ -106,6 +106,12 @@ class ExportXlsxTest(unittest.TestCase):
         self.assertEqual(float(row[f"{col(header.index('cache_write_tokens'))}{n}"][1]), 3.0)
         self.assertEqual(float(row[f"{col(header.index('wall_minutes'))}{n}"][1]), 10.0)
 
+    def test_solo_codex_run_is_all_codex_usd(self):
+        run = run_json("c1", "A26", 1, usd=3.0)
+        run["cost"]["scenarios"]["billed"]["by_model"] = {"gpt-6.1-sol": 3.0}
+        self.assertEqual(export_xlsx.split_cost(run, "billed"), (0, 3.0))
+        self.assertEqual(aggregate.ARM_DESCRIPTIONS["A26"], "solo Codex GPT-6.1 Sol, high effort")
+
     def test_output_is_deterministic(self):
         runs = [run_json("bbbb0001", "A1", 1), run_json("bbbb0002", "A3", 1, task="task2")]
         self.assertEqual(self.build(runs), self.build(runs))

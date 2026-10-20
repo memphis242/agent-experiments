@@ -21,6 +21,7 @@ import subprocess
 import sys
 import tempfile
 import time
+import tomllib
 import functools
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -137,17 +138,22 @@ def hash_tree(root: Path) -> str:
     return digest.hexdigest()
 
 
-def copy_arm_root(source: Path, dest: Path) -> None:
-    """Copy exactly settings.json, CLAUDE.md, agents/, and codex/; refuse any other content."""
+def copy_arm_root(source: Path, dest: Path, claude_files: bool = True) -> None:
+    """Copy exactly settings.json, CLAUDE.md, agents/, and codex/; refuse any other content.
+    An arm whose main agent is Codex (claude_files False) has only codex/, which is required."""
     extras = sorted(p.name for p in source.iterdir() if p.name not in ARM_ROOT_ENTRIES)
+    if not claude_files:  # a Claude Code configuration would be inert here, and so is a sign of a stale root
+        extras += sorted(n for n in ("settings.json", "CLAUDE.md", "agents") if (source / n).exists())
     if extras:
         raise RunError(f"arm root {source} holds unexpected entries {extras}; remove them or regenerate the arm")
-    for name in ("settings.json", "CLAUDE.md"):
-        if not (source / name).is_file():
+    required = ("settings.json", "CLAUDE.md") if claude_files else (arms.CODEX_DIR,)
+    for name in required:
+        if not (source / name).exists():
             raise RunError(f"arm root {source} lacks {name}; run harness/arms.py")
     dest.mkdir(parents=True)
-    shutil.copyfile(source / "settings.json", dest / "settings.json")
-    shutil.copyfile(source / "CLAUDE.md", dest / "CLAUDE.md")
+    if claude_files:
+        shutil.copyfile(source / "settings.json", dest / "settings.json")
+        shutil.copyfile(source / "CLAUDE.md", dest / "CLAUDE.md")
     if (source / "agents").exists():
         shutil.copytree(source / "agents", dest / "agents")
     if (source / arms.CODEX_DIR).exists():
@@ -339,6 +345,15 @@ def child_env(config_dir: Path, base: dict[str, str] | None = None, include_toke
     return env
 
 
+def codex_main_env(codex_home: Path, base: dict[str, str] | None = None) -> dict[str, str]:
+    """Allowlisted environment for a Codex main agent: no Claude token or configuration, and
+    CODEX_HOME naming the run's own Codex home."""
+    source = os.environ if base is None else base
+    env = {k: source[k] for k in ENV_ALLOWLIST if k in source}
+    env["CODEX_HOME"] = str(codex_home)
+    return env
+
+
 def kill_stray_processes(run_dir: Path, names: frozenset[str] = STRAY_PROCESS_NAMES) -> list[int]:
     """SIGKILL processes named in `names` whose cwd is under run_dir (found via /proc)."""
     root = run_dir.resolve()
@@ -377,6 +392,11 @@ def build_claude_command(cfg: RunConfig, run_id: str, message: str, session_id: 
     if arm.subagent_model is None or arm.codex:
         cmd += ["--disallowedTools", "Agent"]
     return cmd
+
+
+def codex_developer_instructions(run_id: str) -> str:
+    """The Codex main agent's counterpart of the Claude main agent's `--append-system-prompt`."""
+    return f"Run ID: {run_id}"
 
 
 def parse_cli_result(stdout: str) -> dict[str, Any]:
@@ -439,7 +459,8 @@ def provenance(cfg: RunConfig, spec: Path, pack: Path) -> dict[str, object]:
     sha, dirty = harness_git()
     version_env = {k: v for k, v in os.environ.items() if k in ENV_ALLOWLIST}
     return {
-        "claude_version": _capture([cfg.claude_bin, "--version"], env=version_env),
+        "claude_version": (None if arms.get_arm(cfg.arm).codex_main
+                           else _capture([cfg.claude_bin, "--version"], env=version_env)),
         "harness_sha": sha, "harness_dirty": dirty,
         "spec_sha256": hashlib.sha256(spec.read_bytes()).hexdigest(),
         "pack_sha256": hash_tree(pack),
@@ -458,18 +479,23 @@ class Runner:
         self.leak_hits: list[dict[str, object]] = []
         self.leak_offsets: dict[str, int] = {}
         self.record: dict[str, Any] = {}
-        self.codex_home: Path | None = codex.home_for(run_dir) if arms.get_arm(cfg.arm).codex else None
+        self.codex_main = arms.get_arm(cfg.arm).codex_main
+        self.codex_home: Path | None = codex.home_for(run_dir) if arms.get_arm(cfg.arm).uses_codex else None
+        self.codex_bin: str | None = None  # the pinned Codex binary of a Codex main agent, set by prepare_codex
 
     def init_record(self, started: datetime) -> None:
         arm = arms.get_arm(self.cfg.arm)
-        settings_path = self.source_root / "settings.json"
+        # The configuration the agent runs under: Claude Code's settings.json, or a Codex main agent's config.toml.
+        settings_path = (self.source_root / arms.CODEX_DIR / "config.toml" if arm.codex_main
+                         else self.source_root / "settings.json")
         try:
-            settings = json.loads(settings_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            text = settings_path.read_text(encoding="utf-8")
+            settings = tomllib.loads(text) if arm.codex_main else json.loads(text)
+        except (OSError, json.JSONDecodeError, tomllib.TOMLDecodeError) as exc:
             raise RunError(f"arm root not generated or unreadable ({settings_path}): {exc}; run harness/arms.py") from exc
         config_hash = hash_config_root(self.source_root)
         try:
-            copy_arm_root(self.source_root, self.arm_root)
+            copy_arm_root(self.source_root, self.arm_root, claude_files=not arm.codex_main)
         except OSError as exc:
             raise RunError(f"cannot copy arm root {self.source_root} to {self.arm_root}: {exc}") from exc
         assert hash_config_root(self.arm_root) == config_hash
@@ -479,6 +505,7 @@ class Runner:
             "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir,
             "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
+            "main_harness": arm.main_harness,
             "models": {"main": arm.main_model,
                        "subagent": ({n: arm.model_for(n) for n in arm.agents} if arm.multi_model
                                     else arm.subagent_model)},
@@ -505,6 +532,7 @@ class Runner:
                                       child_env(self.arm_root, include_token=False))
         except (codex.CodexError, OSError) as exc:
             raise InfraError(f"cannot prepare the Codex home: {exc}") from exc
+        self.codex_bin = str(info["codex_bin"])
         self.record["codex"] = info
         self.save()
 
@@ -523,23 +551,52 @@ class Runner:
         self.record["resume_request_indices"] = list(self.resume_indices)
         write_json_atomic(self.run_dir / "run.json", self.record)
 
-    # -- claude invocation -------------------------------------------------
-    def invoke(self, message: str, session_id: str | None, round_no: int) -> dict[str, Any]:
-        cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
-        env = child_env(self.arm_root, codex_home=self.codex_home)
+    # -- agent invocation --------------------------------------------------
+    def execute(self, cmd: list[str], env: dict[str, str], round_no: int, name: str, binary: str,
+                stdin: str | None = None) -> subprocess.CompletedProcess[str]:
+        """Run the agent's command for one round (wrapped in namespaces unless --no-netns) in the
+        repo; its leftover cFS processes are killed afterwards."""
         if self.cfg.netns:
             codex_arm = self.codex_home is not None
             cmd = wrap_netns(cmd, hide_run_dir=self.run_dir,
                              visible=VISIBLE_RUN_DIRS + ((codex.HOME_DIR,) if codex_arm else ()),
                              host_visible=codex.HOST_VISIBLE if codex_arm else (), dns_forward=codex_arm)
         try:
-            done = proc.run_group(cmd, cwd=self.repo, env=env, timeout=self.cfg.cli_timeout_s)
+            return proc.run_group(cmd, cwd=self.repo, env=env, timeout=self.cfg.cli_timeout_s, stdin=stdin)
         except subprocess.TimeoutExpired:
-            raise RunError(f"claude exceeded --cli-timeout of {self.cfg.cli_timeout_s} s in round {round_no}") from None
+            raise RunError(f"{name} exceeded --cli-timeout of {self.cfg.cli_timeout_s} s in round {round_no}") from None
         except OSError as exc:
-            raise RunError(f"cannot execute {self.cfg.claude_bin!r}: {exc}") from exc
+            raise RunError(f"cannot execute {binary!r}: {exc}") from exc
         finally:
             kill_stray_processes(self.run_dir)
+
+    def invoke_codex(self, message: str, thread_id: str | None, round_no: int) -> dict[str, Any]:
+        """One round of a Codex main agent: `codex exec` (or `codex exec resume <thread>`) with the
+        message on standard input. Raises UsageLimit or RunError when the round started no thread."""
+        assert self.codex_main and self.codex_bin is not None and self.codex_home is not None
+        arm = arms.get_arm(self.cfg.arm)
+        last_message = self.run_dir / f"codex-main-round{round_no}.last.txt"
+        cmd = codex.main_command(self.codex_bin, arm.main_model, arm.main_effort,
+                                 codex_developer_instructions(self.run_id), last_message.resolve(),
+                                 self.repo.resolve(), thread_id)
+        done = self.execute(cmd, codex_main_env(self.codex_home), round_no, "codex", self.codex_bin, stdin=message)
+        (self.run_dir / f"codex-main-round{round_no}.events.jsonl").write_text(done.stdout, encoding="utf-8")
+        (self.run_dir / f"codex-main-round{round_no}.stderr.txt").write_text(done.stderr, encoding="utf-8")
+        result = codex.main_round_result(done.stdout, done.stderr, done.returncode, last_message)
+        if result["session_id"] is None:
+            text = f"codex started no thread in round {round_no} (exit {done.returncode}): {result['result'] or 'no output'}"
+            raise (UsageLimit if result["_usage_limit"] else RunError)(text)
+        if thread_id is not None and result["session_id"] != thread_id:
+            raise RunError(f"codex resumed thread {thread_id} but reported thread {result['session_id']} "
+                           f"in round {round_no}")
+        return result
+
+    def invoke(self, message: str, session_id: str | None, round_no: int) -> dict[str, Any]:
+        if self.codex_main:
+            return self.invoke_codex(message, session_id, round_no)
+        cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
+        done = self.execute(cmd, child_env(self.arm_root, codex_home=self.codex_home), round_no, "claude",
+                            self.cfg.claude_bin)
         (self.run_dir / f"cli-round{round_no}.stdout.json").write_text(done.stdout, encoding="utf-8")
         (self.run_dir / f"cli-round{round_no}.stderr.txt").write_text(done.stderr, encoding="utf-8")
         try:
@@ -556,6 +613,10 @@ class Runner:
 
     # -- analysis ----------------------------------------------------------
     def transcripts(self) -> tuple[list[Path], list[Path]]:
+        """Claude main transcripts and their subagent dirs; none for a Codex main agent, whose
+        session logs live in the run's Codex home."""
+        if self.codex_main:
+            return [], []
         mains: list[Path] = []
         for sid in dict.fromkeys(self.session_ids):
             mains.append(transcript.find_main_transcript(self.arm_root, self.repo.resolve(), sid))
@@ -585,7 +646,8 @@ class Runner:
         """Refresh cost, behavior, validation, and totals; failures are recorded, not fatal."""
         try:
             mains, sub_dirs = self.transcripts()
-            self.archive_transcripts(mains)
+            if not self.codex_main:
+                self.archive_transcripts(mains)
             self.scan_leaks(mains, sub_dirs, round_no)
         except (transcript.TranscriptError, OSError) as exc:
             self.record["analysis_error"] = str(exc)
@@ -615,9 +677,13 @@ class Runner:
                 return
             entry["wall_time_s"] = round(time.monotonic() - t0, 3)
             entry["ended_epoch"] = time.time()
-            entry["cli"] = {k: result.get(k) for k in (
-                "session_id", "total_cost_usd", "num_turns", "duration_ms", "duration_api_ms",
-                "usage", "modelUsage", "is_error", "result", "subtype", "_exit_code")}
+            if self.codex_main:
+                entry["codex_cli"] = {k: result.get(k) for k in (
+                    "session_id", "usage", "turns_completed", "errors", "is_error", "result", "_exit_code")}
+            else:
+                entry["cli"] = {k: result.get(k) for k in (
+                    "session_id", "total_cost_usd", "num_turns", "duration_ms", "duration_api_ms",
+                    "usage", "modelUsage", "is_error", "result", "subtype", "_exit_code")}
             session_id = str(result["session_id"])
             if not self.session_ids or self.session_ids[-1] != session_id:
                 self.session_ids.append(session_id)
@@ -626,14 +692,14 @@ class Runner:
             self.analyze(round_no)
             self.save()
             if result.get("is_error") or result["_exit_code"] != 0:
-                text = f"claude reported an error in round {round_no} (exit {result['_exit_code']}): {result.get('result')}"
+                agent = "codex" if self.codex_main else "claude"
+                text = f"{agent} reported an error in round {round_no} (exit {result['_exit_code']}): {result.get('result')}"
                 self.record.update(status="usage_limit" if result.get("_usage_limit") else "cli_error", error=text)
                 return
             if self.codex_invalidated(round_no):
                 return
             # The next resume's first request is the one after those seen so far.
-            mains, _ = self.transcripts()
-            next_index = cost.main_request_count(mains)
+            next_index = self.main_request_count()
             feedback: str | None = None
             try:
                 try:
@@ -666,10 +732,18 @@ class Runner:
             self.save()
         raise AssertionError("loop exits through a return")
 
+    def main_request_count(self) -> int:
+        """The main agent's requests so far, which is the index of the next resume's first request."""
+        if self.codex_main:
+            assert self.codex_home is not None
+            return len(codex.load_requests(self.codex_home, "main"))
+        mains, _ = self.transcripts()
+        return cost.main_request_count(mains)
+
     def codex_invalidated(self, round_no: int) -> bool:
         """Stop the run (before acceptance) when a Codex subagent hit its usage limit or failed."""
         summary = (self.record.get("behavior") or {}).get("codex")
-        if self.codex_home is None or summary is None:
+        if self.codex_home is None or self.codex_main or summary is None:
             return False
         outcome = codex.run_outcome(summary)
         if outcome is None:
@@ -678,11 +752,14 @@ class Runner:
         return True
 
     def analyze_if_possible(self, round_no: int) -> None:
-        if self.session_ids:
+        # A Codex main agent that was stopped mid-round has session logs (and spend) without a reported thread id.
+        if self.session_ids or (self.codex_main and self.codex_home is not None
+                                and codex.rollout_files(self.codex_home)):
             self.analyze(round_no)
 
 
 def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
+    arm = arms.get_arm(cfg.arm)
     repo = run_dir / "repo"
     sample_feedback = "<deterministic feedback composed from failing checks>"
     steps = [
@@ -691,31 +768,40 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
         ["git", "-C", str(repo), "add", "TASK.md"],
         ["git", "-C", str(repo), "commit", "-m", "Add TASK.md"],
         ["bash", str(repo / "ctf" / "setup_ctf.sh")],
-        ["cp", "settings.json, CLAUDE.md, agents/, codex/ from", str(arms.arm_root(cfg.arm, cfg.arms_dir)),
-         "to", str(run_dir / "config")],
+        ["cp", "codex/ from" if arm.codex_main else "settings.json, CLAUDE.md, agents/, codex/ from",
+         str(arms.arm_root(cfg.arm, cfg.arms_dir)), "to", str(run_dir / "config")],
     ]
-    if arms.get_arm(cfg.arm).codex:
+    if arm.uses_codex:
         steps.append(["# build", str(codex.home_for(run_dir)), "from config/codex/, disable bundled skills, check "
-                      "the subagent prompt, copy", str(codex.USER_AUTH), "(removed when the run ends)"])
+                      "the Codex prompt, copy", str(codex.USER_AUTH), "(removed when the run ends)"])
     print(f"# run id: {run_id}\n# run dir: {run_dir}")
     for step in steps:
         print(shlex.join(step))
-    env = (f"env -i {' '.join(f'{k}=<{k}>' for k in ENV_ALLOWLIST)} "
-           + " ".join(f"{k}={v}" for k, v in ENV_FIXED.items())
-           + f" CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>")
-
-    codex_arm = arms.get_arm(cfg.arm).codex
-    if codex_arm:
+    allowlist = f"env -i {' '.join(f'{k}=<{k}>' for k in ENV_ALLOWLIST)} "
+    if arm.codex_main:
+        env = allowlist + f"CODEX_HOME={shlex.quote(str(codex.home_for(run_dir)))}"
+    else:
+        env = (allowlist + " ".join(f"{k}={v}" for k, v in ENV_FIXED.items())
+               + f" CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>")
+    codex_arm = arm.uses_codex
+    if arm.codex:
         env += (f" CODEX_HOME={shlex.quote(str(codex.home_for(run_dir)))}"
                 f" PATH={shlex.quote(str(run_dir / 'config' / arms.CODEX_DIR / 'bin'))}:<PATH>")
 
     def claude_line(message: str, session: str | None) -> str:
-        cmd = build_claude_command(cfg, run_id, message, session)
+        if arm.codex_main:
+            cmd = codex.main_command("<pinned codex>", arm.main_model, arm.main_effort,
+                                     codex_developer_instructions(run_id),
+                                     run_dir.resolve() / "codex-main-round<N>.last.txt", repo.resolve(), session)
+        else:
+            cmd = build_claude_command(cfg, run_id, message, session)
         if cfg.netns:
             cmd = wrap_netns(cmd, hide_run_dir=run_dir,
                              visible=VISIBLE_RUN_DIRS + ((codex.HOME_DIR,) if codex_arm else ()),
                              host_visible=codex.HOST_VISIBLE if codex_arm else (), dns_forward=codex_arm)
-        return f"cd {shlex.quote(str(repo))} && {env} " + shlex.join(cmd)
+        # A Codex main agent reads the message from standard input.
+        feed = f"printf %s {shlex.quote(message)} | " if arm.codex_main else ""
+        return f"cd {shlex.quote(str(repo))} && {feed}{env} " + shlex.join(cmd)
 
     print(claude_line(prompt, None))
     print(f"# then, up to {cfg.max_rounds - 1} times while acceptance fails (pack copied to {run_dir}/acceptance "
@@ -783,6 +869,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
         p.error("--rep and --max-rounds must be >= 1")
     if a.autocompact is not None and a.autocompact < 100_000:
         p.error("--autocompact must be at least 100000")
+    if a.autocompact is not None and arms.get_arm(a.arm).codex_main:
+        p.error("--autocompact configures Claude Code and does not apply to a Codex main agent")
     try:
         short, directory = resolve_task(a.tasks_dir, a.task)
     except RunError as exc:
@@ -812,10 +900,13 @@ def main(argv: Sequence[str] | None = None) -> int:
             run_id = "<8-hex-nonce>"
             dry_run(cfg, run_id, cfg.runs_dir / run_id, prompt)
             return 0
-        if not os.environ.get(TOKEN_ENV):
+        arm = arms.get_arm(cfg.arm)
+        if not arm.codex_main and not os.environ.get(TOKEN_ENV):
             raise RunError(f"{TOKEN_ENV} is not set; create one with `claude setup-token`")
         if cfg.netns:
-            if arms.get_arm(cfg.arm).codex:
+            if arm.codex_main:
+                check_netns(cfg.runs_dir, "codex", ("python3",), codex.HOST_VISIBLE, dns_forward=True)
+            elif arm.codex:
                 check_netns(cfg.runs_dir, cfg.claude_bin, ("codex", "python3"), codex.HOST_VISIBLE, dns_forward=True)
             else:
                 check_netns(cfg.runs_dir, cfg.claude_bin)

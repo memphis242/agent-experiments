@@ -34,6 +34,9 @@ EQUIVALENT_RUN_CODES: frozenset[str] = frozenset({
     # 4122116 (A13 to A15 waves): the current change only lets a pack declare its acceptance
     # timeout; packs without the declaration keep 2400 s.
     "72a53602f78e97f9692bc56aab09601efd2a2a553c49076a738bc1bf6cb06792",
+    # bd8d6a3 (A24 and A25 results): the current change adds arms whose main agent is a Codex
+    # session; the config roots and run path of the Claude-main arms (A1 to A25) are unchanged.
+    "24b431b3cd96e59e4b5f497bbc5b5fa0ff697e727dc0e512fc46355569b77fa8",
 })
 
 

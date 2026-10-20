@@ -1,6 +1,8 @@
-"""Headless Codex subagents: per-run CODEX_HOME setup and check, and session-log analysis.
+"""Headless Codex sessions: per-run CODEX_HOME setup and check, and session-log analysis.
 
-A Codex arm's main agent starts subagents with the codex-agent command (codex_agent.py).
+A Codex-subagent arm's Claude Code main agent starts subagents with the codex-agent
+command (codex_agent.py); a Codex-main arm's main agent is itself a `codex exec` session
+that run.py starts and resumes (main_command, main_round_result).
 Every run gets its own CODEX_HOME under the run dir, built from the arm's codex/
 config, so no Codex state (sessions, history, memories, caches, skills, login
 refreshes) is shared with other runs or with the user's ~/.codex, which the run's
@@ -25,6 +27,7 @@ from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
 
 import cost
+from codex_agent import USAGE_LIMIT_RE, toml_string
 from transcript import TranscriptError, parse_timestamp
 
 HOME_DIR = "codex-home"          # under the run dir; CODEX_HOME while the agent runs
@@ -36,7 +39,7 @@ USER_AUTH = Path("~/.codex/auth.json").expanduser()
 HOST_VISIBLE: tuple[Path, ...] = (Path("~/.codex/packages").expanduser(),)
 RUNTIME_FILE = "agent-runtime.json"  # read by codex-agent: the Codex binary this run is pinned to
 PROMPT_INPUT_FILE = "codex-prompt-input.json"
-# Prompt sections that must not reach a subagent: bundled skills, multi-agent
+# Prompt sections that must not reach an agent: bundled skills, multi-agent
 # collaboration, connected apps and plugins.
 FORBIDDEN_PROMPT_MARKERS: tuple[str, ...] = ("<skills_instructions>", "<multi_agent_role>", "<multi_agent_mode>",
                                              "<apps_instructions>", "<plugins_instructions>")
@@ -191,8 +194,9 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
     feature states, disable Codex's bundled skills, check the model-visible prompt, validate
     the final config strictly, and install a copy of the user's Codex login.
 
-    The prompt check renders exactly what a subagent's first request carries apart from
-    its role and task, saves it as codex-prompt-input.json in the run dir, and fails
+    The prompt check renders exactly what a Codex agent's first request carries apart from
+    its role (a subagent), run id (the main agent), and task, saves it as codex-prompt-input.json
+    in the run dir, and fails
     unless the working agreement is present and no skills, multi-agent, app, or plugin
     section is. The login is copied last, and not at all when Codex would refresh it
     within RUN_MARGIN. Returns provenance for run.json."""
@@ -220,12 +224,12 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
     joined = "\n".join(t for _, t in texts)
     present = [m for m in FORBIDDEN_PROMPT_MARKERS if m in joined]
     if present:
-        raise CodexError(f"the Codex subagent prompt still carries {present}; see {run_dir / PROMPT_INPUT_FILE}")
+        raise CodexError(f"the Codex prompt still carries {present}; see {run_dir / PROMPT_INPUT_FILE}")
     agreement = (codex_config / "AGENTS.md").read_text(encoding="utf-8").strip()
     if agreement not in joined:
-        raise CodexError(f"the Codex subagent prompt lacks the working agreement; see {run_dir / PROMPT_INPUT_FILE}")
+        raise CodexError(f"the Codex prompt lacks the working agreement; see {run_dir / PROMPT_INPUT_FILE}")
     if f"<cwd>{repo.resolve()}</cwd>" not in joined:
-        raise CodexError(f"the Codex subagent prompt does not place it in {repo}; see {run_dir / PROMPT_INPUT_FILE}")
+        raise CodexError(f"the Codex prompt does not place the agent in {repo}; see {run_dir / PROMPT_INPUT_FILE}")
     check_strict_config(codex_bin, repo, env)
     version = _capture([codex_bin, "--version"], repo, base_env).strip()
     if not USER_AUTH.is_file():
@@ -405,12 +409,14 @@ def _usage_int(usage: dict, key: str) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
-def load_requests(home: Path) -> tuple[cost.Request, ...]:
-    """One subagent request per model response in the Codex session logs.
+def load_requests(home: Path, source: str = "subagent") -> tuple[cost.Request, ...]:
+    """One request per model response in the Codex session logs: a subagent's by default,
+    or, for a Codex-main arm (source "main"), the main agent's, numbered in log order.
 
     Codex reports input_tokens inclusive of cached and cache-write tokens; the
     uncached remainder is billed at the input price, cached tokens at the cache-read
     price, and cache writes at the cache-write price (both TTL slots carry it)."""
+    assert source in cost.SOURCES
     requests: list[cost.Request] = []
     for rollout in read_rollouts(home):
         for key, model, stamp, usage in rollout.usage:
@@ -420,7 +426,8 @@ def load_requests(home: Path) -> tuple[cost.Request, ...]:
             if cached + written > total:
                 raise TranscriptError(f"{rollout.path}: response {key} reports more cached and written tokens than input")
             requests.append(cost.Request(
-                message_id=key, model=model, source="subagent", main_index=None, timestamp=stamp,
+                message_id=key, model=model, source=source,
+                main_index=len(requests) if source == "main" else None, timestamp=stamp,
                 input_tokens=total - cached - written, output_tokens=_usage_int(usage, "output_tokens"),
                 cache_read_tokens=cached, cache_write_5m_tokens=written, cache_write_1h_tokens=0,
                 thread=f"codex-{rollout.thread}", ttl_split_known=False))
@@ -534,6 +541,115 @@ def leak_scan_files(home: Path) -> list[Path]:
     """Files whose new lines the leak scan reads: session logs and the tasks handed to subagents."""
     tasks = sorted((home / CALLS_DIR).glob("*/task.txt")) if (home / CALLS_DIR).is_dir() else []
     return [*rollout_files(home), *tasks]
+
+
+# -- Codex as the main agent -----------------------------------------------------------------------
+# Tools of Codex's multi-agent collaboration and its web search; a Codex main agent runs without
+# any of them, as a Claude solo arm runs without the Agent tool.
+FORBIDDEN_MAIN_TOOLS: frozenset[str] = frozenset({
+    "spawn_agent", "send_input", "send_message", "followup_task", "wait_agent", "close_agent", "resume_agent",
+    "interrupt_agent", "list_agents", "web_search"})
+USAGE_KEYS: tuple[str, ...] = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens")
+
+
+def main_command(codex_bin: str, model: str, effort: str, developer_instructions: str, last_message: Path,
+                 repo: Path, thread_id: str | None) -> list[str]:
+    """argv of one round of a Codex main agent, the prompt or feedback arriving on standard input.
+
+    The first round is `codex exec`; later rounds are `codex exec resume <thread id>`, which has no
+    -C and so runs in the working directory the caller sets (the repo)."""
+    assert last_message.is_absolute() and repo.is_absolute()
+    cmd = [codex_bin, "exec"]
+    if thread_id is not None:
+        cmd.append("resume")
+    cmd += ["--json", "--strict-config"]
+    if thread_id is None:
+        cmd += ["-C", str(repo)]
+    cmd += ["-o", str(last_message), "-c", f"model={toml_string(model)}",
+            "-c", f"model_reasoning_effort={toml_string(effort)}",
+            "-c", f"developer_instructions={toml_string(developer_instructions)}"]
+    if thread_id is not None:
+        cmd.append(thread_id)
+    cmd.append("-")
+    return cmd
+
+
+def parse_exec_events(stdout: str) -> dict[str, Any]:
+    """From a `codex exec --json` stream: the thread id, the token usage of the last
+    turn.completed event (which Codex reports cumulatively for the whole thread, resumed
+    rounds included), how many turns completed or failed, and the error messages.
+    Lines that are not JSON objects are ignored."""
+    thread: str | None = None
+    usage = {key: 0 for key in USAGE_KEYS}
+    completed = failed = 0
+    errors: list[str] = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if not isinstance(event, dict):
+            continue
+        kind = event.get("type")
+        if kind == "thread.started" and event.get("thread_id"):
+            thread = str(event["thread_id"])
+        elif kind == "turn.completed":
+            completed += 1
+            reported = event.get("usage") if isinstance(event.get("usage"), dict) else {}
+            usage = {key: _usage_int(reported, key) for key in USAGE_KEYS}
+        elif kind in ("error", "turn.failed"):
+            if kind == "turn.failed":
+                failed += 1
+            detail = event.get("message") or (event.get("error") or {}).get("message") or json.dumps(event)
+            errors.append(str(detail))
+    return {"thread_id": thread, "usage": usage, "turns_completed": completed, "turns_failed": failed,
+            "errors": errors}
+
+
+def main_round_result(stdout: str, stderr: str, exit_code: int, last_message: Path) -> dict[str, Any]:
+    """The record of one Codex main-agent round, shaped like the fields run.py reads from a
+    Claude result: session_id (the thread id, None when the stream never started one), is_error,
+    result (the final message, or the failure detail of a failed round), _exit_code, and
+    _usage_limit, plus usage, turns_completed, and errors.
+
+    A round failed when Codex exited non-zero or a turn failed; error events alone are
+    warnings. A failed round hit the usage limit when its errors or stderr say so."""
+    events = parse_exec_events(stdout)
+    failed = exit_code != 0 or events["turns_failed"] > 0
+    detail = "; ".join(events["errors"][-3:]) or stderr.strip()[-600:]
+    try:
+        final = last_message.read_text(encoding="utf-8")
+    except OSError:
+        final = ""
+    limited = failed and bool(USAGE_LIMIT_RE.search("\n".join(events["errors"]) + "\n" + stderr))
+    return {"session_id": events["thread_id"], "usage": events["usage"],
+            "turns_completed": events["turns_completed"], "errors": events["errors"],
+            "is_error": failed, "result": detail if failed else final, "_exit_code": exit_code,
+            "_usage_limit": limited}
+
+
+def validate_main(summary: dict[str, Any], rollouts: Sequence[Rollout], model: str, effort: str,
+                  thread_ids: Sequence[str]) -> list[dict[str, Any]]:
+    """Violations for a Codex main agent (reported, never acted on): a turn on another model or
+    effort, a forbidden tool, a recorded thread without a session log, or a session log of a thread
+    the rounds did not report."""
+    found: Counter[tuple[str, str, str]] = Counter()
+    for rollout in rollouts:
+        for got_model, got_effort in rollout.turn_contexts:
+            if got_model != model:
+                found[("model", model, got_model)] += 1
+            if got_effort != effort:
+                found[("effort", effort, got_effort)] += 1
+    for tool, count in summary["tool_calls"].items():
+        if tool in FORBIDDEN_MAIN_TOOLS:
+            found[("forbidden_tool", "not used", tool)] += count
+    logged = {r.thread for r in rollouts}
+    for thread in sorted(set(thread_ids) - logged):
+        found[("codex_session_log_missing", "rollout file", thread)] += 1
+    for thread in sorted(logged - set(thread_ids)):
+        found[("codex_unexpected_session", "a thread a round reported", thread)] += 1
+    return [{"kind": k[0], "source": "main", "file": "-", "expected": k[1], "observed": k[2], "count": n}
+            for k, n in sorted(found.items())]
 
 
 # -- login refresh ---------------------------------------------------------------------------------

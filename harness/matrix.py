@@ -83,7 +83,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"matrix: error: cannot hash arm roots in {a.arms_dir}: {exc}", file=sys.stderr)
         return 1
     for arm, sha in config_shas.items():
-        if not (a.arms_dir / arm / "settings.json").is_file():
+        config = Path(arms.CODEX_DIR) / "config.toml" if arms.get_arm(arm).codex_main else Path("settings.json")
+        if not (a.arms_dir / arm / config).is_file():
             print(f"matrix: error: arm root for {arm} is missing in {a.arms_dir}; run harness/arms.py", file=sys.stderr)
             return 1
     attempts = load_attempts(a.runs_dir)

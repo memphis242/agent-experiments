@@ -129,6 +129,31 @@ working around a missing subagent. A call the main agent (or the CLI) stops
 with a signal is not a failure. The launcher holds every Codex cell after such
 a run until it has been looked into.
 
+A26 to A29 are solo Codex arms: the main agent is a headless `codex exec`
+session on GPT-6.1 Sol (A26), GPT-6 Luna (A27), GPT-5.6 Sol (A28) or GPT-5.6
+Luna (A29) at high reasoning effort, with no subagents. They get the same task
+prompt, acceptance rounds and feedback as the Claude arms, and the working
+agreement (CLAUDE.md without its delegation section) as the run's Codex
+AGENTS.md, so A26 to A29 compare to the solo Claude arms on identical
+instructions. The first round is `codex exec --json -C <repo> -o <last message>`
+with the prompt on standard input; each feedback round is `codex exec resume
+<thread id>` with the feedback on standard input, the thread id taken from the
+`thread.started` event. Every round passes the model, reasoning effort and a
+`Run ID: <id>` developer message (the counterpart of the Claude main agent's
+appended system prompt) as `-c` overrides. The run uses the same per-run
+CODEX_HOME, login handling, namespaces and prompt check as the Codex-subagent
+arms, with the same Codex configuration (web search, apps, plugins, memories,
+sub-agents and fast mode disabled). It needs no Claude token, and `--autocompact`
+does not apply. A round that fails ends the run as `usage_limit` (the ChatGPT
+plan's Codex limit, recognised from Codex's own error text) or `cli_error`.
+Cost, turns (model requests), context peak, compactions, tools, model and effort
+come from the session log in the run's CODEX_HOME; the validation section flags
+a turn on another model or effort, a multi-agent or web-search tool, and
+sessions the rounds did not report. `codex exec` reports each thread's cumulative
+usage, which `cost.exec_usage_reconciliation` compares with the log. The cache
+write TTL scenarios coincide with billed, since Codex has no TTL split and no
+pauses are simulated.
+
 Codex usage is priced at OpenAI's standard API rates for GPT-6.1 Sol (USD per
 million tokens: input 2.00, cached input 0.10, cache write 2.50, output 10.00;
 above 272K input tokens 4.00, 0.20, 5.00 and 15.00, applied per request, since

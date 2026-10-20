@@ -21,6 +21,7 @@ EXPECTED = {"A1": None, "A2": "claude-opus-5-5", "A3": "claude-opus-5-5", "A4": 
             "A15": "claude-sonnet-5-5", "A16": None, "A17": None,
             "A18": None, "A19": None, "A20": None, "A21": "gpt-6.1-sol", "A22": "gpt-6.1-sol",
             "A23": "gpt-6.1-sol", "A24": "gpt-6-luna", "A25": "gpt-5.6-sol"}
+CODEX_MAIN = {"A26": "gpt-6.1-sol", "A27": "gpt-6-luna", "A28": "gpt-5.6-sol", "A29": "gpt-5.6-luna"}
 CODEX_AGENTS = {"A21": sorted(arms.SUBAGENT_NAMES), "A22": ["debugger", "implementer", "tester"],
                 "A23": ["implementer", "small-implementer", "tester"],
                 "A24": ["implementer", "small-implementer", "tester"],
@@ -49,7 +50,7 @@ class ArmsTest(unittest.TestCase):
         cls.tmp.cleanup()
 
     def test_all_roots(self):
-        self.assertEqual(sorted(p.name for p in self.base.iterdir()), sorted(EXPECTED))
+        self.assertEqual(sorted(p.name for p in self.base.iterdir()), sorted(EXPECTED | CODEX_MAIN))
 
     def test_settings_and_models(self):
         for arm, sub_model in EXPECTED.items():
@@ -165,6 +166,40 @@ class ArmsTest(unittest.TestCase):
         self.assertEqual(arms.ARMS["A23"].subagent_models, {arms.GPT_61_SOL, arms.GPT_6_LUNA})
         with self.assertRaises(AssertionError):  # and a Claude arm a Claude model
             arms.ArmSpec("X", arms.GPT_61_SOL, "eager")
+
+    def test_codex_main_arm_roots(self):
+        for arm, model in CODEX_MAIN.items():
+            root = self.base / arm
+            self.assertEqual([p.name for p in root.iterdir()], ["codex"])  # no Claude Code configuration
+            self.assertEqual(sorted(p.name for p in (root / "codex").iterdir()), ["AGENTS.md", "config.toml"])
+            config = (root / "codex" / "config.toml").read_text()
+            for line in (f'model = "{model}"', 'model_reasoning_effort = "high"', 'web_search = "disabled"',
+                         'approval_policy = "never"', "multi_agent = false", "[agents]\nenabled = false"):
+                self.assertIn(line, config)
+            self.assertNotIn("{{", config)
+            # The same working agreement a Claude solo arm's CLAUDE.md holds.
+            agreement = (root / "codex" / "AGENTS.md").read_text()
+            self.assertEqual(agreement, (self.base / "A1" / "CLAUDE.md").read_text())
+            self.assertNotIn("Delegation", agreement)
+
+    def test_codex_main_arm_spec(self):
+        spec = arms.ARMS["A26"]
+        self.assertTrue(spec.codex_main and spec.uses_codex and not spec.codex)
+        self.assertEqual(dict(arms.effort_map(spec)), {"gpt-6.1-sol": "high"})
+        self.assertEqual(spec.subagent_models, frozenset())
+        self.assertFalse(arms.ARMS["A1"].codex_main or arms.ARMS["A21"].codex_main)
+        self.assertTrue(arms.ARMS["A21"].uses_codex and not arms.ARMS["A1"].uses_codex)
+        with self.assertRaises(AssertionError):  # the main model must be a Codex model
+            arms.ArmSpec("X", None, None, main_model=arms.OPUS_55, main_harness="codex")
+        with self.assertRaises(AssertionError):  # and a Claude main agent a Claude model
+            arms.ArmSpec("X", None, None, main_model=arms.GPT_6_LUNA)
+        with self.assertRaises(AssertionError):  # a Codex main agent has no subagents
+            arms.ArmSpec("X", arms.GPT_6_LUNA, "eager", main_model=arms.GPT_61_SOL, main_harness="codex",
+                         subagent_harness="codex")
+        with self.assertRaises(AssertionError):
+            arms.ArmSpec("X", None, None, main_model=arms.GPT_61_SOL, main_harness="gemini")
+        with self.assertRaises(AssertionError):  # Claude-side files exist only for a Claude main agent
+            arms.build_settings(spec)
 
     def test_unknown_arm(self):
         with self.assertRaises(arms.ArmError):

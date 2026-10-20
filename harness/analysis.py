@@ -15,6 +15,10 @@ import transcript
 
 HYPOTHETICAL_NOTE = ("The none, 5m, 1h, and uniform_1h scenarios are computed from transcripts only and "
                      "exclude untranscribed requests (compaction summaries).")
+CODEX_MAIN_NOTE = ("A Codex main agent's cache writes carry no 5m/1h split and no pauses are simulated, so "
+                   "the 5m, 1h, and uniform_1h scenarios equal billed; none reprices cache tokens at the input "
+                   "price. All figures come from the session logs and exclude untranscribed requests "
+                   "(compaction); exec_usage_reconciliation compares them with the CLI's own totals.")
 
 
 def reconcile(record: dict[str, Any], requests: Sequence[cost.Request]) -> dict[str, Any]:
@@ -98,32 +102,66 @@ def cache_ttl_report(requests: Sequence[cost.Request], expected_main: str,
     return summary, violations
 
 
+def exec_usage_reconciliation(record: dict[str, Any], requests: Sequence[cost.Request]) -> dict[str, Any]:
+    """Token totals of the session logs against the totals `codex exec` reported. Each round
+    reports its thread's cumulative usage, so the last round of each thread counts. Report
+    only: the difference is requests the logs omit."""
+    last: dict[str, dict[str, Any]] = {}
+    for r in record["rounds"]:
+        reported = r.get("codex_cli") or {}
+        if reported.get("session_id"):
+            last[reported["session_id"]] = reported.get("usage") or {}
+    exec_usage = {key: sum(usage.get(key) or 0 for usage in last.values()) for key in codex.USAGE_KEYS}
+    logged = {"input_tokens": sum(cost.context_tokens(r) for r in requests),
+              "cached_input_tokens": sum(r.cache_read_tokens for r in requests),
+              "output_tokens": sum(r.output_tokens for r in requests)}
+    return {"exec_usage": exec_usage, "logged_usage": logged,
+            "diff": {key: exec_usage[key] - logged[key] for key in logged}}
+
+
 def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Sequence[Path],
                   resume_indices: Sequence[int], gaps_path: Path, seed: int,
                   definition_models: dict[str, str], codex_home: Path | None = None) -> None:
     """Recompute cost, behavior, validation, and totals in place; failures go to analysis_error.
 
-    With codex_home (a Codex arm), the headless Codex subagents' requests join the
-    Claude requests as subagent requests, and their calls count as spawns."""
+    With codex_home (a Codex-subagent arm), the headless Codex subagents' requests join the
+    Claude requests as subagent requests, and their calls count as spawns. For a Codex-main
+    arm there are no Claude transcripts (mains and sub_dirs are empty): the Codex session logs
+    in codex_home hold the main agent's requests, and the CLI's own cost figures do not exist."""
+    arm = arms.get_arm(record["arm"])
+    assert (codex_home is not None) == arm.uses_codex
+    assert not arm.codex_main or not (mains or sub_dirs)
+    main_turns: int | None = None
     try:
         gaps: tuple[float, ...] | None = None
         warnings: list[str] = []
-        if resume_indices:
+        if resume_indices and not arm.codex_main:
             if gaps_path.is_file():
                 gaps = cost.load_gaps(gaps_path)
             else:
                 warnings.append(f"pause samples {gaps_path} missing; scenarios computed without pauses")
         claude_requests = cost.load_requests(list(mains), list(sub_dirs))
-        requests = claude_requests + (codex.load_requests(codex_home) if codex_home is not None else ())
+        if arm.codex_main:
+            assert not claude_requests
+            requests = codex.load_requests(codex_home, "main")
+            main_turns = len(requests)
+        else:
+            requests = claude_requests + (codex.load_requests(codex_home) if codex_home is not None else ())
         pauses = cost.sample_pauses(resume_indices, gaps, seed) if resume_indices and gaps else {}
         report = cost.compute_cost(requests, pauses)
         data = {**report.to_dict(), "primary_scenario": cost.PRIMARY_SCENARIO, "seed": seed,
-                "scenarios_note": HYPOTHETICAL_NOTE, "reconciliation": reconcile(record, claude_requests)}
+                "scenarios_note": CODEX_MAIN_NOTE if arm.codex_main else HYPOTHETICAL_NOTE,
+                "reconciliation": {} if arm.codex_main else reconcile(record, claude_requests)}
         transcript_billed = data["scenarios"]["billed"]["total_usd"]
         data["billed_transcript_usd"] = transcript_billed
-        usage = session_model_usage(record)
-        if usage:
-            mu = cost.billed_from_model_usage(report, usage, arms.get_arm(record["arm"]).main_model)
+        if arm.codex_main:
+            data["billed_basis"] = "codex_rollout"
+            reconciliation = data["exec_usage_reconciliation"] = exec_usage_reconciliation(record, requests)
+            if any(v > 0 for v in reconciliation["diff"].values()):
+                warnings.append(f"codex exec reported more usage than the session logs hold ({reconciliation['diff']}); "
+                                "billed cost omits those requests")
+        elif usage := session_model_usage(record):
+            mu = cost.billed_from_model_usage(report, usage, arm.main_model)
             data["scenarios"]["billed"]["total_usd"] = round(mu["total_usd"], 6)
             data["scenarios"]["billed"]["by_model"] = {k: round(v, 6) for k, v in sorted(mu["by_model"].items())}
             data["untranscribed"] = mu["untranscribed"]
@@ -141,10 +179,9 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         ttl, ttl_violations = cache_ttl_report(claude_requests, arms.PROMPT_CACHE_TTL, arms.SUBAGENT_PROMPT_CACHE_TTL)
         behavior["cache_ttl"] = ttl
         behavior["cache_ttl_drop"] = ttl["main"]["mismatched_requests"] > 0
-        arm = arms.get_arm(record["arm"])
         codex_violations: list[dict[str, Any]] = []
         if codex_home is not None:
-            assert arm.codex and arm.subagent_model is not None
+            assert arm.uses_codex
             summary = codex.summarize(codex_home)
             behavior["codex"] = summary
             if summary["unpriced_usage_records"]:
@@ -152,15 +189,20 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                                 "left unpriced")
             if summary["truncated_logs"]:
                 warnings.append(f"Codex session log(s) cut off mid-line, last line ignored: {summary['truncated_logs']}")
-            behavior["subagent_spawn_calls"] = behavior["subagent_spawn_calls"] + codex.spawn_calls(summary)
-            behavior["subagent_spawns"] += summary["calls"]
-            by_type = dict(behavior["subagent_spawns_by_type"])
-            for agent, n in summary["calls_by_agent"].items():
-                by_type[agent] = by_type.get(agent, 0) + n
-            behavior["subagent_spawns_by_type"] = dict(sorted(by_type.items()))
             behavior["compaction_events"] += summary["compaction_events"]
-            codex_violations = codex.validate(codex_home, summary, {n: arm.model_for(n) for n in arm.agents},
-                                              arm.subagent_effort)
+            if arm.codex_main:
+                assert summary["calls"] == 0, "a Codex main agent starts no codex-agent calls"
+                codex_violations = codex.validate_main(summary, codex.read_rollouts(codex_home), arm.main_model,
+                                                       arm.main_effort, record["session_ids"])
+            else:
+                behavior["subagent_spawn_calls"] = behavior["subagent_spawn_calls"] + codex.spawn_calls(summary)
+                behavior["subagent_spawns"] += summary["calls"]
+                by_type = dict(behavior["subagent_spawns_by_type"])
+                for agent, n in summary["calls_by_agent"].items():
+                    by_type[agent] = by_type.get(agent, 0) + n
+                behavior["subagent_spawns_by_type"] = dict(sorted(by_type.items()))
+                codex_violations = codex.validate(codex_home, summary, {n: arm.model_for(n) for n in arm.agents},
+                                                  arm.subagent_effort)
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None or arm.codex else [])
@@ -178,13 +220,15 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
     rounds = record["rounds"]
     billed = ((record.get("cost") or {}).get("scenarios", {}).get(cost.PRIMARY_SCENARIO, {}).get("total_usd"))
     cli = [(r.get("cli") or {}).get("total_cost_usd") for r in rounds]
+    # Without a Claude CLI there is no reported cost, turn count, or API time; a Codex main
+    # agent's turns are its model requests in the session logs.
     record["totals"] = {
         "billed_usd": billed,
         # The CLI figure is cumulative for the session on resumed rounds; stored as reported.
         "cli_reported_by_round_usd": cli,
         "cli_reported_cumulative_usd": next((c for c in reversed(cli) if c is not None), None),
-        "turns": sum((r.get("cli") or {}).get("num_turns") or 0 for r in rounds),
-        "api_time_ms": sum((r.get("cli") or {}).get("duration_api_ms") or 0 for r in rounds),
-        "cli_duration_ms": sum((r.get("cli") or {}).get("duration_ms") or 0 for r in rounds),
+        "turns": main_turns if arm.codex_main else sum((r.get("cli") or {}).get("num_turns") or 0 for r in rounds),
+        "api_time_ms": None if arm.codex_main else sum((r.get("cli") or {}).get("duration_api_ms") or 0 for r in rounds),
+        "cli_duration_ms": None if arm.codex_main else sum((r.get("cli") or {}).get("duration_ms") or 0 for r in rounds),
         "wall_time_s": round(sum(r["wall_time_s"] for r in rounds), 3),
     }

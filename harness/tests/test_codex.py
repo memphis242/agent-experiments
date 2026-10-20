@@ -1,5 +1,6 @@
 import json
 import os
+import stat
 import subprocess
 import sys
 import tempfile
@@ -13,6 +14,7 @@ from pathlib import Path
 from unittest import mock
 
 import _support  # noqa: F401
+import analysis
 import arms
 import codex
 import cost
@@ -381,6 +383,224 @@ class CodexRunWiringTest(unittest.TestCase):
         cfg = run.RunConfig("A21", "task1", 1, None, Path("/t"), Path("/r"), Path("/a"), Path("/k"), Path("/g"),
                             5, 60.0, None, 0, "claude")
         self.assertEqual(run.build_claude_command(cfg, "id", "go", None)[-2:], ["--disallowedTools", "Agent"])
+
+
+# A fake `codex exec` / `codex exec resume` for a Codex main agent: it logs each invocation, writes the
+# session log Codex would, prints the --json events, and leaves done in the repo on a resumed round.
+FAKE_CODEX_MAIN = textwrap.dedent(r"""
+    #!/usr/bin/env python3
+    import json, os, sys
+    from pathlib import Path
+    argv = sys.argv[1:]
+    task = sys.stdin.read()
+    home = Path(os.environ["CODEX_HOME"])
+    resume = argv[1] == "resume"
+    thread = argv[argv.index("-") - 1] if resume else "@THREAD@"
+    with (home / "fake-invocations.jsonl").open("a") as f:
+        f.write(json.dumps({"argv": argv, "task": task, "cwd": os.getcwd(), "env": dict(os.environ)}) + "\n")
+    if "FAIL" in task:
+        print(json.dumps({"type": "thread.started", "thread_id": thread}))
+        print(json.dumps({"type": "error", "message": "You've hit your usage limit."}))
+        print(json.dumps({"type": "turn.failed", "error": {"message": "You've hit your usage limit."}}))
+        sys.exit(1)
+    log = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{thread}.jsonl"
+    log.parent.mkdir(parents=True, exist_ok=True)
+    n = sum(1 for l in log.open() if "token_usage_record" in l) if log.exists() else 0
+    entries = [] if resume else [{"timestamp": "2026-10-19T13:49:16.832Z", "type": "session_meta",
+                                  "payload": {"id": thread}}]
+    entries += [{"timestamp": "2026-10-19T13:49:18.823Z", "type": "turn_context",
+                 "payload": {"model": "gpt-6.1-sol", "effort": "high"}},
+                {"timestamp": "2026-10-19T13:49:22.113Z", "type": "token_usage_record",
+                 "payload": {"response_id": f"resp_{n}", "usage": {
+                     "input_tokens": 1000 * (n + 1), "cached_input_tokens": 500 * n, "cache_write_input_tokens": 0,
+                     "output_tokens": 100, "reasoning_output_tokens": 10, "total_tokens": 1100 * (n + 1)}}}]
+    with log.open("a") as f:
+        f.write("".join(json.dumps(e) + "\n" for e in entries))
+    if resume:
+        Path("done").write_text("x")
+    print(json.dumps({"type": "thread.started", "thread_id": thread}))
+    print(json.dumps({"type": "turn.completed", "usage": {
+        "input_tokens": sum(1000 * (i + 1) for i in range(n + 1)), "cached_input_tokens": sum(500 * i for i in range(n + 1)),
+        "output_tokens": 100 * (n + 1), "reasoning_output_tokens": 10 * (n + 1)}}))
+    Path(argv[argv.index("-o") + 1]).write_text("final for " + task.strip()[:20])
+    """).lstrip().replace("@THREAD@", THREAD)
+
+FAKE_PACK = textwrap.dedent("""\
+    #!/usr/bin/env bash
+    if [ -f "$1/done" ]; then
+      echo '{"passed": true, "checks": [{"id": "done-file", "passed": true, "feedback": "", "detail": ""}]}' > "$2"; exit 0
+    fi
+    echo '{"passed": false, "checks": [{"id": "done-file", "passed": false, "feedback": "The work is incomplete.", "detail": "no file"}]}' > "$2"; exit 1
+    """)
+
+MAIN_MODEL, MAIN_EFFORT = "gpt-6.1-sol", "high"
+
+
+class CodexMainTest(unittest.TestCase):
+    def write_log(self, home, lines):
+        path = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{THREAD}.jsonl"
+        path.parent.mkdir(parents=True)
+        path.write_text("".join(json.dumps(l) + "\n" for l in lines))
+        return path
+
+    def test_initial_and_resume_command_lines(self):
+        last, repo = Path("/run/codex-main-round1.last.txt"), Path("/run/repo")
+        first = codex.main_command("/bin/codex", MAIN_MODEL, MAIN_EFFORT, "Run ID: ab12", last, repo, None)
+        self.assertEqual(first, ["/bin/codex", "exec", "--json", "--strict-config", "-C", "/run/repo",
+                                 "-o", str(last), "-c", 'model="gpt-6.1-sol"', "-c", 'model_reasoning_effort="high"',
+                                 "-c", 'developer_instructions="Run ID: ab12"', "-"])
+        resumed = codex.main_command("/bin/codex", MAIN_MODEL, MAIN_EFFORT, "Run ID: ab12", last, repo, THREAD)
+        self.assertEqual(resumed[:5], ["/bin/codex", "exec", "resume", "--json", "--strict-config"])
+        self.assertNotIn("-C", resumed)  # resume runs in the caller's working directory
+        self.assertEqual(resumed[-2:], [THREAD, "-"])
+        self.assertEqual(run.codex_developer_instructions("ab12"), "Run ID: ab12")
+
+    def test_event_stream_becomes_a_round_record(self):
+        events = "\n".join(json.dumps(e) for e in [
+            {"type": "thread.started", "thread_id": THREAD}, {"type": "turn.started"},
+            {"type": "error", "message": "model metadata not found"},  # a warning, not a failure
+            {"type": "turn.completed", "usage": {"input_tokens": 100, "cached_input_tokens": 40,
+                                                 "output_tokens": 7, "reasoning_output_tokens": 3}}]) + "\nnot json\n"
+        with tempfile.TemporaryDirectory() as tmp:
+            last = Path(tmp) / "last.txt"
+            last.write_text("all done")
+            result = codex.main_round_result(events, "", 0, last)
+            self.assertEqual((result["session_id"], result["is_error"], result["result"], result["_exit_code"]),
+                             (THREAD, False, "all done", 0))
+            self.assertEqual(result["usage"]["cached_input_tokens"], 40)
+            self.assertEqual((result["turns_completed"], result["errors"]), (1, ["model metadata not found"]))
+            limited = codex.main_round_result(
+                '{"type": "thread.started", "thread_id": "t"}\n'
+                '{"type": "turn.failed", "error": {"message": "You\'ve hit your usage limit."}}\n', "", 1, last)
+            self.assertTrue(limited["is_error"] and limited["_usage_limit"])
+            self.assertIn("usage limit", limited["result"])
+            other = codex.main_round_result('{"type": "thread.started", "thread_id": "t"}\n', "boom", 2, last)
+            self.assertTrue(other["is_error"] and not other["_usage_limit"])
+            self.assertEqual(other["result"], "boom")
+            self.assertIsNone(codex.main_round_result("", "no network", 1, last)["session_id"])
+
+    def test_cost_and_analysis_from_a_main_session_log(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.write_log(home, rollout_lines())
+            requests = codex.load_requests(home, "main")
+            self.assertEqual([(r.source, r.main_index) for r in requests], [("main", 0), ("main", 1)])
+            record = {"arm": "A26", "session_ids": [THREAD], "resume_request_indices": [1], "rounds": [
+                {"round": 1, "started_epoch": 1.0, "wall_time_s": 60.0, "codex_cli": {
+                    "session_id": THREAD, "usage": {"input_tokens": 307_452, "cached_input_tokens": 7296,
+                                                    "output_tokens": 124, "reasoning_output_tokens": 6}}}]}
+            analysis.update_record(record, [], [], [1], Path("/missing"), 0, {}, home)
+            self.assertIsNone(record["analysis_error"])
+            billed = record["cost"]["scenarios"]["billed"]
+            self.assertEqual(set(billed["by_model"]), {"gpt-6.1-sol"})
+            self.assertEqual(billed["by_source"]["subagent"], 0.0)
+            self.assertAlmostEqual(billed["by_source"]["main"], billed["total_usd"])
+            self.assertAlmostEqual(billed["total_usd"], (7452 * 2.00 + 110 * 10.00) / 1e6
+                                   + (292_704 * 4.00 + 7296 * 0.20 + 14 * 15.00) / 1e6, places=6)
+            self.assertEqual(record["cost"]["billed_basis"], "codex_rollout")
+            self.assertEqual(record["cost"]["exec_usage_reconciliation"]["diff"],
+                             {"input_tokens": 0, "cached_input_tokens": 0, "output_tokens": 0})
+            self.assertEqual(record["behavior"]["max_context_main"], 300_000)
+            self.assertIsNone(record["behavior"]["max_context_subagent"])
+            self.assertEqual(record["totals"]["turns"], 2)
+            self.assertEqual(record["totals"]["billed_usd"], billed["total_usd"])
+            self.assertTrue(record["validation"]["ok"], record["validation"])
+
+    def test_validation_flags_a_wrong_model_a_forbidden_tool_and_a_foreign_session(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            self.write_log(home, rollout_lines(model="gpt-6-luna", effort="low")
+                           + [{"type": "response_item", "payload": {"type": "function_call", "name": "spawn_agent"}}])
+            kinds = sorted(v["kind"] for v in codex.validate_main(
+                codex.summarize(home), codex.read_rollouts(home), MAIN_MODEL, MAIN_EFFORT, ["another-thread"]))
+            self.assertEqual(kinds, ["codex_session_log_missing", "codex_unexpected_session", "effort",
+                                     "forbidden_tool", "model"])
+
+    def test_session_logs_are_leak_scanned_and_compactions_counted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            path = self.write_log(home, rollout_lines() + [{"type": "compacted", "payload": {}}])
+            self.assertEqual(codex.leak_scan_files(home), [path])
+            self.assertEqual(codex.summarize(home)["compaction_events"], 1)
+
+    def make_world(self, root, prompt):
+        template = root / "template"
+        template.mkdir()
+        subprocess.run(["git", "init", "-q", str(template)], check=True)
+        (template / "README").write_text("x")
+        subprocess.run(["git", "-C", str(template), "add", "."], check=True)
+        subprocess.run(["git", "-C", str(template), "-c", "user.name=t", "-c", "user.email=t@t",
+                        "commit", "-qm", "init"], check=True)
+        tasks = root / "tasks" / "t1"
+        (tasks / "acceptance").mkdir(parents=True)
+        (tasks / "spec.md").write_text("spec")
+        (tasks / "prompt.md").write_text(prompt)
+        (tasks / "acceptance" / "run.sh").write_text(FAKE_PACK)
+        fake = root / "fake-codex"
+        fake.write_text(FAKE_CODEX_MAIN)
+        fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
+        arms.generate_arm("A26", root / "arms")
+
+        def fake_prepare(run_dir, codex_config, repo, base_env):
+            self.assertEqual({p.name for p in codex_config.parent.iterdir()}, {"codex"})  # no Claude configuration
+            codex.home_for(run_dir).mkdir()
+            return {"codex_bin": str(fake), "codex_version": "fake"}
+
+        patcher = mock.patch.object(codex, "prepare_home", fake_prepare)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return ["--arm", "A26", "--task", "t1", "--rep", "1", "--template", str(template),
+                "--runs-dir", str(root / "runs"), "--arms-dir", str(root / "arms"),
+                "--tasks-dir", str(root / "tasks"), "--gaps", str(root / "missing.json"), "--no-netns"]
+
+    def invocations(self, run_dir):
+        lines = (codex.home_for(run_dir) / "fake-invocations.jsonl").read_text().splitlines()
+        return [json.loads(l) for l in lines]
+
+    def test_fake_codex_main_loop(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):
+            os.environ.pop(run.TOKEN_ENV, None)  # a Codex main agent needs no Claude token
+            root = Path(tmp)
+            self.assertEqual(run.main(self.make_world(root, "Do the task.")), 0)
+            (run_dir,) = [p for p in (root / "runs").iterdir() if p.is_dir()]
+            rec = json.loads((run_dir / "run.json").read_text())
+            self.assertEqual((rec["status"], rec["passed"], rec["rounds_used"]), ("completed", True, 2))
+            self.assertEqual((rec["main_harness"], rec["session_ids"], rec["resume_request_indices"]),
+                             ("codex", [THREAD], [1]))
+            self.assertEqual(rec["settings"]["model"], MAIN_MODEL)
+            self.assertEqual([r["codex_cli"]["session_id"] for r in rec["rounds"]], [THREAD, THREAD])
+            self.assertNotIn("cli", rec["rounds"][0])
+            self.assertIn("The work is incomplete.", rec["rounds"][1]["message"])
+            first, second = self.invocations(run_dir)
+            self.assertEqual((first["task"], first["argv"][:2]), ("Do the task.", ["exec", "--json"]))
+            self.assertEqual(second["argv"][:2], ["exec", "resume"])
+            self.assertEqual(second["argv"][-2:], [THREAD, "-"])
+            self.assertIn("The work is incomplete.", second["task"])
+            self.assertEqual(second["cwd"], str((run_dir / "repo").resolve()))
+            self.assertEqual(second["env"]["CODEX_HOME"], str(codex.home_for(run_dir)))
+            self.assertFalse([k for k in second["env"] if k.startswith(("CLAUDE", "ANTHROPIC"))])
+            self.assertIn(f"Run ID: {rec['run_id']}", json.dumps(second["argv"]))
+            self.assertTrue((run_dir / "codex-main-round2.events.jsonl").is_file())
+            self.assertEqual((run_dir / "codex-main-round1.last.txt").read_text(), "final for Do the task.")
+            self.assertIsNone(rec["analysis_error"])
+            billed = rec["cost"]["scenarios"]["billed"]
+            self.assertEqual((set(billed["by_model"]), {k for k, v in billed["by_source"].items() if v}),
+                             ({MAIN_MODEL}, {"main"}))
+            self.assertEqual((rec["totals"]["turns"], rec["behavior"]["max_context_main"]), (2, 2000))
+            self.assertEqual(rec["cost"]["exec_usage_reconciliation"]["diff"]["input_tokens"], 0)
+            self.assertTrue(rec["validation"]["ok"], rec["validation"])
+            self.assertFalse((run_dir / "transcripts").exists())
+
+    def test_codex_usage_limit_is_a_usage_limit_run(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):
+            os.environ.pop(run.TOKEN_ENV, None)
+            root = Path(tmp)
+            self.assertEqual(run.main(self.make_world(root, "FAIL right away")), run.EXIT_USAGE_LIMIT)
+            (run_dir,) = [p for p in (root / "runs").iterdir() if p.is_dir()]
+            rec = json.loads((run_dir / "run.json").read_text())
+            self.assertEqual(rec["status"], "usage_limit")
+            self.assertIn("usage limit", rec["error"])
+            self.assertEqual(rec["rounds_used"], 1)
 
 
 if __name__ == "__main__":

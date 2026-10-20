@@ -43,15 +43,16 @@ def reanalyze_run(run_dir: Path, gaps_path: Path) -> tuple[float | None, float |
                 if key in result:
                     entry["cli"][key] = result[key]
     transcripts = run_dir / "transcripts"
-    mains = sorted(transcripts.glob("*.jsonl"))
-    if not mains:
+    codex_main = record.get("main_harness") == "codex"
+    mains = [] if codex_main else sorted(transcripts.glob("*.jsonl"))
+    if not mains and not codex_main:
         raise transcript.TranscriptError(f"no archived transcripts in {transcripts}")
     # Archived order follows the session order recorded in run.json.
     order = {sid: i for i, sid in enumerate(record.get("session_ids", []))}
     mains.sort(key=lambda p: order.get(p.stem, len(order)))
     sub_dirs = [transcripts / m.stem / "subagents" for m in mains]
     definition_models = (record.get("behavior") or {}).get("agent_definition_models", {})
-    codex_home = codex.home_for(run_dir) if record.get("subagent_harness") == "codex" else None
+    codex_home = (codex.home_for(run_dir) if codex_main or record.get("subagent_harness") == "codex" else None)
     analysis.update_record(record, mains, sub_dirs, record.get("resume_request_indices", []),
                            gaps_path, (record.get("cost") or {}).get("seed", 0), definition_models, codex_home)
     record["reanalyzed_with"] = run.harness_git()[0]

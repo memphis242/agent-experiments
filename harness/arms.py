@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Generate the per-arm Claude Code configuration roots.
+"""Generate the per-arm configuration roots.
 
-Each arm root is used as CLAUDE_CONFIG_DIR and holds only that arm's
-settings.json, CLAUDE.md, and either agents/ (Claude Code subagents) or codex/
-(headless Codex subagents started through the codex-agent command). Templates
-live under harness/arms/templates/ so they can be reviewed as plain files.
+An arm whose main agent is Claude Code uses its root as CLAUDE_CONFIG_DIR; it holds
+only that arm's settings.json, CLAUDE.md, and either agents/ (Claude Code subagents)
+or codex/ (headless Codex subagents started through the codex-agent command). An arm
+whose main agent is a headless Codex session (solo, no subagents) holds only codex/:
+the Codex configuration and the working agreement as AGENTS.md. Templates live under
+harness/arms/templates/ so they can be reviewed as plain files.
 """
 from __future__ import annotations
 
@@ -34,10 +36,11 @@ GPT_56_SOL = "gpt-5.6-sol"
 GPT_56_LUNA = "gpt-5.6-luna"
 
 KNOWN_MODELS: frozenset[str] = frozenset({OPUS_55, SONNET_55, SONNET_5, SONNET_46, HAIKU_55})
-# Models a headless Codex subagent may run on, with their display names.
+# Models a headless Codex session (subagent or main agent) may run on, with their display names.
 CODEX_MODELS: Mapping[str, str] = MappingProxyType({GPT_61_SOL: "GPT-6.1 Sol", GPT_6_LUNA: "GPT-6 Luna",
                                                      GPT_56_SOL: "GPT-5.6 Sol", GPT_56_LUNA: "GPT-5.6 Luna"})
 SUBAGENT_HARNESSES: tuple[str, ...] = ("claude", "codex")
+MAIN_HARNESSES: tuple[str, ...] = ("claude", "codex")
 EFFORT_LEVELS: frozenset[str] = frozenset({"low", "medium", "high", "xhigh", "max"})
 
 SUBAGENT_NAMES: tuple[str, ...] = ("explorer", "implementer", "tester", "debugger", "reviewer")
@@ -80,11 +83,19 @@ class ArmSpec:
     # "claude": Claude Code subagents through the Agent tool; "codex": headless
     # Codex sessions started with the codex-agent command, the Agent tool denied.
     subagent_harness: str = "claude"
+    # "claude": the main agent is Claude Code (main_model a Claude model); "codex": a
+    # headless Codex session (main_model a Codex model), solo and without subagents.
+    main_harness: str = "claude"
 
     def __post_init__(self) -> None:
         assert (self.subagent_model is None) == (self.delegation is None)
         assert self.delegation in (None, "eager", "conservative", "roles", "roles-debugger", "tiered")
-        assert self.main_model in KNOWN_MODELS
+        assert self.main_harness in MAIN_HARNESSES
+        if self.main_harness == "codex":
+            assert self.main_model in CODEX_MODELS
+            assert self.subagent_model is None and self.subagent_harness == "claude" and not self.agent_models
+        else:
+            assert self.main_model in KNOWN_MODELS
         assert self.subagent_harness in SUBAGENT_HARNESSES
         if self.subagent_harness == "codex":
             assert self.subagent_model in CODEX_MODELS
@@ -121,6 +132,16 @@ class ArmSpec:
     def codex(self) -> bool:
         """Whether subagents are headless Codex sessions rather than Claude Code subagents."""
         return self.subagent_harness == "codex"
+
+    @property
+    def codex_main(self) -> bool:
+        """Whether the main agent is a headless Codex session rather than Claude Code."""
+        return self.main_harness == "codex"
+
+    @property
+    def uses_codex(self) -> bool:
+        """Whether any agent of this arm is a headless Codex session."""
+        return self.codex or self.codex_main
 
     @property
     def claude_subagent_models(self) -> frozenset[str]:
@@ -171,6 +192,10 @@ ARMS: Mapping[str, ArmSpec] = MappingProxyType({
         ArmSpec("A24", GPT_6_LUNA, "tiered", main_effort="low", agents=TIERED_AGENTS, subagent_harness="codex"),
         ArmSpec("A25", GPT_56_SOL, "tiered", main_effort="low", agents=TIERED_AGENTS,
                 agent_models=CODEX_56_TIERED_MODELS, subagent_harness="codex"),
+        ArmSpec("A26", None, None, main_model=GPT_61_SOL, main_harness="codex"),
+        ArmSpec("A27", None, None, main_model=GPT_6_LUNA, main_harness="codex"),
+        ArmSpec("A28", None, None, main_model=GPT_56_SOL, main_harness="codex"),
+        ArmSpec("A29", None, None, main_model=GPT_56_LUNA, main_harness="codex"),
     )
 })
 
@@ -195,7 +220,8 @@ def _read_template(relative: str) -> str:
 
 
 def build_settings(arm: ArmSpec) -> dict[str, object]:
-    """The settings.json content for an arm."""
+    """The settings.json content for an arm whose main agent is Claude Code."""
+    assert not arm.codex_main
     model_settings = {model: {"effortLevel": effort} for model, effort in effort_map(arm).items()}
     settings: dict[str, object] = {
         "model": arm.main_model,
@@ -237,6 +263,7 @@ def working_agreement() -> str:
 def build_claude_md(arm: ArmSpec) -> str:
     """CLAUDE.md text: the base text plus the arm's delegation paragraph and, for a Codex
     arm, the section on starting subagents with codex-agent."""
+    assert not arm.codex_main
     base = _read_template("CLAUDE.base.md")
     assert "{{DELEGATION}}" in base
     if arm.delegation is None:
@@ -286,15 +313,28 @@ def build_codex_section(arm: ArmSpec) -> str:
     return text
 
 
+def _codex_config(model: str, effort: str) -> str:
+    """The config.toml of a Codex session running `model` at `effort`."""
+    assert model in CODEX_MODELS and effort in EFFORT_LEVELS
+    config = _read_template("codex/config.toml").replace("{{MODEL}}", model).replace("{{EFFORT}}", effort)
+    assert "{{" not in config
+    return config
+
+
+def build_codex_main_files(arm: ArmSpec) -> dict[str, str]:
+    """Map of path under codex/ to content for an arm whose main agent is Codex: config.toml
+    and AGENTS.md, which holds the same working agreement a Claude solo arm's CLAUDE.md does."""
+    assert arm.codex_main
+    return {"config.toml": _codex_config(arm.main_model, arm.main_effort), "AGENTS.md": working_agreement()}
+
+
 def build_codex_files(arm: ArmSpec) -> dict[str, str]:
     """Map of path under codex/ to content for a Codex arm: config.toml, AGENTS.md (the
     working agreement every Codex subagent follows), agent.json (the codex-agent launcher's
     roster), and roles/<name>.md (each agent's Claude Code definition body, used as
     Codex developer instructions). The launcher itself is copied by generate_arm."""
     assert arm.codex and arm.subagent_model is not None
-    config = (_read_template("codex/config.toml").replace("{{MODEL}}", arm.subagent_model)
-              .replace("{{EFFORT}}", arm.subagent_effort))
-    assert "{{" not in config
+    config = _codex_config(arm.subagent_model, arm.subagent_effort)
     roster = {name: {"read_only": codex_role_read_only(name), "model": arm.model_for(name),
                      "effort": arm.subagent_effort} for name in arm.agents}
     files = {"config.toml": config, "AGENTS.md": working_agreement(),
@@ -326,8 +366,9 @@ def generate_arm(arm_id: str, base_dir: Path = DEFAULT_ARMS_DIR) -> Path:
     arm = get_arm(arm_id)
     root = arm_root(arm_id, base_dir)
     root.mkdir(parents=True, exist_ok=True)
-    (root / "settings.json").write_text(json.dumps(build_settings(arm), indent=2) + "\n", encoding="utf-8")
-    (root / "CLAUDE.md").write_text(build_claude_md(arm), encoding="utf-8")
+    if not arm.codex_main:
+        (root / "settings.json").write_text(json.dumps(build_settings(arm), indent=2) + "\n", encoding="utf-8")
+        (root / "CLAUDE.md").write_text(build_claude_md(arm), encoding="utf-8")
     agents_dir = root / "agents"
     if agents_dir.exists():
         shutil.rmtree(agents_dir)
@@ -348,6 +389,11 @@ def generate_arm(arm_id: str, base_dir: Path = DEFAULT_ARMS_DIR) -> Path:
         launcher.parent.mkdir(parents=True)
         shutil.copyfile(CODEX_AGENT_SCRIPT, launcher)
         launcher.chmod(launcher.stat().st_mode | stat.S_IXUSR | stat.S_IXGRP | stat.S_IXOTH)
+    elif arm.codex_main:
+        for relative, text in build_codex_main_files(arm).items():
+            target = codex_dir / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(text, encoding="utf-8")
     return root
 
 

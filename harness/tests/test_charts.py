@@ -47,6 +47,8 @@ class FamilyTest(unittest.TestCase):
             "Sonnet 5 subagents, conservative": "Sonnet 5",
             "Sonnet 4.6 subagents, eager": "Sonnet 4.6",
             "Haiku 5.5 subagents, eager": "Haiku 5.5",
+            "Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager": "Codex",
+            "solo Codex GPT-6.1 Sol, high effort": "Solo Codex",
             "A12": "Other",
         }
         for description, family in cases.items():
@@ -68,9 +70,16 @@ class LabelTest(unittest.TestCase):
             "A10": "solo Sonnet 5.5, xhigh",
             "A13": "solo Opus 5.5, medium",
             "A14": "Opus 5.5 low main, Sonnet 5.5 high + Haiku 5.5 high, tiered",
+            "A26": "solo Codex GPT-6.1 Sol, high",
         }
         for arm, label in cases.items():
             self.assertEqual(charts.chart_label(arm, aggregate.ARM_DESCRIPTIONS[arm]), label, arm)
+
+    def test_solo_codex_has_its_own_colour(self):
+        solo = {charts.family_style(aggregate.ARM_DESCRIPTIONS[arm]) for arm in ("A26", "A27", "A28", "A29")}
+        self.assertEqual(len(solo), 1)
+        (_, color), = solo
+        self.assertEqual([fam for _, fam, c in charts.FAMILIES if c == color], ["Solo Codex"])
 
     def test_unknown_arm_keeps_description(self):
         self.assertEqual(charts.chart_label("A99", "something"), "something")
