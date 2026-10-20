@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="1048.0" viewBox="0 0 1130 1048.0" role="img" aria-label="Task 3: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1130" height="1092.0" viewBox="0 0 1130 1092.0" role="img" aria-label="Task 3: wall time per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 3: wall time per run</title>
-<rect x="8" y="8" width="1114" height="1032.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1114" height="1076.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 3: wall time per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">117 runs across 19 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
-<circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
-<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
-<circle cx="117.4" cy="96.0" r="5" fill="#10b981"/>
-<text x="128.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">127 runs across 20 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<circle cx="41.0" cy="96.0" r="5" fill="#10b981"/>
+<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol</text>
+<circle cx="187.8" cy="96.0" r="5" fill="#fbbf24"/>
+<text x="198.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="264.2" cy="96.0" r="5" fill="#a78bfa"/>
 <text x="275.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5</text>
 <circle cx="353.4" cy="96.0" r="5" fill="#60a5fa"/>
@@ -36,19 +36,19 @@
 <rect x="28" y="760.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="848.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="936.0" width="1074.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="144.0" x2="456.0" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
-<line x1="559.6" y1="144.0" x2="559.6" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="559.6" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
-<line x1="663.2" y1="144.0" x2="663.2" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="663.2" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">40 min</text>
-<line x1="766.8" y1="144.0" x2="766.8" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="766.8" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">60 min</text>
-<line x1="870.4" y1="144.0" x2="870.4" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="870.4" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">80 min</text>
-<line x1="974.0" y1="144.0" x2="974.0" y2="980.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="1000.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">100 min</text>
-<line x1="456.0" y1="980.0" x2="974.0" y2="980.0" stroke="#484f58" stroke-width="1"/>
+<line x1="456.0" y1="144.0" x2="456.0" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
+<line x1="559.6" y1="144.0" x2="559.6" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="559.6" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">20 min</text>
+<line x1="663.2" y1="144.0" x2="663.2" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="663.2" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">40 min</text>
+<line x1="766.8" y1="144.0" x2="766.8" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="766.8" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">60 min</text>
+<line x1="870.4" y1="144.0" x2="870.4" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="870.4" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">80 min</text>
+<line x1="974.0" y1="144.0" x2="974.0" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">100 min</text>
+<line x1="456.0" y1="1024.0" x2="974.0" y2="1024.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="163.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="163.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="177.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=6</text>
@@ -280,4 +280,20 @@
 <circle cx="590.5" cy="958.0" r="4.6" fill="#83dbbd" fill-opacity="0.92"/>
 <line x1="555.0" y1="947.0" x2="555.0" y2="969.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
 <text x="606.5" y="962.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">15.0 to 26.0</text>
+<text x="36.0" y="999.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A23</text>
+<text x="78.0" y="999.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered</text>
+<text x="78.0" y="1013.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="514.5" y="994.0" width="101.8" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="522.5" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="540.2" cy="997.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="542.7" cy="1006.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="551.4" cy="995.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="551.5" cy="1009.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="552.8" cy="999.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="567.3" cy="1004.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="580.4" cy="996.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="587.7" cy="1007.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="608.4" cy="1002.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="552.1" y1="991.0" x2="552.1" y2="1013.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="624.4" y="1006.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">12.8 to 29.4</text>
 </svg>

@@ -1,6 +1,6 @@
-# Task 3 results (housekeeping staleness detection), 117 runs, 2026-10-20
+# Task 3 results (housekeeping staleness detection), 127 runs, 2026-10-20
 
-All 117 valid runs passed acceptance. Billed cost includes compaction requests
+All 127 valid runs passed acceptance. Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the repetitions (five per arm so
 far for A1 to A15, ten for A16 and A17); spend per pass is total spend over all attempts
 divided by passes. Nineteen attempts from the first wave were cut off by the subscription
@@ -47,11 +47,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3* | 0 | 498.3 to 856.0 | - |
 | A21 | Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager | task3 | 10/10 | 5.41 | 4.65 to 6.57 | 1.92 | 17.0 to 30.3 | 5 to 31 | 2 to 8 | 1 | 0 | 148.6 to 198.1 | 99.6 to 112.5 |
 | A22 | Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger | task3 | 10/10 | 6.56 | 5.04 to 7.28 | 2.24 | 15.0 to 26.0 | 11 to 99 | 1 to 2 | 1 | 0 | 188.2 to 260.6 | 80.2 to 114.8 |
+| A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task3 | 10/10 | 1.92 | 1.34 to 2.53 | 1.19 | 12.8 to 29.4 | 2 to 34 | 1 to 3 | 1 | 0 to 1 | 38.1 to 94.9 | 110.1 to 245.3 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.37, A11 0.39, A14 0.41, A12
-0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A10 0.85, A13 0.87, A9 0.88,
-A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with asterisked runs not rerun (A6, A8,
-A15, A17) carry rounds lost to the pack defect or the wait ceiling.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A23 0.23, A16 0.37, A11 0.39, A14
+0.41, A12 0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A10 0.85, A13
+0.87, A9 0.88, A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with asterisked runs not
+rerun (A6, A8, A15, A17) carry rounds lost to the pack defect or the wait ceiling.
 
 Notes:
 
@@ -142,6 +143,13 @@ Notes:
   Opus main agent, whose context peaked at 188K to 261K against A21's 149K to 198K. A22 had
   the shortest single run on Task 3, 15 minutes (15 to 26 overall). Codex subagent contexts peaked at 80K to
   115K tokens.
+- A23 (added 2026-10-20) is the Codex counterpart of A14: Opus 5.5 at low effort
+  directing headless Codex subagents, the implementer on GPT-6.1 Sol and the small
+  implementer and tester on GPT-6 Luna, all at high effort, with A14's tiered delegation
+  text. It ran ten repetitions on four slots and passed all ten in one round at 1.92 USD
+  per pass, 0.23 of A1 and the cheapest arm on the task, against A14's 0.41 (3.47 USD);
+  Codex is 1.04 per run (54 percent). Its Opus main context peaked at 38K to 95K tokens
+  and its runs took 13 to 29 minutes.
 - A16 and A17 both qualify for Task 4 under the task gate: no run failed and none reached
   the final round.
 - \* Round counts and spend of these arms include runs that lost rounds to a defect outside

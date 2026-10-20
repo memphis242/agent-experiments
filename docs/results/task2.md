@@ -1,8 +1,8 @@
-# Task 2 results (SAMPLE_APP status command), 194 runs, 2026-10-19 (preliminary: A19 in progress)
+# Task 2 results (SAMPLE_APP status command), 204 runs, 2026-10-19 (preliminary: A19 in progress)
 
-All 194 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
+All 204 completed runs passed acceptance (10 repetitions per arm, except A19, which has 4 so far; for A1 to A9 the first three
 were run on three parallel slots and the remaining seven on six; A10 to A15 were added
-later and run on six or seven, A16 and A17 on up to nine, A19 on six, the Codex arms A21 and A22 on three). Billed cost includes compaction
+later and run on six or seven, A16 and A17 on up to nine, A19 on six, the Codex arms A21 and A22 on three, A23 on four). Billed cost includes compaction
 requests (none occurred). Ranges are min to max over the ten repetitions; spend per
 pass is total spend over all attempts divided by passes.
 
@@ -38,10 +38,12 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A19 | solo Sonnet 5, high effort | task2 | 4/4† | 6.52 | 5.61 to 7.36 | 1.75 | 15.9 to 27.8 | 135 to 185 | 0 | 1 | 0 | 248.8 to 294.0 | - |
 | A21 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager | task2 | 10/10 | 2.80 | 2.19 to 3.32 | 1.13 | 11.0 to 16.5 | 3 to 44 | 3 to 4 | 1 | 0 | 76.7 to 132.1 | 67.7 to 103.5 |
 | A22 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger | task2 | 10/10 | 3.15 | 2.57 to 3.80 | 1.22 | 9.4 to 12.6 | 10 to 56 | 0 to 1 | 1 | 0 | 137.2 to 171.8 | 57.4 to 82.7 |
+| A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task2 | 10/10 | 1.22 | 1.00 to 1.52 | 0.53 | 7.4 to 13.8 | 6 to 19 | 1 to 2 | 1 | 0 | 32.4 to 59.9 | 70.3 to 127.6 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.32, A11 0.33, A12 0.35, A14
-0.37, A15 0.55, A17 0.57, A21 0.71, A13 0.74, A10 0.79, A22 0.80, A4 0.83, A3 0.93, A7
-0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.71. A19 (4 of 10 runs so far) is not ranked; it would be 1.65.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A23 0.31, A16 0.32, A11 0.33, A12
+0.35, A14 0.37, A15 0.55, A17 0.57, A21 0.71, A13 0.74, A10 0.79, A22 0.80, A4 0.83, A3
+0.93, A7 0.93, A5 0.95, A9 0.96, A2 1.28, A8 1.41, A6 1.71. A19 (4 of 10 runs so far) is not
+ranked; it would be 1.65.
 
 Notes:
 
@@ -121,6 +123,13 @@ Notes:
   at 137K to 172K, close to the solo arms. The four Codex pilot runs, made on the
   delegation text before it forbade polling a background subagent, are excluded (see
   `superseded.json` and the rerun ledger).
+- A23 (added 2026-10-20) is the Codex counterpart of A14: Opus 5.5 at low effort
+  directing headless Codex subagents, the implementer on GPT-6.1 Sol and the small
+  implementer and tester on GPT-6 Luna, all at high effort, with A14's tiered delegation
+  text. It is the cheapest arm on the task: all ten runs passed in one round at 1.22 USD
+  per pass, 0.31 of A1 against A14's 0.37, of which Codex is 0.58 per run (48 percent).
+  Its Opus main context peaked at 32K to 60K tokens. Twelve of its fourteen Codex calls
+  went to the Sol implementer.
 - A2 rep 7 and A6 rep 2 originally lost a background subagent to the CLI's ten-minute
   print-mode wait ceiling. Both were rerun with the raised ceiling and the originals are
   excluded (`superseded.json`); A2's spend per pass is unchanged at 1.28 of A1 and A6's

@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="1510" height="1092.0" viewBox="0 0 1510 1092.0" role="img" aria-label="Task 2: billed cost per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
+<svg xmlns="http://www.w3.org/2000/svg" width="1510" height="1136.0" viewBox="0 0 1510 1136.0" role="img" aria-label="Task 2: billed cost per run" font-family='-apple-system, &quot;Segoe UI&quot;, Inter, Roboto, &quot;Helvetica Neue&quot;, Arial, sans-serif'>
 <title>Task 2: billed cost per run</title>
-<rect x="8" y="8" width="1494" height="1076.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
+<rect x="8" y="8" width="1494" height="1120.0" rx="14" fill="#0d1117" stroke="#30363d" stroke-width="1"/>
 <text x="36.0" y="48.0" font-size="20" font-weight="700" fill="#e6edf3" text-anchor="start">Task 2: billed cost per run</text>
-<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">194 runs across 20 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
-<circle cx="41.0" cy="96.0" r="5" fill="#fbbf24"/>
-<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
-<circle cx="117.4" cy="96.0" r="5" fill="#10b981"/>
-<text x="128.4" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol</text>
+<text x="36.0" y="70.0" font-size="13" font-weight="400" fill="#9da7b3" text-anchor="start">204 runs across 21 arms; bar = min to max, dot = one run, tick = median, light tint = conservative</text>
+<circle cx="41.0" cy="96.0" r="5" fill="#10b981"/>
+<text x="52.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol</text>
+<circle cx="187.8" cy="96.0" r="5" fill="#fbbf24"/>
+<text x="198.8" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Tiered</text>
 <circle cx="264.2" cy="96.0" r="5" fill="#a78bfa"/>
 <text x="275.2" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5</text>
 <circle cx="353.4" cy="96.0" r="5" fill="#60a5fa"/>
@@ -39,21 +39,22 @@
 <rect x="28" y="760.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="848.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="936.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
-<line x1="456.0" y1="144.0" x2="456.0" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="456.0" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$0</text>
-<line x1="542.3" y1="144.0" x2="542.3" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="542.3" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$2</text>
-<line x1="628.7" y1="144.0" x2="628.7" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="628.7" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$4</text>
-<line x1="715.0" y1="144.0" x2="715.0" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="715.0" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$6</text>
-<line x1="801.3" y1="144.0" x2="801.3" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="801.3" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$8</text>
-<line x1="887.7" y1="144.0" x2="887.7" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="887.7" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$10</text>
-<line x1="974.0" y1="144.0" x2="974.0" y2="1024.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
-<text x="974.0" y="1044.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$12</text>
-<line x1="456.0" y1="1024.0" x2="974.0" y2="1024.0" stroke="#484f58" stroke-width="1"/>
+<rect x="28" y="1024.0" width="1454.0" height="44" rx="6" fill="#161b22"/>
+<line x1="456.0" y1="144.0" x2="456.0" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="456.0" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$0</text>
+<line x1="542.3" y1="144.0" x2="542.3" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="542.3" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$2</text>
+<line x1="628.7" y1="144.0" x2="628.7" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="628.7" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$4</text>
+<line x1="715.0" y1="144.0" x2="715.0" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="715.0" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$6</text>
+<line x1="801.3" y1="144.0" x2="801.3" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="801.3" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$8</text>
+<line x1="887.7" y1="144.0" x2="887.7" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="887.7" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$10</text>
+<line x1="974.0" y1="144.0" x2="974.0" y2="1068.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
+<text x="974.0" y="1088.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">$12</text>
+<line x1="456.0" y1="1068.0" x2="974.0" y2="1068.0" stroke="#484f58" stroke-width="1"/>
 <text x="36.0" y="163.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A1</text>
 <text x="78.0" y="163.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Opus 5.5, high</text>
 <text x="78.0" y="177.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
@@ -468,4 +469,25 @@
 <text x="1236.0" y="1006.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 6.9M</text>
 <text x="1324.0" y="1006.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 172K</text>
 <text x="1390.0" y="1006.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx 83K</text>
+<text x="36.0" y="1043.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A23</text>
+<text x="78.0" y="1043.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered</text>
+<text x="78.0" y="1057.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
+<rect x="491.1" y="1038.0" width="38.7" height="16" rx="8.0" fill="#10b981" fill-opacity="0.34"/>
+<circle cx="499.1" cy="1046.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="503.7" cy="1041.8" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="505.8" cy="1050.2" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="506.5" cy="1039.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="506.8" cy="1053.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="506.9" cy="1043.9" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="508.8" cy="1048.1" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="509.5" cy="1040.4" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="515.9" cy="1051.6" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<circle cx="521.8" cy="1046.0" r="4.6" fill="#10b981" fill-opacity="0.92"/>
+<line x1="506.9" y1="1035.0" x2="506.9" y2="1057.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="537.8" y="1050.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">1.00 to 1.52</text>
+<text x="1108.0" y="1050.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>in 166K</text>
+<text x="1170.0" y="1050.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>out 35K</text>
+<text x="1236.0" y="1050.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>cached 3.6M</text>
+<text x="1324.0" y="1050.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>ctx 60K</text>
+<text x="1390.0" y="1050.0" font-size="11" fill="#9da7b3" font-family='ui-monospace, SFMono-Regular, Menlo, Consolas, &quot;Liberation Mono&quot;, monospace'>sub ctx 128K</text>
 </svg>
