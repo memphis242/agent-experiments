@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a packet that exactly fills MaxPacketFileBytes rolls over",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Before appending a packet that would make the open file exce"
+    ]
+  },
+  "expected_behaviours": [
+    "pkt-rollover"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

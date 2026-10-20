@@ -1,0 +1,32 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -163,10 +163,24 @@
+     }
+ }
+ 
+-void STOR_TaskPipe(const CFE_SB_Buffer_t *Buf)
+-{
+-    CFE_SB_MsgId_t MsgId = CFE_SB_INVALID_MSG_ID;
+-    uint32         v;
++void STOR_TaskPipe(const CFE_SB_Buffer_t *SBBufPtr)
++{
++    static union
++    {
++        CFE_SB_Buffer_t Buf;
++        uint8           Bytes[CFE_MISSION_SB_MAX_SB_MSG_SIZE];
++    } Copy;
++    const CFE_SB_Buffer_t *Buf   = &Copy.Buf;
++    CFE_SB_MsgId_t         MsgId = CFE_SB_INVALID_MSG_ID;
++    CFE_MSG_Size_t         Size  = 0;
++    uint32                 v;
++
++    CFE_MSG_GetSize(&SBBufPtr->Msg, &Size);
++    if (Size > sizeof(Copy))
++    {
++        Size = sizeof(Copy);
++    }
++    memcpy(Copy.Bytes, SBBufPtr, Size);
+ 
+     CFE_MSG_GetMsgId(&Buf->Msg, &MsgId);
+     v = CFE_SB_MsgIdToValue(MsgId);

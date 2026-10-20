@@ -77,12 +77,20 @@ TABLE_NAME_SIZE = 400  # sizeof(STOR_StorageTable_t) per the specification
 TABLE_FILE_HDR = 116   # CFE_FS_Header_t (64) + CFE_TBL_File_Hdr_t (52)
 
 EVENT_RE = re.compile(rb"EVS Port\d+ \S+ \d+/\d+/STOR (\d+): ?(.*)")
+# cFE TIME leaves flywheel mode about one second after boot and steps the clock back to the tone;
+# scenarios start only after that, so idle-time arithmetic never sees time run backwards.
+FLYWHEEL_STOP = b"CFE_TIME 21: Stop FLYWHEEL"
+FLYWHEEL_WAIT_S = 8.0
+BOOT_SETTLE_MIN_S = 3.0
+# Console lines that are bus noise from other apps; they are left out of the log excerpts in failure details.
+STOR_EXIT_RE = re.compile(rb"Application STOR called CFE_ES_ExitApp|ErrExit Application STOR")
+LOG_NOISE_RE = re.compile(r"Pipe Overflow|CFE_SB 25:|SBN|sbn")
 
 
 class Fail(Exception):
     """A check did not hold; the message is the experimenter detail.
 
-    `feedback`, when given, replaces the check's standard feedback text.
+    `feedback`, when given, names the failing behaviour and replaces the check's standard feedback text.
     """
 
     def __init__(self, message: str = "", feedback: str | None = None) -> None:
@@ -90,8 +98,20 @@ class Fail(Exception):
         self.feedback = feedback
 
 
-class InfraError(Exception):
-    """The pack itself cannot run."""
+class SharedFail(Fail):
+    """A failure whose cause is shared by several checks (the build, the table image, cFS startup).
+
+    The first check that meets it reports the feedback in full; later checks refer to it. `retry` tells whether
+    a fresh attempt can change the outcome.
+    """
+
+    retry = False
+
+
+class StartFail(SharedFail):
+    """cFS with STOR could not be brought into a state where a scenario can begin."""
+
+    retry = True
 
 
 # -- packet construction and parsing -----------------------------------------
@@ -321,6 +341,16 @@ def check_fs_header(data: bytes) -> list[str]:
 
 # -- the running system ------------------------------------------------------
 
+STOR_ERROR_EVENTS = {2: "CC_ERR", 5: "MID_ERR", 6: "CMD_LEN_ERR", 7: "PIPE_ERR", 8: "TBL_REG_ERR", 9: "TBL_LOAD_ERR",
+                     10: "TBL_VAL_ERR", 11: "SUB_ERR", 12: "DIR_CREATE_ERR", 15: "FILE_WRITE_ERR"}
+
+
+def describe_table(t: TableSpec) -> str:
+    entries = "; ".join(f"0x{m:04X} priority {p} decimation {d}" for m, p, d in t.entries)
+    return (f"TelemetryQuotaBytes {t.telemetry_quota}, FileQuotaBytes {t.file_quota}, MaxPacketFileBytes "
+            f"{t.max_packet_file}, PurgeThresholdPercent {t.threshold} and entries [{entries}]")
+
+
 class Receiver(threading.Thread):
     """Collects every datagram TO_LAB sends, with arrival times."""
 
@@ -332,7 +362,10 @@ class Receiver(threading.Thread):
         try:
             self.sock.bind((HOST, TO_LAB_PORT))
         except OSError as exc:
-            raise InfraError(f"cannot listen on {HOST}:{TO_LAB_PORT}: {exc}") from exc
+            self.sock.close()
+            raise StartFail(f"cannot listen on {HOST}:{TO_LAB_PORT} for TO_LAB telemetry: {exc}",
+                            "cFS could not be driven for this scenario because the telemetry port was in use; "
+                            "STOR and its test setup must not leave cFS processes running.") from exc
         self.sock.settimeout(0.2)
         self.lock = threading.Lock()
         self.packets: list[tuple[float, int, bytes]] = []
@@ -379,6 +412,7 @@ class Cfs:
         self.running = False
         self.tlm_dir = self.cf / "stor" / "tlm"
         self.files_dir = self.cf / "stor" / "files"
+        self.boot_note = ""
 
     # -- lifecycle ---------------------------------------------------------
     def stop(self) -> None:
@@ -417,26 +451,84 @@ class Cfs:
         if table is not None:
             image = image[:TABLE_FILE_HDR] + pack_table(table)
         (self.cf / "stor_tbl.tbl").write_bytes(image)
+        what = "the default StorageTable" if table is None else f"a StorageTable with {describe_table(table)}"
         self.rx = Receiver()
         self.rx.start()
         env = dict(os.environ, CFS_RUN_DIR=str(self.run_dir), CFS_TIMEOUT="40")
-        proc = subprocess.run(["bash", str(self.tree / "tools" / "run_cfs.sh")], env=env,
-                              capture_output=True, text=True, timeout=90, check=False)
+        try:
+            proc = subprocess.run(["bash", str(self.tree / "tools" / "run_cfs.sh")], env=env,
+                                  capture_output=True, text=True, errors="replace", timeout=90, check=False)
+        except subprocess.TimeoutExpired:
+            self.stop()
+            raise StartFail(f"tools/run_cfs.sh did not return within 90 s ({what}); {self.log_excerpt()}",
+                            f"With {what}, cFS did not reach its operational state; STOR's initialization must "
+                            f"complete and return control to its main loop.") from None
         if proc.returncode != 0:
             self.stop()
-            raise Fail(f"cFS did not reach OPERATIONAL: {proc.stderr[-800:]}")
+            raise StartFail(f"cFS did not reach OPERATIONAL ({what}): {proc.stderr[-600:]}; {self.log_excerpt()}",
+                            f"With {what}, cFS did not reach its operational state{self.stor_errors_phrase()}; "
+                            f"STOR's initialization must complete and return control to its main loop.")
         self.running = True
-        deadline = time.monotonic() + 15
+        booted = time.monotonic()
+        deadline = booted + 15
         while time.monotonic() < deadline:
             if self.events(0, 1):
                 break
+            if not self.alive() or STOR_EXIT_RE.search(self.log_bytes()):
+                break
             time.sleep(0.2)
         else:
-            tail = self.log.read_text(errors="replace")[-1500:] if self.log.is_file() else ""
+            excerpt = self.log_excerpt()
+            phrase = self.stor_errors_phrase()
             self.stop()
-            raise Fail(f"STOR did not report its initialization event (ID 1) within 15 s; log tail: {tail}")
+            raise StartFail(f"STOR did not report its initialization event (ID 1) within 15 s ({what}); {excerpt}",
+                            f"With {what}, STOR did not send its initialization event (ID 1) within 15 s of "
+                            f"boot{phrase}.")
+        if not self.events(0, 1):
+            excerpt = self.log_excerpt()
+            phrase = self.stor_errors_phrase()
+            exited = STOR_EXIT_RE.search(self.log_bytes()) is not None
+            self.stop()
+            if exited:
+                raise StartFail(f"STOR exited during initialization ({what}); {excerpt}",
+                                f"With {what}, STOR exited during initialization (CFE_ES_ExitApp) without sending its "
+                                f"initialization event (ID 1){phrase}.")
+            raise StartFail(f"cFS exited during startup ({what}); {excerpt}",
+                            f"With {what}, cFS stopped running during startup{phrase}; STOR must initialize "
+                            f"without crashing or exiting.")
+        # Let cFE TIME settle (see FLYWHEEL_STOP) before any scenario step.
+        fly_deadline = booted + FLYWHEEL_WAIT_S
+        while FLYWHEEL_STOP not in self.log_bytes() and time.monotonic() < fly_deadline:
+            time.sleep(0.2)
+        self.boot_note = "flywheel stop seen" if FLYWHEEL_STOP in self.log_bytes() else "no flywheel stop in the log"
         self.send(build_command(TO_LAB_CMD_MID, TO_LAB_OUTPUT_ENABLE_CC, b"127.0.0.1".ljust(16, b"\0")))
-        time.sleep(0.9)
+        time.sleep(max(0.9, BOOT_SETTLE_MIN_S - (time.monotonic() - booted)))
+        if not self.alive():
+            excerpt = self.log_excerpt()
+            phrase = self.stor_errors_phrase()
+            self.stop()
+            raise StartFail(f"cFS exited right after STOR initialized ({what}); {excerpt}",
+                            f"With {what}, cFS stopped running within seconds of STOR's initialization{phrase}.")
+
+    # -- log access -------------------------------------------------------------
+    def log_bytes(self) -> bytes:
+        try:
+            return self.log.read_bytes()
+        except OSError:
+            return b""
+
+    def log_excerpt(self, limit: int = 40) -> str:
+        """The last console lines that are not bus noise (for the experimenter detail)."""
+        lines = [ln for ln in self.log_bytes().decode("latin-1").splitlines() if ln.strip() and not LOG_NOISE_RE.search(ln)]
+        stor = [ln for ln in lines if "STOR" in ln or "stor" in ln]
+        return "STOR log lines: " + " | ".join(stor[-limit:]) + " || last log lines: " + " | ".join(lines[-12:])
+
+    def stor_errors_phrase(self) -> str:
+        """`; STOR reported events ...` naming the STOR error events in the log, or an empty string."""
+        errs = sorted({e for e, _ in self.events(0) if e in STOR_ERROR_EVENTS})
+        if not errs:
+            return ""
+        return "; STOR reported " + ", ".join(f"event {e} ({STOR_ERROR_EVENTS[e]})" for e in errs)
 
     # -- events (from the cFS console log) --------------------------------------
     def log_mark(self) -> int:
@@ -492,17 +584,27 @@ class Cfs:
     def hk(self) -> Hk:
         """Housekeeping after everything sent so far (the last packet in the window)."""
         got = self._request(SEND_HK_MID, 0, b"", HK_MID) or self._request(SEND_HK_MID, 0, b"", HK_MID)
-        if not self.alive():
-            raise Fail("cFS stopped running")
+        self.require_alive()
         if not got:
-            raise Fail("no housekeeping packet (message ID 0x08C4) followed SEND_HK")
+            raise Fail("no housekeeping packet (message ID 0x08C4) followed SEND_HK",
+                       "STOR must answer every SEND_HK with a housekeeping packet on STOR_HK_TLM_MID (0x08C4) that "
+                       "reaches the ground through TO_LAB; during this scenario one SEND_HK went unanswered.")
         return parse_hk(got[-1])
 
     def stats(self) -> dict[int, EntryStats]:
         got = self._request(CMD_MID, CC_SEND_STATS, b"", STATS_MID) or self._request(CMD_MID, CC_SEND_STATS, b"", STATS_MID)
+        self.require_alive()
         if not got:
-            raise Fail("no statistics packet (message ID 0x08C6) followed SEND_STATS")
+            raise Fail("no statistics packet (message ID 0x08C6) followed SEND_STATS",
+                       "SEND_STATS must transmit one STOR_StatsTlm_t on STOR_STATS_TLM_MID (0x08C6) that reaches "
+                       "the ground through TO_LAB; during this scenario one SEND_STATS went unanswered.")
         return parse_stats(got[-1])
+
+    def require_alive(self) -> None:
+        if not self.alive():
+            raise Fail(f"cFS stopped running during the scenario; {self.log_excerpt()}",
+                       f"cFS stopped running while STOR was handling the commands and packets of this "
+                       f"scenario{self.stor_errors_phrase()}; STOR must not crash or exit.")
 
     def listing(self, cc: int, payload: bytes = b"") -> list[ListPacket]:
         got = self._request(CMD_MID, cc, payload, LIST_MID)
@@ -529,14 +631,26 @@ class Cfs:
 
 @dataclass
 class Problems:
-    """Collects assertion failures so one check can report every deviation."""
-    items: list[str] = field(default_factory=list)
+    """Collects assertion failures so one check can report every deviation.
 
-    def check(self, cond: bool, msg: str) -> bool:
+    Each failure carries the experimenter detail and, optionally, one sentence naming the failing behaviour;
+    the feedback of the raised Fail lists the distinct sentences in order of first occurrence. A failure
+    whose sentence is None makes the check fall back to its standard feedback; an empty sentence marks a
+    detail-only note.
+    """
+    items: list[tuple[str, str | None]] = field(default_factory=list)
+
+    def check(self, cond: bool, msg: str, behaviour: str | None = None) -> bool:
         if not cond:
-            self.items.append(msg)
+            self.items.append((msg, behaviour))
         return cond
 
     def raise_if(self) -> None:
-        if self.items:
-            raise Fail("; ".join(self.items))
+        if not self.items:
+            return
+        sentences: list[str] = []
+        for _msg, b in self.items:
+            if b and b not in sentences:
+                sentences.append(b)
+        generic = any(b is None for _m, b in self.items)
+        raise Fail("; ".join(m for m, _b in self.items), " ".join(sentences) if sentences and not generic else None)

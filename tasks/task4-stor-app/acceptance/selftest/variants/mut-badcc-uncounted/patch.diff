@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -158,7 +158,6 @@
+         default:
+             CFE_EVS_SendEvent(STOR_CC_ERR_EID, CFE_EVS_EventType_ERROR, "Invalid ground command code: CC = %d",
+                               (int)cc);
+-            STOR_Data.CommandErrorCounter++;
+             break;
+     }
+ }

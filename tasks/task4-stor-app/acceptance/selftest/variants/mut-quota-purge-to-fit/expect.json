@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the quota check purges closed files (ignoring the threshold) to make room before dropping",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "The quota check never deletes files (no purging to make room"
+    ]
+  },
+  "expected_behaviours": [
+    "quota-no-purge"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

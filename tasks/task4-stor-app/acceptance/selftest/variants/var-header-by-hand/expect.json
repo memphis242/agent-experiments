@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "the packet file header is cleared and filled by hand and written with CFE_FS_WriteHeader, without CFE_FS_InitHeader"
+}

@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -194,7 +194,6 @@
+         }
+         if (!keep)
+         {
+-            CFE_SB_Unsubscribe(CFE_SB_ValueToMsgId(Old[i].MsgIdValue), STOR_Data.CommandPipe);
+             if (Old[i].Open)
+             {
+                 STOR_Data.Entries[i] = Old[i];

@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "idle files are closed after 5 seconds",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "On WAKEUP STOR must close every packet file whose last write"
+    ]
+  },
+  "expected_behaviours": [
+    "idle-close"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

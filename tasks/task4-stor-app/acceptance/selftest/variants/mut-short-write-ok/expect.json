@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a short OS_write (fewer bytes than the packet) is treated as success",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "When OS_write of a packet returns anything other than the pa"
+    ]
+  },
+  "expected_behaviours": [
+    "write-fail-packet"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

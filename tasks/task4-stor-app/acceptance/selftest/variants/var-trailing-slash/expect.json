@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "the absolute path of the file area root is built with a trailing slash (\"<FileRoot>/\") for an empty relative path, as LIST_DIR \"\" and the scans use it"
+}

@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_dispatch.c b/apps/stor/fsw/src/stor_dispatch.c
+--- a/apps/stor/fsw/src/stor_dispatch.c
++++ b/apps/stor/fsw/src/stor_dispatch.c
+@@ -194,6 +194,7 @@
+         {
+             CFE_EVS_SendEvent(STOR_MID_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: invalid packet, MID = 0x%x",
+                               (unsigned int)v);
++            STOR_Data.CommandErrorCounter++;
+         }
+     }
+ }

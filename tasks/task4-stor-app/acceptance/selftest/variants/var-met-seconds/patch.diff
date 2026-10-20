@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -9,7 +9,7 @@
+ 
+ static uint32 STOR_Now(void)
+ {
+-    return CFE_TIME_GetTime().Seconds;
++    return CFE_TIME_GetMETseconds();
+ }
+ 
+ /* tlm_<MMMM>_<NNNNNNNN>.bin exactly: four upper-case hex digits and eight decimal digits. */

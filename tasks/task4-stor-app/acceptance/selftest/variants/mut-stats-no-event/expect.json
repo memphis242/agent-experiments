@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "SEND_STATS does not send STOR_STATS_INF_EID",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "SEND_STATS must send STOR_STATS_INF_EID (28, INFORMATION) on"
+    ]
+  },
+  "expected_behaviours": [
+    "stats-event"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

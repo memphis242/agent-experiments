@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the packet file header is written with OS_write in host byte order instead of CFE_FS_WriteHeader",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Each packet file must start with a CFE_FS_Header_t written w"
+    ]
+  },
+  "expected_behaviours": [
+    "pkt-file-header"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

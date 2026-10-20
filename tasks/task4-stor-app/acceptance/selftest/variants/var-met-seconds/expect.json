@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "idle time is measured with CFE_TIME_GetMETseconds instead of CFE_TIME_GetTime"
+}

@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a table update does not unsubscribe removed entries",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "On a table update STOR must subscribe to the MsgIds of new e"
+    ]
+  },
+  "expected_behaviours": [
+    "table-update-subscriptions"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

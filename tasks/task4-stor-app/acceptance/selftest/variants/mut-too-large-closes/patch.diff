@@ -1,0 +1,11 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -300,6 +300,7 @@
+ 
+     if (sizeof(CFE_FS_Header_t) + Size > STOR_Data.Tbl.MaxPacketFileBytes)
+     {
++        STOR_CloseEntry(E);
+         E->Dropped++;
+         STOR_Data.PacketsDropped++;
+         CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR,

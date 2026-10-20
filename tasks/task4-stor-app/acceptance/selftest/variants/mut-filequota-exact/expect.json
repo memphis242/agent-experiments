@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "an ADD_FILE that exactly reaches FileQuotaBytes is rejected",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "ADD_FILE must be rejected with STOR_FILE_QUOTA_ERR_EID (21, "
+    ]
+  },
+  "expected_behaviours": [
+    "file-add-quota"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

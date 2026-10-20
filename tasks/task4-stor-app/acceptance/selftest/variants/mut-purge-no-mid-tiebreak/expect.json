@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "purge orders by priority and sequence but not by MID value",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Among closed files with equal priority and equal sequence nu"
+    ]
+  },
+  "expected_behaviours": [
+    "purge-tie-break"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

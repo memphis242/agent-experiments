@@ -1,0 +1,47 @@
+diff --git a/apps/stor/fsw/src/stor.h b/apps/stor/fsw/src/stor.h
+--- a/apps/stor/fsw/src/stor.h
++++ b/apps/stor/fsw/src/stor.h
+@@ -79,6 +79,8 @@
+     uint32           RunStatus;
+     CFE_SB_PipeId_t  CommandPipe;
+     CFE_TBL_Handle_t TblHandle;
++    bool             TblLoaded;
++    CFE_TIME_SysTime_t TblTime;
+ } STOR_Data_t;
+ 
+ extern STOR_Data_t STOR_Data;
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -157,16 +157,23 @@
+     const STOR_StorageTable_t *T;
+     STOR_Entry_t         Old[STOR_MAX_ENTRIES];
+ 
++    CFE_TBL_Info_t       Info;
++
+     CFE_TBL_Manage(STOR_Data.TblHandle);
++    memset(&Info, 0, sizeof(Info));
++    CFE_TBL_GetInfo(&Info, "STOR.StorageTable");
++    if (STOR_Data.TblLoaded && Info.TimeOfLastUpdate.Seconds == STOR_Data.TblTime.Seconds &&
++        Info.TimeOfLastUpdate.Subseconds == STOR_Data.TblTime.Subseconds)
++    {
++        return;
++    }
+     status = CFE_TBL_GetAddress(&Addr, STOR_Data.TblHandle);
+-    if (status != CFE_TBL_INFO_UPDATED)
+-    {
+-        if (status == CFE_SUCCESS || status > 0)
+-        {
+-            CFE_TBL_ReleaseAddress(STOR_Data.TblHandle);
+-        }
+-        return;
+-    }
++    if (status < CFE_SUCCESS)
++    {
++        return;
++    }
++    STOR_Data.TblLoaded = true;
++    STOR_Data.TblTime   = Info.TimeOfLastUpdate;
+ 
+     T = Addr;
+     memcpy(&STOR_Data.Tbl, T, sizeof(STOR_Data.Tbl));

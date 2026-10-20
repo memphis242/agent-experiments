@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "the table address is never released, so table services cannot activate an update",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "STOR must check for a table update at least once per SEND_HK"
+    ]
+  },
+  "expected_behaviours": [
+    "table-update-check"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

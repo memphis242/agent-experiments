@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a packet file of a MID that is not a used entry is purged last",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A packet file whose MID is not a used table entry has priori"
+    ]
+  },
+  "expected_behaviours": [
+    "purge-unused-mid"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

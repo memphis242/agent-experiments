@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor.c b/apps/stor/fsw/src/stor.c
+--- a/apps/stor/fsw/src/stor.c
++++ b/apps/stor/fsw/src/stor.c
+@@ -89,8 +89,6 @@
+                               STOR_TableValidate);
+     if (status != CFE_SUCCESS)
+     {
+-        CFE_EVS_SendEvent(STOR_TBL_REG_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: error registering table, RC = 0x%08lX",
+-                          (unsigned long)status);
+         return status;
+     }
+ 

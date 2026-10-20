@@ -1,0 +1,14 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -259,9 +259,7 @@
+         {
+             uint32 pa = STOR_PriorityOf(STOR_Data.Closed[i].MsgIdValue);
+             uint32 pb = STOR_PriorityOf(STOR_Data.Closed[best].MsgIdValue);
+-            if (pa < pb || (pa == pb && STOR_Data.Closed[i].Seq < STOR_Data.Closed[best].Seq) ||
+-                (pa == pb && STOR_Data.Closed[i].Seq == STOR_Data.Closed[best].Seq &&
+-                 STOR_Data.Closed[i].MsgIdValue < STOR_Data.Closed[best].MsgIdValue))
++            if (pa < pb || (pa == pb && STOR_Data.Closed[i].Seq < STOR_Data.Closed[best].Seq))
+             {
+                 best = i;
+             }

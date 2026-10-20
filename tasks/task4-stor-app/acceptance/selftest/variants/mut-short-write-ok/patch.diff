@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -368,7 +368,7 @@
+     }
+ 
+     written = OS_write(E->Fd, SBBufPtr, Size);
+-    if (written != (int32)Size)
++    if (written < 0)
+     {
+         CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: packet write failed (%d)", (int)written);
+         if (written > 0)

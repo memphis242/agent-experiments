@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -242,7 +242,7 @@
+ static uint32 STOR_PriorityOf(uint32 MsgIdValue)
+ {
+     const STOR_Entry_t *E = STOR_FindEntry(MsgIdValue);
+-    return (E == NULL) ? 0 : E->Priority;
++    return (E == NULL) ? 256 : E->Priority;
+ }
+ 
+ void STOR_Purge(void)

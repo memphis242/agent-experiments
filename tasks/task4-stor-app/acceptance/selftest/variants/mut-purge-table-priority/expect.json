@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "purge uses the table priorities instead of the run-time priorities",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "Purge order must use the current run-time priorities set by "
+    ]
+  },
+  "expected_behaviours": [
+    "purge-runtime-priority"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

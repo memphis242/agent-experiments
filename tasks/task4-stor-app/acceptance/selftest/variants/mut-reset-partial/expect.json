@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "RESET_COUNTERS does not reset PacketsDropped and FilesPurged",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "RESET_COUNTERS must zero CommandCounter, CommandErrorCounter"
+    ]
+  },
+  "expected_behaviours": [
+    "cmd-reset"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

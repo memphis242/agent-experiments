@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "LIST_DIR names carry the directory prefix relative to FileRoot",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "LIST_DIR must list the immediate entries of <FileRoot>/<Path"
+    ]
+  },
+  "expected_behaviours": [
+    "list-dir"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

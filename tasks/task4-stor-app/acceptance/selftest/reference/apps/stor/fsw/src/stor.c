@@ -103,10 +103,6 @@ CFE_Status_t STOR_Init(void)
     }
 
     STOR_PollTable();
-    if (STOR_Data.Tbl.TelemetryQuotaBytes == 0)
-    {
-        return CFE_STATUS_EXTERNAL_RESOURCE_FAIL;
-    }
 
     if (STOR_MakeDirs(STOR_Data.Tbl.TelemetryRoot, true) == false || STOR_MakeDirs(STOR_Data.Tbl.FileRoot, true) == false)
     {

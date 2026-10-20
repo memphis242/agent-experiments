@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -289,7 +289,7 @@
+     int32          written;
+ 
+     E->Received++;
+-    if (((E->Received - 1) % E->Decimation) != 0)
++    if ((E->Received % E->Decimation) != 0)
+     {
+         E->Decimated++;
+         STOR_Data.PacketsDecimated++;

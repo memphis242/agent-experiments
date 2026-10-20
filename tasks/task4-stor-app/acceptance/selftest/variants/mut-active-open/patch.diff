@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -482,7 +482,7 @@
+     P->OpenPacketFiles       = 0;
+     for (i = 0; i < STOR_MAX_ENTRIES; i++)
+     {
+-        P->ActiveEntries += STOR_Data.Entries[i].Used ? 1 : 0;
++        P->ActiveEntries += (STOR_Data.Entries[i].Used && STOR_Data.Entries[i].Open) ? 1 : 0;
+         P->OpenPacketFiles += (STOR_Data.Entries[i].Used && STOR_Data.Entries[i].Open) ? 1 : 0;
+     }
+     CFE_SB_TimeStampMsg(CFE_MSG_PTR(STOR_Data.HkTlm.TelemetryHeader));

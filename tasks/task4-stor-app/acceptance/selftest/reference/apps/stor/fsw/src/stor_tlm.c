@@ -12,6 +12,45 @@ static uint32 STOR_Now(void)
     return CFE_TIME_GetTime().Seconds;
 }
 
+/* tlm_<MMMM>_<NNNNNNNN>.bin exactly: four upper-case hex digits and eight decimal digits. */
+static bool STOR_ParsePacketName(const char *Name, uint32 *Mid, uint32 *Seq)
+{
+    uint32 i;
+    uint32 m = 0;
+    uint32 q = 0;
+
+    if (strlen(Name) != 21 || strncmp(Name, "tlm_", 4) != 0 || Name[8] != '_' || strcmp(&Name[17], ".bin") != 0)
+    {
+        return false;
+    }
+    for (i = 4; i < 8; i++)
+    {
+        if (Name[i] >= '0' && Name[i] <= '9')
+        {
+            m = m * 16 + (uint32)(Name[i] - '0');
+        }
+        else if (Name[i] >= 'A' && Name[i] <= 'F')
+        {
+            m = m * 16 + (uint32)(Name[i] - 'A' + 10);
+        }
+        else
+        {
+            return false;
+        }
+    }
+    for (i = 9; i < 17; i++)
+    {
+        if (Name[i] < '0' || Name[i] > '9')
+        {
+            return false;
+        }
+        q = q * 10 + (uint32)(Name[i] - '0');
+    }
+    *Mid = m;
+    *Seq = q;
+    return true;
+}
+
 int32 STOR_TableValidate(void *TblData)
 {
     const STOR_StorageTable_t *T = TblData;
@@ -197,6 +236,7 @@ void STOR_PollTable(void)
         E->Decimation = D->Decimation;
     }
     STOR_Data.PurgeThresholdPercent = STOR_Data.Tbl.PurgeThresholdPercent;
+    STOR_Purge();
 }
 
 static uint32 STOR_PriorityOf(uint32 MsgIdValue)
@@ -219,7 +259,9 @@ void STOR_Purge(void)
         {
             uint32 pa = STOR_PriorityOf(STOR_Data.Closed[i].MsgIdValue);
             uint32 pb = STOR_PriorityOf(STOR_Data.Closed[best].MsgIdValue);
-            if (pa < pb || (pa == pb && STOR_Data.Closed[i].Seq < STOR_Data.Closed[best].Seq))
+            if (pa < pb || (pa == pb && STOR_Data.Closed[i].Seq < STOR_Data.Closed[best].Seq) ||
+                (pa == pb && STOR_Data.Closed[i].Seq == STOR_Data.Closed[best].Seq &&
+                 STOR_Data.Closed[i].MsgIdValue < STOR_Data.Closed[best].MsgIdValue))
             {
                 best = i;
             }
@@ -244,6 +286,7 @@ void STOR_StorePacket(STOR_Entry_t *E, const CFE_SB_Buffer_t *SBBufPtr)
     CFE_MSG_Size_t Size = 0;
     uint32         cost;
     bool           newfile;
+    int32          written;
 
     E->Received++;
     if (((E->Received - 1) % E->Decimation) != 0)
@@ -254,6 +297,16 @@ void STOR_StorePacket(STOR_Entry_t *E, const CFE_SB_Buffer_t *SBBufPtr)
     }
 
     CFE_MSG_GetSize(&SBBufPtr->Msg, &Size);
+
+    if (sizeof(CFE_FS_Header_t) + Size > STOR_Data.Tbl.MaxPacketFileBytes)
+    {
+        E->Dropped++;
+        STOR_Data.PacketsDropped++;
+        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR,
+                          "STOR: packet of %u bytes does not fit in a packet file, MID 0x%X", (unsigned int)Size,
+                          (unsigned int)E->MsgIdValue);
+        return;
+    }
 
     newfile = !E->Open;
     if (E->Open && E->OpenBytes + Size > STOR_Data.Tbl.MaxPacketFileBytes)
@@ -285,11 +338,11 @@ void STOR_StorePacket(STOR_Entry_t *E, const CFE_SB_Buffer_t *SBBufPtr)
             uint32 k;
             E->SeqInit = true;
             E->NextSeq = 0;
-            for (k = 0; k < STOR_Data.NumClosed; k++)
+            for (k = 0; k < STOR_Data.NumScanSeq; k++)
             {
-                if (STOR_Data.Closed[k].MsgIdValue == E->MsgIdValue && STOR_Data.Closed[k].Seq >= E->NextSeq)
+                if (STOR_Data.ScanSeq[k].MsgIdValue == E->MsgIdValue)
                 {
-                    E->NextSeq = STOR_Data.Closed[k].Seq + 1;
+                    E->NextSeq = STOR_Data.ScanSeq[k].Seq + 1;
                 }
             }
         }
@@ -314,9 +367,16 @@ void STOR_StorePacket(STOR_Entry_t *E, const CFE_SB_Buffer_t *SBBufPtr)
         STOR_Data.TelemetryBytesUsed += sizeof(Hdr);
     }
 
-    if (OS_write(E->Fd, SBBufPtr, Size) != (int32)Size)
+    written = OS_write(E->Fd, SBBufPtr, Size);
+    if (written != (int32)Size)
     {
-        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: packet write failed");
+        CFE_EVS_SendEvent(STOR_FILE_WRITE_ERR_EID, CFE_EVS_EventType_ERROR, "STOR: packet write failed (%d)", (int)written);
+        if (written > 0)
+        {
+            E->OpenBytes += (uint32)written;
+            STOR_Data.TelemetryBytesUsed += (uint32)written;
+        }
+        STOR_CloseEntry(E);
         return;
     }
     E->OpenBytes += Size;
@@ -337,6 +397,10 @@ void STOR_Wakeup(void)
     for (i = 0; i < STOR_MAX_ENTRIES; i++)
     {
         STOR_Entry_t *E = &STOR_Data.Entries[i];
+        if (E->Used && E->Open && now < E->LastWrite)
+        {
+            E->LastWrite = now; /* time stepped back: restart the idle period */
+        }
         if (E->Used && E->Open && now - E->LastWrite >= STOR_IDLE_CLOSE_SEC)
         {
             STOR_CloseEntry(E);
@@ -350,10 +414,9 @@ void STOR_ScanTelemetry(void)
     os_dirent_t   Ent;
     char          Path[OS_MAX_PATH_LEN];
     os_fstat_t    St;
-    unsigned int  mid;
-    unsigned int  seq;
-    uint32        maxseq = 0;
-    bool          any    = false;
+    uint32        mid;
+    uint32        seq;
+    uint32        k;
 
     if (OS_DirectoryOpen(&Dir, STOR_Data.Tbl.TelemetryRoot) != OS_SUCCESS)
     {
@@ -361,7 +424,7 @@ void STOR_ScanTelemetry(void)
     }
     while (OS_DirectoryRead(Dir, &Ent) == OS_SUCCESS)
     {
-        if (sscanf(OS_DIRENTRY_NAME(Ent), "tlm_%4X_%8u.bin", &mid, &seq) != 2)
+        if (!STOR_ParsePacketName(OS_DIRENTRY_NAME(Ent), &mid, &seq))
         {
             continue;
         }
@@ -378,14 +441,21 @@ void STOR_ScanTelemetry(void)
             STOR_Data.Closed[STOR_Data.NumClosed].Size       = (uint32)OS_FILESTAT_SIZE(St);
             STOR_Data.NumClosed++;
         }
-        if (!any || seq > maxseq)
+        for (k = 0; k < STOR_Data.NumScanSeq && STOR_Data.ScanSeq[k].MsgIdValue != mid; k++)
         {
-            maxseq = seq;
-            any    = true;
+        }
+        if (k == STOR_Data.NumScanSeq && k < STOR_MAX_SCAN_MIDS)
+        {
+            STOR_Data.ScanSeq[k].MsgIdValue = mid;
+            STOR_Data.ScanSeq[k].Seq        = seq;
+            STOR_Data.NumScanSeq++;
+        }
+        else if (k < STOR_Data.NumScanSeq && seq > STOR_Data.ScanSeq[k].Seq)
+        {
+            STOR_Data.ScanSeq[k].Seq = seq;
         }
     }
     OS_DirectoryClose(Dir);
-    STOR_Data.NextSeq = any ? maxseq + 1 : 0;
 }
 
 void STOR_SendHk(void)

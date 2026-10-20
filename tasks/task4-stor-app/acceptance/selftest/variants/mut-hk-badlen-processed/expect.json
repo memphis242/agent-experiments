@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a wrongly sized SEND_HK is reported but still answered",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A SEND_HK or WAKEUP whose length is not sizeof(CFE_MSG_Comma"
+    ]
+  },
+  "expected_behaviours": [
+    "cmd-hk-wakeup-length"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

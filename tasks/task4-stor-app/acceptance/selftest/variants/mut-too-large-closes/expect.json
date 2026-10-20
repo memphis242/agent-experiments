@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "a packet too large for any file closes the open file before it is dropped",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "A packet that cannot fit even in an empty file (64-byte head"
+    ]
+  },
+  "expected_behaviours": [
+    "pkt-too-large"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

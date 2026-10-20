@@ -1,0 +1,19 @@
+{
+  "kind": "mutant",
+  "description": "SET_PURGE_THRESHOLD accepts 0",
+  "must_fail": [
+    "hidden-coverage-test"
+  ],
+  "may_fail": [],
+  "feedback_contains": {
+    "hidden-coverage-test": [
+      "SET_PURGE_THRESHOLD outside 1..100 must be rejected with STO"
+    ]
+  },
+  "expected_behaviours": [
+    "cmd-set-threshold-reject"
+  ],
+  "only": [
+    "hidden-coverage-test"
+  ]
+}

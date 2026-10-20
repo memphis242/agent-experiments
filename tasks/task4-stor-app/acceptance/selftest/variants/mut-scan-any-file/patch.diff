@@ -1,0 +1,13 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -426,7 +426,8 @@
+     {
+         if (!STOR_ParsePacketName(OS_DIRENTRY_NAME(Ent), &mid, &seq))
+         {
+-            continue;
++            mid = 0;
++            seq = 0;
+         }
+         snprintf(Path, sizeof(Path), "%s/%s", STOR_Data.Tbl.TelemetryRoot, OS_DIRENTRY_NAME(Ent));
+         if (OS_stat(Path, &St) != OS_SUCCESS || OS_FILESTAT_ISDIR(St))

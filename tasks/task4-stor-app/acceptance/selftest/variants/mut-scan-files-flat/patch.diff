@@ -1,0 +1,12 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -190,7 +190,7 @@
+         if (OS_stat(ChildAbs, &St) != OS_SUCCESS) continue;
+         if (OS_FILESTAT_ISDIR(St))
+         {
+-            STOR_ScanDir(ChildRel);
++            continue;
+         }
+         else
+         {

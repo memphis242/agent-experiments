@@ -14,6 +14,7 @@
 #define STOR_MAX_FILES      2048
 #define STOR_MAX_LIST       512
 #define STOR_IDLE_CLOSE_SEC 10
+#define STOR_MAX_SCAN_MIDS  64
 
 typedef struct
 {
@@ -21,6 +22,13 @@ typedef struct
     uint32 Seq;
     uint32 Size;
 } STOR_ClosedFile_t;
+
+/* Highest packet file sequence of one MID found by the startup scan. */
+typedef struct
+{
+    uint32 MsgIdValue;
+    uint32 Seq;
+} STOR_ScanSeq_t;
 
 typedef struct
 {
@@ -56,12 +64,13 @@ typedef struct
     uint32 PurgeCycles;
     uint16 FileAddsRejected;
     uint16 FileCount;
-    uint32 NextSeq;
 
     STOR_StorageTable_t Tbl;
     STOR_Entry_t        Entries[STOR_MAX_ENTRIES];
     STOR_ClosedFile_t   Closed[STOR_MAX_FILES];
     uint32              NumClosed;
+    STOR_ScanSeq_t      ScanSeq[STOR_MAX_SCAN_MIDS];
+    uint32              NumScanSeq;
 
     STOR_HkTlm_t    HkTlm;
     STOR_ListTlm_t  ListTlm;

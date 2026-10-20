@@ -1,0 +1,10 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -517,5 +517,4 @@
+     }
+     CFE_SB_TimeStampMsg(CFE_MSG_PTR(STOR_Data.StatsTlm.TelemetryHeader));
+     CFE_SB_TransmitMsg(CFE_MSG_PTR(STOR_Data.StatsTlm.TelemetryHeader), true);
+-    CFE_EVS_SendEvent(STOR_STATS_INF_EID, CFE_EVS_EventType_INFORMATION, "STOR: statistics sent");
+-}
++}

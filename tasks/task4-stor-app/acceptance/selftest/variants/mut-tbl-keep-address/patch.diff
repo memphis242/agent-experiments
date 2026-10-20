@@ -1,0 +1,20 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -161,16 +161,11 @@
+     status = CFE_TBL_GetAddress(&Addr, STOR_Data.TblHandle);
+     if (status != CFE_TBL_INFO_UPDATED)
+     {
+-        if (status == CFE_SUCCESS || status > 0)
+-        {
+-            CFE_TBL_ReleaseAddress(STOR_Data.TblHandle);
+-        }
+         return;
+     }
+ 
+     T = Addr;
+     memcpy(&STOR_Data.Tbl, T, sizeof(STOR_Data.Tbl));
+-    CFE_TBL_ReleaseAddress(STOR_Data.TblHandle);
+ 
+     memcpy(Old, STOR_Data.Entries, sizeof(Old));
+     memset(STOR_Data.Entries, 0, sizeof(STOR_Data.Entries));

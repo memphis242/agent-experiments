@@ -1,0 +1,15 @@
+diff --git a/apps/stor/fsw/src/stor_files.c b/apps/stor/fsw/src/stor_files.c
+--- a/apps/stor/fsw/src/stor_files.c
++++ b/apps/stor/fsw/src/stor_files.c
+@@ -145,7 +145,10 @@
+         return;
+     }
+     STOR_Emit(Total);
+-    STOR_Data.CommandCounter++;
++    if (Recurse)
++    {
++        STOR_Data.CommandCounter++;
++    }
+     CFE_EVS_SendEvent(STOR_LIST_INF_EID, CFE_EVS_EventType_INFORMATION, "STOR: listed %u entries", (unsigned int)Total);
+ }
+ 

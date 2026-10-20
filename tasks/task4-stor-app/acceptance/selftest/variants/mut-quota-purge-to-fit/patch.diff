@@ -1,0 +1,17 @@
+diff --git a/apps/stor/fsw/src/stor_tlm.c b/apps/stor/fsw/src/stor_tlm.c
+--- a/apps/stor/fsw/src/stor_tlm.c
++++ b/apps/stor/fsw/src/stor_tlm.c
+@@ -316,6 +316,13 @@
+     }
+     cost = Size + (newfile ? sizeof(CFE_FS_Header_t) : 0);
+ 
++    if ((uint64)STOR_Data.TelemetryBytesUsed + cost > STOR_Data.Tbl.TelemetryQuotaBytes)
++    {
++        uint8 Saved = STOR_Data.PurgeThresholdPercent;
++        STOR_Data.PurgeThresholdPercent = 1;
++        STOR_Purge();
++        STOR_Data.PurgeThresholdPercent = Saved;
++    }
+     if ((uint64)STOR_Data.TelemetryBytesUsed + cost > STOR_Data.Tbl.TelemetryQuotaBytes)
+     {
+         E->Dropped++;
