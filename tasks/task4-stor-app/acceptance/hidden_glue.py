@@ -22,6 +22,9 @@ BEHAVIOUR: dict[str, str] = {
     "startup-roots":
         "At startup STOR must create TelemetryRoot and FileRoot when they are missing, one level at a time with OS_mkdir; "
         "an already existing directory (for which OS_mkdir returns success) is not an error.",
+    "startup-roots-existing":
+        "When TelemetryRoot and FileRoot already exist at startup, STOR must not report STOR_DIR_CREATE_ERR_EID (an "
+        "existing directory, for which OS_mkdir returns success, is not an error).",
     "startup-init-event":
         "When initialization succeeds STOR must send STOR_INIT_INF_EID (1, INFORMATION) exactly once.",
     "startup-evs-register":
@@ -63,8 +66,8 @@ BEHAVIOUR: dict[str, str] = {
     "tbl-accept":
         "The table validation function must accept every table the specification allows, including the boundaries: "
         "MaxPacketFileBytes equal to TelemetryQuotaBytes (also both 1024), thresholds 1 and 100, any non-zero "
-        "FileQuotaBytes, roots of up to 63 characters, unused entries whatever their Priority and Decimation, 32 used "
-        "entries with values 255, and no used entry at all.",
+        "FileQuotaBytes, unused entries whatever their Priority and Decimation, 32 used entries with values 255, and no "
+        "used entry at all.",
     "decimation":
         "For each used entry Received counts every packet; a packet is stored only when (Received - 1) % Decimation "
         "== 0, and every other packet counts in the entry's Decimated and in PacketsDecimated.",
@@ -298,6 +301,9 @@ BEHAVIOUR: dict[str, str] = {
     "exit-unexpected":
         "After a successful startup STOR must keep running its main loop while CFE_ES_RunLoop returns true; it must not "
         "leave the loop on its own.",
+    "infra":
+        "One scenario could not be run because of a problem in the review environment itself, not in STOR; no change "
+        "to STOR is needed for this item.",
     "harness":
         "STOR created far more files or sent far more telemetry than the specified behaviour calls for in a short "
         "scenario.",
@@ -305,7 +311,7 @@ BEHAVIOUR: dict[str, str] = {
 
 # Tags handled specially: "meta" lines summarize a test case, "crash" and "hang" name the scenario, "unmodelled"
 # names the call, "skipped" marks scenarios not run after STOR stopped responding twice.
-SPECIAL_TAGS = {"meta", "crash", "hang", "unmodelled", "skipped"}
+SPECIAL_TAGS = {"meta", "crash", "hang", "unmodelled", "skipped", "startup-scenario"}
 
 # Startup failures that prevent every other behaviour from being checked.
 CRITICAL_TAGS = ("startup-run", "startup-roots")
@@ -398,13 +404,16 @@ def compose(results: list[tuple[str, str, str, str]]) -> tuple[str, str]:
     unexplained = False
     skipped = False
     unresponsive: list[str] = []
+    no_start: list[str] = []
     for case, kind, tag, msg in results:
         if tag == "meta":
             continue
         if tag == "skipped":
             skipped = True
             continue
-        if tag == "crash":
+        if tag == "startup-scenario":
+            no_start.append(case)
+        elif tag == "crash":
             crashed.append(case)
         elif tag == "hang":
             hung.append(case)
@@ -424,6 +433,9 @@ def compose(results: list[tuple[str, str, str, str]]) -> tuple[str, str]:
     if unresponsive and not critical:
         i = behaviours.index("responsive")
         items[i] += f" It stopped responding while handling {_scenarios(unresponsive)}."
+    if no_start and not critical:
+        items.append("With the table of each scenario, STOR_AppMain must complete its initialization and wait on its "
+                     f"pipe; it did not while setting up {_scenarios(no_start)}.")
     if crashed:
         items.append("STOR must not crash, call exit or abort: it ended the process while handling "
                      f"{_scenarios(crashed)}.")
@@ -479,10 +491,13 @@ def run_hidden(ctx, pack: Path) -> None:  # noqa: ANN001 - ctx is check.Ctx (imp
     runner = ctx.tree / "build-native_std" / "exe" / "cpu1" / "coverage-stor-hidden-testrunner"
     if not runner.is_file():
         raise Fail("coverage-stor-hidden-testrunner was not built", BASE)
+    eff, shortened = ctx.budget_timeout(420)
     try:
         proc = subprocess.run([str(runner)], cwd=runner.parent, text=True, errors="replace", capture_output=True,
-                              timeout=ctx.timeout_for(420))
+                              timeout=eff)
     except subprocess.TimeoutExpired:
+        if shortened:
+            raise ctx.budget_ran_out("the behaviour test", eff) from None
         raise Fail("the behaviour test did not finish within 420 s",
                    BASE + " STOR must keep answering messages; it stopped responding while the specified commands "
                    "and packets were delivered.") from None

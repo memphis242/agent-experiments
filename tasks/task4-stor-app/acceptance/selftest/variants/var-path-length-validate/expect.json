@@ -1,0 +1,4 @@
+{
+  "kind": "variant",
+  "description": "the table validation function also rejects roots too long to form OSAL paths (TelemetryRoot plus a packet file name, or FileRoot plus a name, reaching OS_MAX_PATH_LEN), which the specification allows"
+}
