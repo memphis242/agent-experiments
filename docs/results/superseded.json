@@ -12,5 +12,17 @@
   "5f3bc7f2": "A10 task3 rep 4: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as a2a8a986",
   "48593815": "A11 task3 rep 3: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 865b9c71",
   "42e2df75": "A12 task3 rep 1: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 2eec045d",
-  "1b191f23": "A14 task3 rep 2: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as 61865ddd"
+  "1b191f23": "A14 task3 rep 2: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as 61865ddd",
+  "68a2ef63": "A16 task3 rep 2: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as fbad3456",
+  "cca9ca4e": "A11 task3 rep 4: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as 35184806 (it also lost a round to the fresh-event rule)",
+  "03c71dce": "A12 task3 rep 2: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as a3b52eec",
+  "7001758f": "A14 task3 rep 4: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as f4738bb4",
+  "0ae35670": "A11 task3 rep 5: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 336a0a78",
+  "be6ea4c9": "A12 task3 rep 3: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 02ffb632",
+  "875dd8d3": "A14 task3 rep 5: the CLI stopped a background subagent at the 10-minute print-mode wait ceiling; rerun with the raised ceiling and corrected pack as ddc90c5e",
+  "b5e0f533": "A16 task3 rep 3: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 3238b020",
+  "2932c5a8": "A16 task3 rep 4: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as bfd27529",
+  "00472ead": "A12 task3 rep 4: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 8b374856",
+  "8b94fc6e": "A12 task3 rep 5: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as b5d9bd31",
+  "7681f7fe": "A16 task3 rep 5: lost a round to the ambiguous fresh-event rule and its misleading feedback; rerun on the corrected pack as 46fcc4a5"
 }
