@@ -138,6 +138,16 @@ class BuiltinAgentsTest(unittest.TestCase):
         self.write_log(THREAD, lines)
         self.assertIn("forbidden_tool", [v["kind"] for v in self.analyze()["validation"]["violations"]])
 
+    def test_children_may_report_with_send_message_but_not_spawn(self):
+        lines = child_lines()
+        lines.insert(-1, {"type": "response_item", "payload": {
+            "type": "function_call", "name": "collaboration.send_message"}})
+        self.write_log(CHILD, lines)
+        self.assertTrue(self.analyze()["validation"]["ok"])
+        lines[-2]["payload"]["name"] = "collaboration.spawn_agent"
+        self.write_log(CHILD, lines)
+        self.assertEqual([v["kind"] for v in self.analyze()["validation"]["violations"]], ["forbidden_tool"])
+
     def test_child_errors_and_incomplete_rollouts_stop_before_acceptance(self):
         cfg = run.RunConfig("A30", "t1", 1, None, self.root / "template", self.root, self.root / "arms",
                             self.root / "tasks", self.root / "missing", 1, 60.0, 60.0, 0, "unused", "t1", False)

@@ -608,7 +608,7 @@ def validate_children(children: Sequence[Rollout], agent_models: Mapping[str, st
             if got_effort != effort:
                 found[("effort", effort, got_effort)] += 1
         for tool, count in child.tools.items():
-            if tool.rsplit(".", 1)[-1] in FORBIDDEN_MAIN_TOOLS:
+            if tool.rsplit(".", 1)[-1] in FORBIDDEN_CHILD_TOOLS:
                 found[("forbidden_tool", "not used", tool)] += count
         if child.errors:
             found[("codex_call_failed", "no error events", "; ".join(child.errors))] += 1
@@ -672,6 +672,8 @@ def leak_scan_files(home: Path) -> list[Path]:
 FORBIDDEN_MAIN_TOOLS: frozenset[str] = frozenset({
     "spawn_agent", "send_input", "send_message", "followup_task", "wait_agent", "close_agent", "resume_agent",
     "interrupt_agent", "list_agents", "web_search"})
+# A built-in child reports to its parent with send_message, so it is the one collaboration tool children keep.
+FORBIDDEN_CHILD_TOOLS: frozenset[str] = FORBIDDEN_MAIN_TOOLS - {"send_message"}
 USAGE_KEYS: tuple[str, ...] = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens")
 
 
