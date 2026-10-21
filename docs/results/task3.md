@@ -1,6 +1,6 @@
-# Task 3 results (housekeeping staleness detection), 147 runs, 2026-10-20
+# Task 3 results (housekeeping staleness detection), 191 runs, 2026-10-21
 
-All 147 valid runs passed acceptance. Billed cost includes compaction requests
+188 of the 191 valid runs passed acceptance; the three that failed all five rounds are A27 reps 1 and 3 and A29 rep 9 (see the notes). Billed cost includes compaction requests
 (one occurred, in a subagent). Ranges are min to max over the repetitions (five per arm so
 far for A1 to A15, ten for A16 and A17); spend per pass is total spend over all attempts
 divided by passes. Nineteen attempts from the first wave were cut off by the subscription
@@ -12,7 +12,7 @@ rerun. A13 to A15 were added after that and run with up to nine runs in parallel
 dropped attempts. A16 and A17 run on six slots. Repetitions 4 and up of A1 to A15 run on
 three slots, with up to twelve shortly before a usage-window reset. A1 and A2 have a sixth
 repetition from the start of the extension to ten, which is on hold. The Codex arms (A21,
-A22) ran ten repetitions each on six slots; the Codex-main arms A26 to A32 have no Task 3 runs yet (they run after the Task 2 batch); their cost includes the Codex subagents at
+A22) ran ten repetitions each on six slots; the Codex-main arms A26, A27, A29 and A30 ran ten repetitions each on up to sixteen shared slots, and A28 four before the owner paused it after Task 2; A31 waits for the weekly usage reset and A32 is held. The Codex arms' cost includes the Codex subagents at
 GPT-6.1 Sol API rates. Twenty runs that lost rounds to a defect outside their own code
 have been rerun (see the footnote); each rerun replaces its original here.
 
@@ -33,27 +33,33 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A3 | Opus 5.5 subagents, conservative | task3 | 5/5 | 7.12 | 6.16 to 8.25 | 2.09 | 18.1 to 22.6 | 88 to 112 | 0 | 1 | 0 | 242.4 to 291.8 | - |
 | A4 | Sonnet 5.5 subagents, eager | task3 | 5/5 | 6.87 | 6.36 to 7.37 | 1.01 | 21.1 to 32.8 | 7 to 13 | 3 to 4 | 1 | 0 | 126.1 to 172.0 | 149.8 to 188.7 |
 | A5 | Sonnet 5.5 subagents, conservative | task3 | 5/5 | 8.39 | 7.34 to 9.30 | 1.96 | 19.5 to 30.9 | 101 to 123 | 0 | 1 | 0 | 268.4 to 310.8 | - |
-| A6 | Sonnet 5 subagents, eager | task3 | 5/5 | 14.88 | 10.19 to 18.49 | 8.30 | 26.3 to 62.6 | 10 to 83 | 2 to 9 | 1 to 4* | 0 | 164.8 to 218.3 | 191.6 to 381.9 |
+| A6 | Sonnet 5 subagents, eager | task3 | 5/5 | 14.88 | 10.19 to 18.49 | 8.30 | 26.3 to 62.6 | 10 to 83 | 2 to 9 | 1 to 4 | 0 | 164.8 to 218.3 | 191.6 to 381.9 |
 | A7 | Sonnet 5 subagents, conservative | task3 | 5/5 | 8.41 | 7.94 to 8.85 | 0.91 | 21.5 to 31.3 | 106 to 123 | 0 | 1 | 0 | 284.2 to 307.3 | - |
-| A8 | Sonnet 4.6 subagents, eager | task3 | 5/5 | 16.51 | 11.86 to 18.95 | 7.09 | 28.0 to 48.4 | 9 to 79 | 3 to 5 | 1 to 3* | 0 to 1 | 146.4 to 214.2 | 162.8 to 167.1 |
+| A8 | Sonnet 4.6 subagents, eager | task3 | 5/5 | 16.51 | 11.86 to 18.95 | 7.09 | 28.0 to 48.4 | 9 to 79 | 3 to 5 | 1 to 3 | 0 to 1 | 146.4 to 214.2 | 162.8 to 167.1 |
 | A9 | Sonnet 4.6 subagents, conservative | task3 | 5/5 | 7.50 | 6.60 to 8.81 | 2.21 | 19.1 to 27.4 | 93 to 114 | 0 | 1 | 0 | 250.3 to 318.7 | - |
 | A10 | solo Sonnet 5.5, xhigh effort | task3 | 5/5 | 7.20 | 6.15 to 8.85 | 2.70 | 26.3 to 40.4 | 6 to 174 | 0 | 1 | 0 | 403.8 to 503.8 | - |
 | A11 | Sonnet 5.5 main, Haiku 5.5 implementer and tester | task3 | 5/5 | 3.36 | 3.12 to 3.54 | 0.42 | 18.1 to 35.8 | 1 to 33 | 1 to 2 | 1 | 0 | 163.6 to 227.8 | 237.4 to 276.6 |
 | A12 | solo Sonnet 5.5, high effort | task3 | 5/5 | 3.70 | 3.25 to 3.90 | 0.65 | 18.2 to 24.2 | 89 to 109 | 0 | 1 | 0 | 255.1 to 290.0 | - |
 | A13 | solo Opus 5.5, medium effort | task3 | 5/5 | 7.42 | 6.30 to 8.04 | 1.74 | 21.5 to 28.6 | 89 to 129 | 0 | 1 | 0 | 257.5 to 282.4 | - |
 | A14 | Opus 5.5 low main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 3.47 | 3.29 to 3.59 | 0.30 | 19.5 to 26.5 | 4 to 17 | 3 | 1 | 0 | 65.1 to 91.5 | 228.3 to 302.2 |
-| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 4.94 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 28 | 3 to 4 | 1 to 2* | 0 | 139.9 to 158.5 | 230.7 to 250.3 |
+| A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task3 | 5/5 | 4.94 | 4.06 to 5.64 | 1.58 | 17.8 to 43.8 | 1 to 28 | 3 to 4 | 1 to 2 | 0 | 139.9 to 158.5 | 230.7 to 250.3 |
 | A16 | solo Haiku 5.5, high effort | task3 | 10/10 | 3.19 | 1.85 to 4.24 | 2.38 | 22.3 to 45.3 | 130 to 232 | 0 | 1 to 2 | 0 | 361.9 to 549.8 | - |
-| A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3* | 0 | 498.3 to 856.0 | - |
+| A17 | solo Haiku 5.5, xhigh effort | task3 | 10/10 | 5.93 | 3.58 to 11.44 | 7.86 | 25.3 to 79.8 | 39 to 412 | 0 | 1 to 3 | 0 | 498.3 to 856.0 | - |
 | A21 | Opus 5.5 high main, Codex GPT-6.1 Sol high subagents, eager | task3 | 10/10 | 5.41 | 4.65 to 6.57 | 1.92 | 17.0 to 30.3 | 5 to 31 | 2 to 8 | 1 | 0 | 148.6 to 198.1 | 99.6 to 112.5 |
 | A22 | Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger | task3 | 10/10 | 6.56 | 5.04 to 7.28 | 2.24 | 15.0 to 26.0 | 11 to 99 | 1 to 2 | 1 | 0 | 188.2 to 260.6 | 80.2 to 114.8 |
 | A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task3 | 10/10 | 1.92 | 1.34 to 2.53 | 1.19 | 12.8 to 29.4 | 2 to 34 | 1 to 3 | 1 | 0 to 1 | 38.1 to 94.9 | 110.1 to 245.3 |
 | A24 | Opus 5.5 low main, Codex GPT-6 Luna, tiered | task3 | 10/10 | 1.43 | 0.99 to 1.89 | 0.91 | 16.0 to 28.6 | 7 to 40 | 2 to 4 | 1 | 0 to 1 | 52.7 to 103.8 | 111.5 to 245.4 |
 | A25 | Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | task3 | 10/10 | 7.19 | 4.34 to 9.36 | 5.02 | 18.9 to 138.8 | 5 to 39 | 1 to 3 | 1 to 2 | 0 to 2 | 43.3 to 113.3 | 224.8 to 255.6 |
+| A26 | solo Codex GPT-6.1 Sol, high effort | task3 | 10/10 | 0.97 | 0.79 to 1.18 | 0.39 | 7.5 to 11.5 | 37 to 54 | 0 | 1 | 0 | 123.6 to 159.1 | - |
+| A27 | solo Codex GPT-6 Luna, high effort | task3 | 8/10 | 0.80 | 0.39 to 0.95 | 0.56 | 15.2 to 50.0 | 219 to 639 | 0 | 1 to 5 | 1 to 3 | 211.6 to 245.4 | - |
+| A28 | solo Codex GPT-5.6 Sol, high effort | task3 | 4/4 | 8.86 | 6.08 to 11.89 | 5.81 | 11.8 to 20.0 | 92 to 156 | 0 | 1 | 1 | 245.9 to 247.9 | - |
+| A29 | solo Codex GPT-5.6 Luna, high effort | task3 | 9/10 | 0.88 | 0.53 to 1.34 | 0.80 | 10.4 to 31.6 | 158 to 357 | 0 | 1 to 5 | 1 to 3 | 245.4 to 259.1 | - |
+| A30 | Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered | task3 | 10/10 | 1.23 | 0.90 to 1.66 | 0.76 | 6.9 to 14.2 | 69 to 122 | 3 to 5 | 1 to 2 | 0 to 1 | 84.9 to 132.5 | 111.9 to 200.7 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A24 0.17, A23 0.23, A16 0.37, A11
-0.39, A14 0.41, A12 0.43, A15 0.58, A21 0.64, A17 0.70, A22 0.77, A4 0.81, A3 0.84, A25
-0.84, A10 0.85, A13 0.87, A9 0.88, A5 0.99, A7 0.99, A2 1.36, A6 1.75, A8 1.94. Arms with
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A27 0.09, A29 0.10, A26 0.11, A30
+0.14, A24 0.17, A23 0.23, A16 0.37, A11 0.39, A14 0.41, A12 0.43, A15 0.58, A21 0.64, A17
+0.70, A22 0.77, A4 0.81, A3 0.84, A25 0.84, A10 0.85, A13 0.87, A9 0.88, A5 0.99, A7 0.99,
+A28 1.04, A2 1.36, A6 1.75, A8 1.94. Arms with
 asterisked runs not rerun (A6, A8, A15, A17) carry rounds lost to the pack defect or the
 wait ceiling.
 
@@ -165,6 +171,21 @@ Notes:
   original is superseded. A25 rep 10 polled the Codex subagent with a `pgrep -f` loop that
   matched its own shell, against the arm's instructions, and waited out the two-hour Bash
   timeout (139 minutes); without it A25 runs took 19 to 34 minutes.
+- The Codex-main arms (added 2026-10-20) run Codex as the main agent with no Claude model:
+  solo GPT-6.1 Sol (A26), GPT-6 Luna (A27), GPT-5.6 Sol (A28) and GPT-5.6 Luna (A29), all at
+  high effort, and A30, GPT-6.1 Sol at low effort directing built-in Codex subagents on GPT-6
+  Luna. They are the four cheapest arms on the task. A26 passed all ten runs in one round at
+  0.97 USD per pass (0.11 of A1) in 7.5 to 11.5 minutes. A30 passed all ten at 1.23 (0.14),
+  one run (rep 6) needing a second round for the default copy table entry, in 7 to 14
+  minutes; its main context peaked at 85K to 133K tokens. A28, the previous-generation Sol,
+  passed its four runs in one round but costs 8.86 per pass (1.04 of A1).
+- The Luna main agents are cheap but unreliable here. A27 passed 8 of 10 at 0.80 per pass
+  (0.09 of A1, counting the failed runs' spend); seven of its runs needed two to five
+  rounds and its runs took 15 to 50 minutes with one to three compactions each. Reps 1 and 3
+  failed all five rounds: rep 1 on `report-stale` from round two on, rep 3 on the stale and
+  fresh transitions and `report-stale`. A29 passed 9 of 10 at 0.88 (0.10); rep 9 failed
+  all five rounds on its own CTF test (`ctf-test-passes`), and five other runs needed two or
+  three rounds, mostly for a missing report (`report-present`) or the copy table entry.
 - A16 and A17 both qualify for Task 4 under the task gate: no run failed and none reached
   the final round.
 - \* Round counts and spend of these arms include runs that lost rounds to a defect outside
