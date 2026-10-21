@@ -85,6 +85,7 @@ def summarize(claude_dir: Path) -> dict[str, Any]:
             "exit_code": call.get("exit_code"), "failed": call_failed(call), "unfinished": end is None,
             "stopped_by_signal": call.get("stopped_by_signal"), "usage_limit": bool(call.get("usage_limit")),
             "transcript": path is not None, "requests": len(requests),
+            "observed_models": transcript.observed_models(path) if path else [],
             "max_input_tokens": max((cost.context_tokens(r) for r in requests), default=0),
             "total_cost_usd": call.get("total_cost_usd"), "num_turns": call.get("num_turns")})
     return {"calls": len(calls),
@@ -111,7 +112,8 @@ def run_outcome(summary: Mapping[str, Any]) -> tuple[str, str] | None:
 
 def spawn_calls(summary: Mapping[str, Any]) -> list[dict[str, Any]]:
     """claude-agent calls in the shape of transcript.summarize_behavior's subagent_spawn_calls."""
-    return [{"source": "main", "subagent_type": c["agent"], "model_arg": None, "observed_models": [],
+    return [{"source": "main", "subagent_type": c["agent"], "model_arg": None,
+             "observed_models": c["observed_models"],
              "timestamp": c["started_epoch"], "harness": "claude"} for c in summary["per_call"]]
 
 

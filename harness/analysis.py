@@ -4,6 +4,7 @@ Shared by run.py (after each round) and reanalyze.py (from archived files).
 """
 from __future__ import annotations
 
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Sequence
@@ -197,6 +198,7 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             behavior["compaction_events"] += summary["compaction_events"]
             if arm.codex_main:
                 assert summary["calls"] == 0, "a Codex main agent starts no codex-agent calls in its own home"
+                behavior["tool_calls_main"] = dict(summary["tool_calls"])
                 checked = main_logs + unexpected + (() if arm.builtin_subagents else children)
                 codex_violations = codex.validate_main(summary, checked, arm.main_model,
                                                        arm.main_effort, record["session_ids"],
@@ -238,6 +240,14 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             behavior["subagent_spawns"] = sub["calls"]
             behavior["subagent_spawns_by_type"] = dict(sub["calls_by_agent"])
             behavior["compaction_events"] += sub["compaction_events"]
+            if arm.codex_main:
+                behavior["tool_calls_subagent"] = dict(sub["tool_calls"])
+        if arm.codex_main:
+            behavior["tool_calls_total"] = (sum(behavior["tool_calls_main"].values())
+                                             + sum(behavior["tool_calls_subagent"].values()))
+            by_model = Counter(model for call in behavior["subagent_spawn_calls"]
+                               for model in call["observed_models"] or ["(no transcript)"])
+            behavior["subagent_spawns_by_observed_model"] = dict(sorted(by_model.items()))
         record["behavior"] = behavior
         summarize_delegation(record, behavior)
         forbidden = list(arms.DENIED_TOOLS) + (["Agent"] if arm.subagent_model is None or arm.codex else [])

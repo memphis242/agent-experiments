@@ -92,6 +92,12 @@ def _assistant_messages(path: Path) -> Iterator[tuple[dict, dict]]:
         yield entry, message
 
 
+def observed_models(path: Path) -> list[str]:
+    """Distinct model names in assistant messages, excluding synthetic messages."""
+    return sorted({message["model"] for _, message in _assistant_messages(path)
+                   if isinstance(message.get("model"), str) and message["model"]})
+
+
 def _read_meta(path: Path) -> dict:
     """The subagent transcript's .meta.json content; empty when absent or unreadable."""
     meta_path = path.with_suffix(".meta.json")
