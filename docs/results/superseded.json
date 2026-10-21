@@ -58,5 +58,6 @@
   "87ef583a": "A30 task1 rep 2: validation_error in round 1 (a built-in child's wait_agent call, forbidden by the harness before 90bf29e allowed it); rerun as 89fb2d07",
   "3793522d": "A30 task1 rep 4: validation_error in round 1 (a built-in child's wait_agent call, forbidden by the harness before 90bf29e allowed it); rerun as 64872373",
   "404a0fbc": "A31 task1 rep 3: accounting_error, the Codex JSON Lines reader split a record at U+2028 (fixed in 90bf29e); rerun as 950db34a",
-  "69b4208b": "A31 task1 rep 7: accounting_error, the Codex JSON Lines reader split a record at U+2028 (fixed in 90bf29e); rerun as 1d13eb04"
+  "69b4208b": "A31 task1 rep 7: accounting_error, the Codex JSON Lines reader split a record at U+2028 (fixed in 90bf29e); rerun as 1d13eb04",
+  "77f1022d": "A30 task2 rep 6: codex_error, a built-in child cancelled by Codex after the main turn completed, counted as a failed call before 26b4963; rerun as 08cddc6d"
 }
