@@ -21,7 +21,7 @@ import subprocess
 import tempfile
 import tomllib
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Iterator, Mapping, Sequence
@@ -340,6 +340,19 @@ def _rollout_entries(path: Path) -> Iterator[tuple[dict, bool]]:
             yield entry, False
 
 
+@dataclass(frozen=True)
+class TurnAbort:
+    """An abort event, eligible for cancellation only after its root completes."""
+    epoch: float | None
+    reason: str
+    error: str
+    usage_limit: bool
+
+    def cancelled_after(self, completed_epoch: float | None) -> bool:
+        return (self.reason == "interrupted" and not self.usage_limit and self.epoch is not None
+                and completed_epoch is not None and self.epoch >= completed_epoch)
+
+
 @dataclass
 class Rollout:
     """What one Codex session log records."""
@@ -349,7 +362,11 @@ class Rollout:
     role: str | None = None
     started_epoch: float = 0.0
     completed: bool = False
-    errors: list[str] = field(default_factory=list)
+    completed_epoch: float | None = None
+    root_completed_epoch: float | None = None
+    aborts: list[TurnAbort] = field(default_factory=list)
+    terminal_abort: TurnAbort | None = None
+    error_events: list[str] = field(default_factory=list)
     usage_limit: bool = False
     usage: list[tuple[str, str, float, dict]] = field(default_factory=list)  # response id, model, epoch, usage
     unkeyed_usage: int = 0           # token_usage_record entries without a response id (not priced)
@@ -359,6 +376,15 @@ class Rollout:
     compacted_events: int = 0
     rate_limit_used: list[float] = field(default_factory=list)
     truncated: bool = False
+
+    @property
+    def cancelled(self) -> bool:
+        return self.terminal_abort is not None and self.terminal_abort.cancelled_after(self.root_completed_epoch)
+
+    @property
+    def errors(self) -> list[str]:
+        return self.error_events + [abort.error for abort in self.aborts
+                                    if not abort.cancelled_after(self.root_completed_epoch)]
 
 
 def read_rollout(path: Path) -> Rollout:
@@ -383,6 +409,8 @@ def read_rollout(path: Path) -> Rollout:
             out.started_epoch = parse_timestamp(stamp) if isinstance(stamp, str) else 0.0
         elif kind == "turn_context":
             out.completed = False
+            out.completed_epoch = None
+            out.terminal_abort = None
             model = str(payload.get("model") or model)
             out.turn_contexts.append((str(payload.get("model")), str(payload.get("effort"))))
         elif kind == "compacted":
@@ -407,13 +435,29 @@ def read_rollout(path: Path) -> Rollout:
                 out.rate_limit_used.append(float(primary["used_percent"]))
         elif kind == "event_msg" and payload.get("type") in ("task_started", "turn_started"):
             out.completed = False
+            out.completed_epoch = None
+            out.terminal_abort = None
         elif kind == "event_msg" and payload.get("type") in ("task_complete", "turn_complete", "turn_completed"):
             out.completed = True
+            stamp = entry.get("timestamp")
+            out.completed_epoch = parse_timestamp(stamp) if isinstance(stamp, str) else None
+            out.terminal_abort = None
         elif kind in ("error", "turn.failed") or (kind == "event_msg" and payload.get("type") in
                                                    ("error", "turn_failed", "turn_aborted")):
-            out.errors.append(str(payload.get("message") or payload.get("error") or payload or entry))
+            error = str(payload.get("message") or payload.get("error") or payload or entry)
             detail = json.dumps(entry)
-            out.usage_limit |= bool(USAGE_LIMIT_RE.search(detail)) or "usage_limit_reached" in detail
+            usage_limit = bool(USAGE_LIMIT_RE.search(detail)) or "usage_limit_reached" in detail
+            if kind == "event_msg" and payload.get("type") == "turn_aborted":
+                stamp = entry.get("timestamp")
+                abort = TurnAbort(parse_timestamp(stamp) if isinstance(stamp, str) else None,
+                                  str(payload.get("reason") or ""), error, usage_limit)
+                out.aborts.append(abort)
+                out.terminal_abort = abort
+                out.completed = False
+                out.completed_epoch = None
+            else:
+                out.error_events.append(error)
+            out.usage_limit |= usage_limit
     if not out.thread:  # else the UUID ending the file name
         out.thread = "-".join(path.stem.rsplit("-", 5)[-5:])
     return out
@@ -439,10 +483,12 @@ def read_rollouts(home: Path) -> tuple[Rollout, ...]:
 def split_threads(rollouts: Sequence[Rollout], root_threads: Sequence[str]) -> tuple[tuple[Rollout, ...],
                                                                                  tuple[Rollout, ...],
                                                                                  tuple[Rollout, ...]]:
-    """Main threads, descendants, and unrelated/orphan/cyclic threads, using recorded parent links."""
+    """Main threads, descendants, and unrelated/orphan/cyclic threads, using recorded parent links.
+    Descendants use their root's completion timestamp to classify interrupted turns as cancelled.
+    """
     roots = set(root_threads)
     parents = {r.thread: r.parent_thread for r in rollouts}
-    descendants: set[str] = set()
+    root_of: dict[str, str] = {}
     for thread in parents.keys() - roots:
         seen: set[str] = set()
         current: str | None = thread
@@ -450,9 +496,13 @@ def split_threads(rollouts: Sequence[Rollout], root_threads: Sequence[str]) -> t
             seen.add(current)
             current = parents[current]
         if current in roots:
-            descendants.add(thread)
+            assert current is not None
+            root_of[thread] = current
+    descendants = set(root_of)
+    completed = {r.thread: r.completed_epoch for r in rollouts if r.thread in roots}
     return (tuple(r for r in rollouts if r.thread in roots),
-            tuple(r for r in rollouts if r.thread in descendants),
+            tuple(replace(r, root_completed_epoch=completed.get(root_of[r.thread]))
+                  for r in rollouts if r.thread in descendants),
             tuple(r for r in rollouts if r.thread not in roots | descendants))
 
 
@@ -582,10 +632,11 @@ def summarize_children(home: Path, children: Sequence[Rollout]) -> dict[str, Any
     calls = []
     for thread, logs in by_thread.items():
         errors = [error for log in logs for error in log.errors]
-        unfinished = not logs[-1].completed or logs[-1].truncated
+        unfinished = not (logs[-1].completed or logs[-1].cancelled) or any(log.truncated for log in logs)
         calls.append({"call_id": thread, "thread_id": thread, "agent": logs[0].role,
                       "parent_thread_id": logs[0].parent_thread, "started_epoch": logs[0].started_epoch,
                       "exit_code": None, "failed": bool(errors) or unfinished, "unfinished": unfinished,
+                      "cancelled": logs[-1].cancelled,
                       "errors": errors, "usage_limit": any(log.usage_limit for log in logs),
                       "observed_models": sorted({model for log in logs for model, _ in log.turn_contexts})})
     summary.update(calls=len(calls), per_call=calls,
@@ -596,7 +647,7 @@ def summarize_children(home: Path, children: Sequence[Rollout]) -> dict[str, Any
 
 def validate_children(children: Sequence[Rollout], agent_models: Mapping[str, str],
                       effort: str) -> list[dict[str, Any]]:
-    """Check every built-in child's role, model, effort, tools, and completed rollout."""
+    """Check every built-in child's role, model, effort, tools, and terminal rollout."""
     violations = []
     for child in children:
         found: Counter[tuple[str, str, str]] = Counter()
@@ -613,8 +664,8 @@ def validate_children(children: Sequence[Rollout], agent_models: Mapping[str, st
                 found[("forbidden_tool", "not used", tool)] += count
         if child.errors:
             found[("codex_call_failed", "no error events", "; ".join(child.errors))] += 1
-        if not child.completed or child.truncated:
-            found[("codex_call_unfinished", "a completed rollout", child.thread)] += 1
+        if not (child.completed or child.cancelled) or child.truncated:
+            found[("codex_call_unfinished", "a completed or cancelled rollout", child.thread)] += 1
         violations.extend({"kind": k[0], "source": "subagent", "file": child.path.name,
                            "expected": k[1], "observed": k[2], "count": n} for k, n in sorted(found.items()))
     return violations

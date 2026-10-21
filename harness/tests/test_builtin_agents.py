@@ -156,6 +156,109 @@ class BuiltinAgentsTest(unittest.TestCase):
         self.write_log(CHILD, lines)
         self.assertTrue(self.analyze()["validation"]["ok"])
 
+    def write_aborted_child(self, reason, stamp):
+        self.write_log(THREAD, rollout_lines(effort="low") + [{
+            "timestamp": "2026-10-19T13:50:00.000Z", "type": "event_msg",
+            "payload": {"type": "task_complete"}}])
+        return self.write_log(CHILD, child_lines()[:-1] + [{
+            "timestamp": stamp, "type": "event_msg",
+            "payload": {"type": "turn_aborted", "reason": reason}}])
+
+    def test_child_interrupted_at_or_after_root_completion_is_cancelled(self):
+        for stamp in ("2026-10-19T13:50:00.000Z", "2026-10-19T13:50:00.022Z"):
+            with self.subTest(stamp=stamp):
+                self.write_aborted_child("interrupted", stamp)
+                record = self.analyze()
+                summary = record["behavior"]["codex_subagents"]
+                self.assertIsNone(codex.run_outcome(summary))
+                self.assertTrue(record["validation"]["ok"], record["validation"])
+                call, = summary["per_call"]
+                self.assertTrue(call["cancelled"])
+                self.assertFalse(call["failed"] or call["unfinished"] or call["errors"])
+
+    def test_child_interrupted_before_root_completion_fails(self):
+        self.write_aborted_child("interrupted", "2026-10-19T13:49:59.999Z")
+        record = self.analyze()
+        summary = record["behavior"]["codex_subagents"]
+        self.assertEqual(codex.run_outcome(summary)[0], "codex_error")
+        self.assertEqual({v["kind"] for v in record["validation"]["violations"]},
+                         {"codex_call_failed", "codex_call_unfinished"})
+
+    def test_other_child_abort_reasons_fail_after_root_completion(self):
+        for reason in ("replaced", "shutdown", None):
+            with self.subTest(reason=reason):
+                self.write_aborted_child(reason, "2026-10-19T13:50:00.022Z")
+                record = self.analyze()
+                summary = record["behavior"]["codex_subagents"]
+                self.assertEqual(codex.run_outcome(summary)[0], "codex_error")
+                self.assertEqual({v["kind"] for v in record["validation"]["violations"]},
+                                 {"codex_call_failed", "codex_call_unfinished"})
+
+    def test_cancellation_uses_ancestor_root_completion(self):
+        self.write_aborted_child("interrupted", "2026-10-19T13:50:00.022Z")
+        lines = child_lines("grandchild", CHILD)[:-1] + [{
+            "timestamp": "2026-10-19T13:50:00.023Z", "type": "event_msg",
+            "payload": {"type": "turn_aborted", "reason": "interrupted"}}]
+        self.write_log("grandchild", lines)
+        self.write_log("other-root", [{"type": "session_meta", "payload": {"id": "other-root"}}, {
+            "timestamp": "2026-10-19T13:51:00Z", "type": "event_msg", "payload": {"type": "task_complete"}}])
+        logs = codex.read_rollouts(self.home)
+        _, children, _ = codex.split_threads(logs, [THREAD, "other-root"])
+        self.assertEqual({child.thread for child in children}, {CHILD, "grandchild"})
+        self.assertTrue(all(child.cancelled for child in children))
+        self.assertFalse(codex.validate_children(children, MODELS, "high"))
+        self.assertIsNone(codex.run_outcome(codex.summarize_children(self.home, children)))
+        self.assertFalse(any(log.cancelled for log in logs))
+
+    def test_cancellation_requires_completion_and_abort_timestamps(self):
+        for ending in (
+            [],
+            [{"type": "event_msg", "payload": {"type": "task_complete"}}],
+            [{"timestamp": "2026-10-19T13:50:00Z", "type": "event_msg",
+              "payload": {"type": "task_complete"}},
+             {"type": "event_msg", "payload": {"type": "task_started"}}],
+        ):
+            with self.subTest(ending=ending):
+                self.write_aborted_child("interrupted", "2026-10-19T13:50:00.022Z")
+                self.write_log(THREAD, rollout_lines(effort="low") + ending)
+                record = self.analyze()
+                self.assertEqual(codex.run_outcome(record["behavior"]["codex_subagents"])[0], "codex_error")
+                self.assertFalse(record["validation"]["ok"])
+        path = self.write_aborted_child("interrupted", "2026-10-19T13:50:00.022Z")
+        lines = [json.loads(line) for line in path.read_text().splitlines()]
+        del lines[-1]["timestamp"]
+        self.write_log(CHILD, lines)
+        self.assertFalse(self.analyze()["validation"]["ok"])
+
+    def test_cancellation_preserves_errors_usage_limits_and_truncation(self):
+        cases = (
+            ([{"type": "event_msg", "payload": {"type": "error", "message": "child failed"}}], "", "codex_error"),
+            ([{"type": "event_msg", "payload": {
+                "type": "error", "message": "You've hit your usage limit."}}], "", "usage_limit"),
+            ([{"timestamp": "2026-10-19T13:50:00.001Z", "type": "event_msg", "payload": {
+                "type": "turn_aborted", "reason": "interrupted", "codex_error_info": "usage_limit_reached"}}],
+             "", "usage_limit"),
+            ([], '{"type":', "codex_error"),
+        )
+        for errors, tail, status in cases:
+            with self.subTest(errors=errors, tail=tail):
+                path = self.write_aborted_child("interrupted", "2026-10-19T13:50:00.022Z")
+                lines = [json.loads(line) for line in path.read_text().splitlines()]
+                self.write_log(CHILD, lines[:-1] + errors + lines[-1:])
+                with path.open("a") as log:
+                    log.write(tail)
+                record = self.analyze()
+                self.assertEqual(codex.run_outcome(record["behavior"]["codex_subagents"])[0], status)
+                self.assertFalse(record["validation"]["ok"])
+
+    def test_child_started_after_cancellation_is_unfinished(self):
+        path = self.write_aborted_child("interrupted", "2026-10-19T13:50:00.022Z")
+        with path.open("a") as log:
+            log.write(json.dumps({"type": "event_msg", "payload": {"type": "task_started"}}) + "\n")
+        record = self.analyze()
+        self.assertEqual(codex.run_outcome(record["behavior"]["codex_subagents"])[0], "codex_error")
+        self.assertEqual({v["kind"] for v in record["validation"]["violations"]}, {"codex_call_unfinished"})
+
     def test_child_errors_and_incomplete_rollouts_stop_before_acceptance(self):
         cfg = run.RunConfig("A30", "t1", 1, None, self.root / "template", self.root, self.root / "arms",
                             self.root / "tasks", self.root / "missing", 1, 60.0, 60.0, 0, "unused", "t1", False)
