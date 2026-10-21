@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Render per-arm spread charts (billed cost and wall time per run) as standalone SVG files.
+"""Render per-arm spread charts (billed cost and wall time per run) as standalone SVG files, each with a
+high-resolution PNG copy beside it for viewers that scale SVG poorly (phones).
 
 One chart per metric, one row per arm: a range bar from the arm's minimum to maximum, one dot per
 run (hollow with a red outline when the run did not pass), and a tick at the median. Arms named as
 failed in the notes file (`--notes`) keep their runs on a dark red row background, marked "failed task*"
-beside the run count, with the task's footnote under the axis. Standard library only; the output is deterministic for a given input.
+beside the run count, with the task's footnote under the axis. Standard library only, plus ImageMagick
+(`magick`, with librsvg) for the PNG copies; the SVG output is deterministic for a given input.
 """
 from __future__ import annotations
 
@@ -12,7 +14,9 @@ import argparse
 import json
 import math
 import re
+import shutil
 import statistics
+import subprocess
 import sys
 import textwrap
 from dataclasses import dataclass, field
@@ -121,6 +125,7 @@ TINT_MARKERS = ("conservative", "roles", "secondary debugger")  # description wo
 
 # Metric id -> output file name
 CHART_FILES = {"cost": "{task}-cost.svg", "time": "{task}-time.svg"}
+PNG_DENSITY = 192  # dots per inch for the PNG copy: twice the SVG's 96 px per inch
 
 
 @dataclass(frozen=True)
@@ -501,6 +506,20 @@ def task_label(task: str) -> str:
     return f"Task {found.group(1)}" if found else task
 
 
+def write_png(svg_path: Path) -> Path:
+    """Rasterize svg_path to a PNG beside it with ImageMagick's librsvg delegate; raise OSError on failure."""
+    assert svg_path.suffix == ".svg", svg_path
+    magick = shutil.which("magick")
+    if magick is None:
+        raise OSError("ImageMagick 'magick' not found on PATH; install it to write the PNG copies")
+    png_path = svg_path.with_suffix(".png")
+    done = subprocess.run([magick, "-density", str(PNG_DENSITY), f"rsvg:{svg_path}", "-strip", f"png:{png_path}"],
+                          capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        raise OSError(f"magick could not rasterize {svg_path}: {done.stderr.strip() or done.returncode}")
+    return png_path
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--runs-dir", type=Path, required=True)
@@ -560,6 +579,12 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(f"charts: error: cannot write {path}: {exc}", file=sys.stderr)
             return 1
         print(f"charts: wrote {path}")
+        try:
+            png = write_png(path)
+        except OSError as exc:
+            print(f"charts: error: {exc}", file=sys.stderr)
+            return 1
+        print(f"charts: wrote {png}")
     return 0
 
 
