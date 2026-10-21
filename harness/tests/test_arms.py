@@ -1,5 +1,6 @@
 import json
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
@@ -210,34 +211,46 @@ class ArmsTest(unittest.TestCase):
             head, _, section = text.partition("\n\n## Subagents\n")
             self.assertEqual(head.rstrip(), (self.base / claude_arm / "CLAUDE.md").read_text().split("\n\n## Subagents")[0].rstrip())
             self.assertIn("Delegate implementation, not thinking.", head)
-            self.assertIn("`wait` for all of them in that same command", section)
-            self.assertIn("no `pgrep`, `ps` or polling loop", section)
+            if arm == "A30":
+                self.assertIn('`spawn_agent`', section)
+                self.assertIn('`agent_type`', section)
+                self.assertIn('fork_turns="none"', section)
+                self.assertIn('`wait_agent`', section)
+                self.assertIn('self-contained assignment', section)
+                self.assertNotIn('codex-agent', text)
+            else:
+                self.assertIn("`wait` for all of them in that same command", section)
+                self.assertIn("no `pgrep`, `ps` or polling loop", section)
             for claude_only in ("run_in_background", "Bash timeout", "notified"):
                 self.assertNotIn(claude_only, section)
             self.assertNotIn("{{", text)
-            self.assertTrue(arms.ARMS[arm].codex_main and arms.ARMS[arm].command_subagents)
+            self.assertTrue(arms.ARMS[arm].codex_main)
+            self.assertEqual(arms.ARMS[arm].command_subagents, arm != "A30")
             self.assertEqual(arms.ARMS[arm].main_effort, "low")
             self.assertEqual(arms.ARMS[arm].subagent_effort, "high")
         self.assertIn("run_in_background", (self.base / "A24" / "CLAUDE.md").read_text())  # unchanged for A24
 
-    def test_a30_codex_subagents_have_their_own_home_inputs(self):
+    def test_a30_builtin_roles_and_waits(self):
         codex = self.base / "A30" / "codex"
-        self.assertEqual(sorted(p.name for p in (self.base / "A30").iterdir()), ["codex"])
-        self.assertTrue((codex / "bin" / "codex-agent").stat().st_mode & 0o111)
-        self.assertEqual((codex / "bin" / "codex-agent").read_bytes(), arms.CODEX_AGENT_SCRIPT.read_bytes())
-        self.assertEqual((codex / "subagent" / "AGENTS.md").read_text(), arms.working_agreement())
-        self.assertIn('model = "gpt-6-luna"', (codex / "subagent" / "config.toml").read_text())
-        main = (codex / "config.toml").read_text()
-        self.assertIn('model = "gpt-6.1-sol"', main)
-        self.assertIn('model_reasoning_effort = "low"', main)
-        self.assertIn("background_terminal_max_timeout = 7200000", main)
-        self.assertLess(main.index("background_terminal_max_timeout"), main.index("[agents]"))
-        self.assertNotIn("background_terminal_max_timeout", (self.base / "A26" / "codex" / "config.toml").read_text())
-        roster = json.loads((codex / "agent.json").read_text())
-        self.assertEqual({n: (a["model"], a["effort"]) for n, a in roster["agents"].items()},
-                         {n: ("gpt-6-luna", "high") for n in arms.TIERED_AGENTS})
-        text = (codex / "AGENTS.md").read_text()
-        self.assertIn("OpenAI's GPT-6 Luna at high reasoning effort", text)
+        self.assertEqual(sorted(p.name for p in codex.iterdir()), ["AGENTS.md", "config.toml", "roles"])
+        main = tomllib.loads((codex / "config.toml").read_text())
+        self.assertEqual((main["model"], main["model_reasoning_effort"]), ("gpt-6.1-sol", "low"))
+        self.assertTrue(main["features"]["multi_agent"])
+        self.assertEqual(main["features"]["multi_agent_v2"], {
+            "enabled": True, "default_wait_timeout_ms": 3600000, "max_wait_timeout_ms": 3600000})
+        self.assertTrue(main["agents"]["enabled"])
+        for settings in (main["agents"], main["features"]["multi_agent_v2"]):
+            self.assertNotIn("max_concurrent_threads_per_session", settings)
+        for key in ("shell_environment_policy", "background_terminal_max_timeout"):
+            self.assertNotIn(key, main)
+        for name in arms.TIERED_AGENTS:
+            fields, body = arms._split_agent_template(name)
+            declaration = main["agents"][name]
+            self.assertEqual(declaration["description"], fields["description"])
+            role = tomllib.loads((codex / declaration["config_file"]).read_text())
+            self.assertEqual((role["model"], role["model_reasoning_effort"]), ("gpt-6-luna", "high"))
+            self.assertEqual(role["developer_instructions"], body)
+            self.assertEqual(body, (self.base / "A24" / "codex" / "roles" / f"{name}.md").read_text())
 
     def test_claude_agent_arms(self):
         for arm, models in (("A31", {"implementer": "claude-opus-5-5", "small-implementer": "claude-haiku-5-5",
@@ -246,6 +259,10 @@ class ArmsTest(unittest.TestCase):
             root = self.base / arm
             self.assertEqual(sorted(p.name for p in root.iterdir()), ["claude", "codex"])
             self.assertEqual(sorted(p.name for p in (root / "codex").iterdir()), ["AGENTS.md", "config.toml"])
+            main = tomllib.loads((root / "codex" / "config.toml").read_text())
+            self.assertEqual(main["background_terminal_max_timeout"], 7200000)
+            self.assertEqual(main["features"]["code_mode"], {
+                "enabled": True, "default_exec_yield_time_ms": 600000})
             claude = root / "claude"
             launcher = claude / "bin" / "claude-agent"
             self.assertTrue(launcher.stat().st_mode & 0o111)

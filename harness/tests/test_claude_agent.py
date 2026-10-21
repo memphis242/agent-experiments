@@ -12,13 +12,12 @@ from pathlib import Path
 from unittest import mock
 
 import _support  # noqa: F401
-import analysis
 import arms
 import claude_calls
 import codex
 import cost
 import run
-from test_codex import THREAD, make_world, rollout_lines
+from test_codex import make_world
 
 SECRET = "tok-secret-value"
 # A fake `claude -p`: records how it was started, writes the session transcript Claude Code would,
@@ -255,49 +254,6 @@ class NamespaceCredentialsTest(unittest.TestCase):
         env = run.codex_main_env(Path("/run/codex-home"), base, [Path("/run/config/claude/bin")], "/dev/shm/login")
         self.assertEqual(env, {"PATH": "/run/config/claude/bin:/usr/bin", "HOME": "/h",
                                "CODEX_HOME": "/run/codex-home", "CLAUDE_AGENT_CREDENTIALS_FILE": "/dev/shm/login"})
-
-
-class SeparatedCodexSessionsTest(unittest.TestCase):
-    def write_log(self, home, lines, name):
-        path = home / "sessions" / "2026" / "10" / "19" / f"rollout-2026-10-19T08-49-16-{name}.jsonl"
-        path.parent.mkdir(parents=True)
-        path.write_text("".join(json.dumps(l) + "\n" for l in lines))
-
-    def test_main_and_subagent_homes_are_costed_and_validated_apart(self):
-        sub_thread = "11111111-2222-3333-4444-555555555555"
-        with tempfile.TemporaryDirectory() as tmp:
-            home = Path(tmp)
-            sub = codex.subagent_home_for(home)
-            self.write_log(home, rollout_lines(model="gpt-6.1-sol", effort="low"), THREAD)
-            lines = [dict(l, payload={**l["payload"], "id": sub_thread}) if l["type"] == "session_meta" else l
-                     for l in rollout_lines(model="gpt-6-luna", effort="high")]
-            self.write_log(sub, lines, sub_thread)
-            call = sub / "agent-calls" / "c1-tester"
-            call.mkdir(parents=True)
-            (call / "call.json").write_text(json.dumps({
-                "agent": "tester", "started_epoch": 100.0, "ended_epoch": 160.0, "exit_code": 0, "failed": False,
-                "thread_id": sub_thread, "usage_limit": False}))
-            record = {"arm": "A30", "session_ids": [THREAD], "resume_request_indices": [], "rounds": [
-                {"round": 1, "started_epoch": 90.0, "wall_time_s": 80.0}]}
-            analysis.update_record(record, [], [], [], Path("/missing"), 0, {}, home, sub, None)
-            self.assertIsNone(record["analysis_error"])
-            billed = record["cost"]["scenarios"]["billed"]
-            self.assertEqual(set(billed["by_model"]), {"gpt-6.1-sol", "gpt-6-luna"})
-            self.assertGreater(billed["by_source"]["subagent"], 0)
-            self.assertAlmostEqual(billed["by_source"]["main"] + billed["by_source"]["subagent"], billed["total_usd"], places=5)
-            self.assertAlmostEqual(billed["by_model"]["gpt-6-luna"], billed["by_source"]["subagent"], places=5)
-            behavior = record["behavior"]
-            self.assertEqual((behavior["subagent_spawns"], behavior["subagent_spawns_by_type"]), (1, {"tester": 1}))
-            self.assertEqual(record["totals"]["turns"], 2)  # the main thread's requests only
-            self.assertEqual((behavior["max_context_main"], behavior["max_context_subagent"]), (300_000, 300_000))
-            self.assertEqual(record["rounds"][0]["delegation"]["spawns"], 1)
-            self.assertTrue(record["validation"]["ok"], record["validation"])
-            # A subagent session on the main agent's model or effort is flagged.
-            [path] = codex.rollout_files(sub)
-            path.write_text(path.read_text().replace("gpt-6-luna", "gpt-6.1-sol").replace('"high"', '"low"'))
-            analysis.update_record(record, [], [], [], Path("/missing"), 0, {}, home, sub, None)
-            self.assertEqual(sorted((v["kind"], v["observed"]) for v in record["validation"]["violations"]),
-                             [("effort", "low"), ("model", "gpt-6.1-sol")])
 
 
 if __name__ == "__main__":

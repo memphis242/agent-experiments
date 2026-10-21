@@ -55,7 +55,9 @@ def reanalyze_run(run_dir: Path, gaps_path: Path) -> tuple[float | None, float |
     definition_models = (record.get("behavior") or {}).get("agent_definition_models", {})
     codex_home = (codex.home_for(run_dir) if codex_main or record.get("subagent_harness") == "codex" else None)
     arm = arms.get_arm(record["arm"])
-    subagent_home = codex.subagent_home_for(codex_home) if codex_home and arm.codex_main and arm.codex else None
+    # Persisted shell-launcher runs keep their separate home; built-in children share the main home.
+    candidate = codex.subagent_home_for(codex_home) if codex_home and arm.builtin_subagents else None
+    subagent_home = candidate if candidate is not None and candidate.is_dir() else None
     claude_dir = run_dir / "config" / arms.CLAUDE_DIR if arm.claude_agents else None
     analysis.update_record(record, mains, sub_dirs, record.get("resume_request_indices", []),
                            gaps_path, (record.get("cost") or {}).get("seed", 0), definition_models, codex_home,

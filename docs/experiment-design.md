@@ -155,30 +155,52 @@ write TTL scenarios coincide with billed, since Codex has no TTL split and no
 pauses are simulated.
 
 A30 to A32 give a Codex GPT-6.1 Sol main agent (low effort) the tiered delegation
-of A14, A15 and A24, with subagents at high effort. A30's subagents are headless
-Codex sessions on GPT-6 Luna (the roster of A24, through the same `codex-agent`);
+of A14, A15 and A24, with subagents at high effort. A30's subagents are built-in
+Codex V2 agents on GPT-6 Luna (the roster and role prompts of A24);
 A31's are headless Claude Code sessions, the implementer on Opus 5.5 and the
 small-implementer and tester on Haiku 5.5 (the inverse of A23); A32's are Claude
 Code sessions on Haiku 5.5 throughout (the inverse of A24). The main agent's
 AGENTS.md is what the matching Claude main agent's CLAUDE.md is (the working
 agreement and the tiered paragraph) followed by the subagents section, rewritten
-for Codex's shell tool: it starts a subagent with `codex-agent` or `claude-agent`
-(the task on standard input, the report on standard output), waits for it in the
-foreground, and runs several at once with `&` and a `wait` in the same shell
-command, never polling with `pgrep`, `ps` or a loop. Codex's shell tool has no
-per-command kill timeout: a command that outlives a call keeps running as a
-session that the model polls, the code cell yielding after 30 s and the `wait`
-tool honouring yield times of at least ten minutes. Empty polls of a session
-are capped by `background_terminal_max_timeout` (five minutes by default, 15 s
-when set to 15000, as tried), which the main agent's config sets to two hours.
+for the arm's delegation mechanism. A30 uses Codex 0.163's built-in multi-agent
+V2 runtime, explicitly enabling `features.multi_agent` and
+`features.multi_agent_v2.enabled`. Its `agents.implementer`,
+`agents.small-implementer` and `agents.tester` declarations use the same descriptions
+as A24, each referencing a role TOML with GPT-6 Luna, high reasoning effort and
+exactly the role prompt body A24 passes to `codex-agent`. No concurrency limit is
+set, since the tiered arms specify none: V2 defaults to the root plus three resident
+children. The main uses `spawn_agent` with `agent_type`, `fork_turns="none"` and a
+self-contained assignment, then `wait_agent`. Both
+`features.multi_agent_v2.default_wait_timeout_ms` and `max_wait_timeout_ms` are
+3600000 (one hour), reducing check-ins as approved by the owner. Role features
+disable further delegation. Built-in children inherit global AGENTS.md, including
+the tiered delegation section; Codex cannot replace that with a child-only global
+agreement. The working agreement and tiered paragraph preceding the subagent
+section remain byte-identical to A24.
 
-A30's subagents have a CODEX_HOME of their own, `codex-home/subagents/` (shared
-login by symlink), so that their global AGENTS.md is the plain working agreement
-(as in A21 to A25) rather than the main agent's, and so that main and subagent
-rollouts are told apart by directory: the main agent's shell commands see that
-directory as CODEX_HOME through `shell_environment_policy.set`, which is how the
-unchanged `codex-agent` finds the subagents' configuration. A31 and A32's
-`claude-agent` (`harness/claude_agent.py`) runs `claude -p` with the agent's
+A30 uses one CODEX_HOME for main and children, with no `codex-agent` launcher,
+subagent home or shell CODEX_HOME override. Main invocations never use
+`--ephemeral`, since children need persisted rollouts. The root thread is the one
+reported by `codex exec` or resume; children are identified by the
+`parent_thread_id` ancestry in rollout metadata. Requests are deduplicated within
+threads, attributed to main or subagent and priced per model. Exec's cumulative
+`turn.completed.usage` is reconciled only against the main thread. Spawn counts
+and roles come from child rollout metadata. Main turns must match the main model
+and effort; each child must match its configured role's model and effort. Unknown
+roles, unexpected threads and models fail validation. Child error events or logs
+ending without completion stop the run before acceptance as `codex_error`, or
+`usage_limit` for usage-limit errors.
+
+A31 and A32 start `claude-agent` with the task on standard input and report on
+standard output, waiting in the foreground or running several with `&` and a
+`wait` in the same shell command, never polling with `pgrep`, `ps` or a loop.
+Codex's shell tool has no per-command kill timeout: a command that outlives a call
+keeps running as a session. These arms set `background_terminal_max_timeout` to
+7200000 (two hours) and `features.code_mode.default_exec_yield_time_ms` to 600000
+(ten minutes), explicitly enabling Code Mode. The latter is the 0.163 binary's
+CodeModeConfigToml field, also used in its tool-description template. Feature
+checks support feature tables with `enabled` as well as boolean feature values.
+A31 and A32's `claude-agent` (`harness/claude_agent.py`) runs `claude -p` with the agent's
 model, its role as an appended system prompt, `--tools` limited to the agent's
 definition, the Agent tool and the denied tools denied, and bypassPermissions,
 in a CLAUDE_CONFIG_DIR of the run (`config/claude/`) whose settings.json gives the
@@ -193,8 +215,8 @@ withhold a variable named like a secret anyway, and nothing is on disk; the main
 agent can read the file if it looks for it. A Claude usage limit in a
 `claude-agent` call ends the run as `usage_limit`, any other failed call as
 `claude_error`, after the round and before acceptance. Costs: the main agent from
-its Codex session log (source main), each Codex subagent from the subagents'
-home, each Claude call from its transcript (source subagent, Claude prices and
+its Codex session log (source main), each built-in Codex subagent from its
+descendant thread in the same home, each Claude call from its transcript (source subagent, Claude prices and
 cache TTLs as recorded) plus the tokens the call's own `modelUsage` holds beyond
 its transcript.
 
@@ -304,6 +326,10 @@ and pauses the matrix.
 - `CLAUDE_CONFIG_DIR=/workspace/agent-experiments-arms/<arm>` with only that
   arm's `settings.json`, `CLAUDE.md`, and `agents/`. No global CLAUDE.md, no
   user agents, no plugins. Auth via `CLAUDE_CODE_OAUTH_TOKEN` (subscription).
+- Every arm hides the owner's `Path.home()/".secrets"` directory under an empty
+  tmpfs in the agent's mount namespace, alongside the other hidden paths. The
+  harness loads credentials before entering the namespace; credential delivery
+  into the run is unaffected.
 - Fresh clone of the mission template per run under /workspace, never under
   the home directory (ancestor CLAUDE.md files would load).
 - Unique run ID appended via `--append-system-prompt` so cache prefixes
@@ -328,7 +354,8 @@ and pauses the matrix.
   run is pinned to the Codex binary resolved at its start. Before the first
   round the harness renders Codex's model-visible prompt
   (`codex-prompt-input.json` in the run dir) and refuses to start if it carries
-  skills, multi-agent, app or plugin sections or lacks the working agreement,
+  skills, app or plugin sections (or multi-agent sections outside A30) or lacks
+  the working agreement,
   or if `codex features list` shows a configured feature in the wrong state,
   and loads the final config with `--strict-config` as every call does. The
   login's refresh token is single-use, so two runs refreshing it at once would

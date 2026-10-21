@@ -39,10 +39,8 @@ USER_AUTH = Path("~/.codex/auth.json").expanduser()
 HOST_VISIBLE: tuple[Path, ...] = (Path("~/.codex/packages").expanduser(),)
 RUNTIME_FILE = "agent-runtime.json"  # read by codex-agent: the Codex binary this run is pinned to
 PROMPT_INPUT_FILE = "codex-prompt-input.json"
-SUBAGENT_PROMPT_INPUT_FILE = "codex-prompt-input-subagents.json"
-SUBAGENT_HOME_DIR = "subagents"  # inside CODEX_HOME: the Codex subagents' own CODEX_HOME for a Codex main agent
-# Prompt sections that must not reach an agent: bundled skills, multi-agent
-# collaboration, connected apps and plugins.
+SUBAGENT_HOME_DIR = "subagents"  # legacy shell-launched children, for offline reanalysis
+# Restricted prompt sections; built-in delegation arms allow the collaboration sections.
 FORBIDDEN_PROMPT_MARKERS: tuple[str, ...] = ("<skills_instructions>", "<multi_agent_role>", "<multi_agent_mode>",
                                              "<apps_instructions>", "<plugins_instructions>")
 SETUP_TIMEOUT_S = 120
@@ -66,7 +64,7 @@ def home_for(run_dir: Path) -> Path:
 
 
 def subagent_home_for(home: Path) -> Path:
-    """The Codex subagents' CODEX_HOME of a Codex main agent whose CODEX_HOME is `home`."""
+    """The separate CODEX_HOME of archived shell-launched Codex children."""
     return home / SUBAGENT_HOME_DIR
 
 
@@ -197,18 +195,22 @@ def sweep_stale_logins(runs_dir: Path) -> list[str]:
 
 
 def _build_home(home: Path, source: Path, run_dir: Path, repo: Path, base_env: dict[str, str], codex_bin: str,
-                prompt_file: str, extra_config: str = "") -> dict[str, Any]:
+                prompt_file: str) -> dict[str, Any]:
     """Fill an existing CODEX_HOME from `source` (a dir with config.toml and AGENTS.md): pin the
-    Codex binary, check the feature states, disable the bundled skills, append `extra_config`, check
+    Codex binary, check the feature states, disable the bundled skills, copy role files, check
     the model-visible prompt (saved as `prompt_file` in the run dir), and validate the final config
     strictly. Returns the feature states and the prompt's provenance."""
     (home / RUNTIME_FILE).write_text(json.dumps({"codex_bin": codex_bin}, indent=2) + "\n", encoding="utf-8")
     shutil.copyfile(source / "config.toml", home / "config.toml")
     shutil.copyfile(source / "AGENTS.md", home / "AGENTS.md")
+    if any((source / "roles").glob("*.toml")):
+        shutil.copytree(source / "roles", home / "roles")
     env = {**base_env, "CODEX_HOME": str(home)}
     states = _feature_states(_capture([codex_bin, "features", "list"], repo, env))
     wanted = tomllib.loads((home / "config.toml").read_text(encoding="utf-8")).get("features", {})
-    mismatched = sorted(name for name, on in wanted.items() if states.get(name) is not on)
+    expected = {name: value.get("enabled", True) if isinstance(value, dict) else value
+                for name, value in wanted.items()}
+    mismatched = sorted(name for name, on in expected.items() if states.get(name) is not on)
     if mismatched:  # a misspelled or retired feature key leaves the feature at its default
         raise CodexError(f"Codex features not in their configured state: {mismatched}")
     render = [codex_bin, "debug", "prompt-input"]
@@ -217,11 +219,11 @@ def _build_home(home: Path, source: Path, run_dir: Path, repo: Path, base_env: d
     with (home / "config.toml").open("a", encoding="utf-8") as config:
         for path in skills:
             config.write(f'\n[[skills.config]]\npath = {json.dumps(str(path))}\nenabled = false\n')
-        config.write(extra_config)
     rendered = _capture(render, repo, env)
     (run_dir / prompt_file).write_text(rendered, encoding="utf-8")
     joined = "\n".join(t for _, t in _prompt_texts(rendered))
-    present = [m for m in FORBIDDEN_PROMPT_MARKERS if m in joined]
+    allowed = {"<multi_agent_role>", "<multi_agent_mode>"} if expected.get("multi_agent") else set()
+    present = [m for m in FORBIDDEN_PROMPT_MARKERS if m not in allowed and m in joined]
     if present:
         raise CodexError(f"the Codex prompt still carries {present}; see {run_dir / prompt_file}")
     agreement = (source / "AGENTS.md").read_text(encoding="utf-8").strip()
@@ -233,36 +235,23 @@ def _build_home(home: Path, source: Path, run_dir: Path, repo: Path, base_env: d
     return {"states": states, "skills": len(skills), "prompt_sha256": hashlib.sha256(rendered.encode()).hexdigest()}
 
 
-def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[str, str],
-                 subagent_config: Path | None = None) -> dict[str, Any]:
+def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[str, str]) -> dict[str, Any]:
     """Create <run>/codex-home from the arm's codex/ dir, pin the Codex binary, check the
     feature states, disable Codex's bundled skills, check the model-visible prompt, validate
     the final config strictly, and install a copy of the user's Codex login.
 
     The prompt check renders exactly what a Codex agent's first request carries apart from
     its role (a subagent), run id (the main agent), and task, saves it as codex-prompt-input.json
-    in the run dir, and fails unless the arm's AGENTS.md is present and no skills, multi-agent,
-    app, or plugin section is. The login is copied last, and not at all when Codex would refresh it
-    within RUN_MARGIN.
+    in the run dir, and fails unless the arm's AGENTS.md is present and no skills, app or plugin
+    section is. Collaboration sections are allowed only for built-in arms. The login is copied
+    last, and not at all when Codex would refresh it within RUN_MARGIN.
 
-    With subagent_config (a Codex main agent with Codex subagents), the subagents get their own
-    CODEX_HOME inside the main one, built and checked the same way from that dir (so that their global
-    AGENTS.md is the plain working agreement, not the main agent's), and the main agent's shell
-    commands see it as CODEX_HOME (shell_environment_policy.set) while the main agent itself runs on
-    its own. The subagent home shares the main home's login through a symlink. Returns provenance
-    for run.json."""
+    Built-in role files are copied into the shared home. Returns provenance for run.json.
+    """
     home = home_for(run_dir)
     home.mkdir()
     codex_bin = str(resolve_codex_bin())
-    sub_home = subagent_home_for(home) if subagent_config is not None else None
-    extra = (f"\n[shell_environment_policy.set]\nCODEX_HOME = {json.dumps(str(sub_home))}\n"
-             if sub_home is not None else "")
-    main = _build_home(home, codex_config, run_dir, repo, base_env, codex_bin, PROMPT_INPUT_FILE, extra)
-    sub = None
-    if sub_home is not None:
-        assert subagent_config is not None
-        sub_home.mkdir()
-        sub = _build_home(sub_home, subagent_config, run_dir, repo, base_env, codex_bin, SUBAGENT_PROMPT_INPUT_FILE)
+    main = _build_home(home, codex_config, run_dir, repo, base_env, codex_bin, PROMPT_INPUT_FILE)
     states = main["states"]
     version = _capture([codex_bin, "--version"], repo, base_env).strip()
     if not USER_AUTH.is_file():
@@ -282,15 +271,10 @@ def prepare_home(run_dir: Path, codex_config: Path, repo: Path, base_env: dict[s
         shutil.copyfile(USER_AUTH, target)
         target.chmod(0o600)
         installed = hashlib.sha256(target.read_bytes()).hexdigest()
-    if sub_home is not None:
-        (sub_home / AUTH_FILE).symlink_to(Path("..") / AUTH_FILE)
     enabled = sorted(name for name, on in states.items() if on)
     info = {"codex_version": version, "codex_bin": codex_bin, "features_enabled": enabled,
             "skills_disabled": main["skills"], "prompt_input_sha256": main["prompt_sha256"],
             "auth_sha256": installed, "login_refresh_point": point.isoformat(), "stale_logins_swept": swept}
-    if sub is not None:
-        info.update(subagent_home=str(sub_home), subagent_skills_disabled=sub["skills"],
-                    subagent_prompt_input_sha256=sub["prompt_sha256"])
     return info
 
 
@@ -360,6 +344,12 @@ class Rollout:
     """What one Codex session log records."""
     path: Path
     thread: str = ""
+    parent_thread: str | None = None
+    role: str | None = None
+    started_epoch: float = 0.0
+    completed: bool = False
+    errors: list[str] = field(default_factory=list)
+    usage_limit: bool = False
     usage: list[tuple[str, str, float, dict]] = field(default_factory=list)  # response id, model, epoch, usage
     unkeyed_usage: int = 0           # token_usage_record entries without a response id (not priced)
     turn_contexts: list[tuple[str, str]] = field(default_factory=list)  # model, effort
@@ -381,7 +371,17 @@ def read_rollout(path: Path) -> Rollout:
         payload = entry.get("payload") if isinstance(entry.get("payload"), dict) else {}
         if kind == "session_meta" and not out.thread and payload.get("id"):
             out.thread = str(payload["id"])
+            source = payload.get("source")
+            subagent = source.get("subagent", {}) if isinstance(source, dict) else {}
+            spawn = subagent.get("thread_spawn", {}) if isinstance(subagent, dict) else {}
+            if not isinstance(spawn, dict):
+                spawn = {}
+            out.parent_thread = payload.get("parent_thread_id") or spawn.get("parent_thread_id")
+            out.role = payload.get("agent_role") or spawn.get("agent_role")
+            stamp = entry.get("timestamp") or payload.get("timestamp")
+            out.started_epoch = parse_timestamp(stamp) if isinstance(stamp, str) else 0.0
         elif kind == "turn_context":
+            out.completed = False
             model = str(payload.get("model") or model)
             out.turn_contexts.append((str(payload.get("model")), str(payload.get("effort"))))
         elif kind == "compacted":
@@ -404,25 +404,55 @@ def read_rollout(path: Path) -> Rollout:
             primary = ((payload.get("rate_limits") or {}).get("primary") or {})
             if isinstance(primary.get("used_percent"), (int, float)):
                 out.rate_limit_used.append(float(primary["used_percent"]))
+        elif kind == "event_msg" and payload.get("type") in ("task_started", "turn_started"):
+            out.completed = False
+        elif kind == "event_msg" and payload.get("type") in ("task_complete", "turn_complete", "turn_completed"):
+            out.completed = True
+        elif kind in ("error", "turn.failed") or (kind == "event_msg" and payload.get("type") in
+                                                   ("error", "turn_failed", "turn_aborted")):
+            out.errors.append(str(payload.get("message") or payload.get("error") or payload or entry))
+            detail = json.dumps(entry)
+            out.usage_limit |= bool(USAGE_LIMIT_RE.search(detail)) or "usage_limit_reached" in detail
     if not out.thread:  # else the UUID ending the file name
         out.thread = "-".join(path.stem.rsplit("-", 5)[-5:])
     return out
 
 
 def read_rollouts(home: Path) -> tuple[Rollout, ...]:
-    """Every session log, each response counted once (the first log that records it keeps it)."""
-    seen: set[str] = set()
+    """Every session log, each (thread, response) counted once in the first log recording it."""
+    seen: set[tuple[str, str]] = set()
     rollouts = []
     for path in rollout_files(home):
         rollout = read_rollout(path)
         kept = []
         for usage in rollout.usage:
-            if usage[0] not in seen:
-                seen.add(usage[0])
+            key = (rollout.thread, usage[0])
+            if key not in seen:
+                seen.add(key)
                 kept.append(usage)
         rollout.usage = kept
         rollouts.append(rollout)
     return tuple(rollouts)
+
+
+def split_threads(rollouts: Sequence[Rollout], root_threads: Sequence[str]) -> tuple[tuple[Rollout, ...],
+                                                                                 tuple[Rollout, ...],
+                                                                                 tuple[Rollout, ...]]:
+    """Main threads, descendants, and unrelated/orphan/cyclic threads, using recorded parent links."""
+    roots = set(root_threads)
+    parents = {r.thread: r.parent_thread for r in rollouts}
+    descendants: set[str] = set()
+    for thread in parents.keys() - roots:
+        seen: set[str] = set()
+        current: str | None = thread
+        while current in parents and current not in seen and current not in roots:
+            seen.add(current)
+            current = parents[current]
+        if current in roots:
+            descendants.add(thread)
+    return (tuple(r for r in rollouts if r.thread in roots),
+            tuple(r for r in rollouts if r.thread in descendants),
+            tuple(r for r in rollouts if r.thread not in roots | descendants))
 
 
 def thread_id(path: Path) -> str:
@@ -449,16 +479,22 @@ def _usage_int(usage: dict, key: str) -> int:
     return int(value) if isinstance(value, (int, float)) else 0
 
 
-def load_requests(home: Path, source: str = "subagent") -> tuple[cost.Request, ...]:
+def load_requests(home: Path, source: str = "subagent", *,
+                  root_threads: Sequence[str] | None = None) -> tuple[cost.Request, ...]:
     """One request per model response in the Codex session logs: a subagent's by default,
     or, for a Codex-main arm (source "main"), the main agent's, numbered in log order.
+    With root_threads, main selects those roots and subagent selects their descendants.
 
     Codex reports input_tokens inclusive of cached and cache-write tokens; the
     uncached remainder is billed at the input price, cached tokens at the cache-read
     price, and cache writes at the cache-write price (both TTL slots carry it)."""
     assert source in cost.SOURCES
     requests: list[cost.Request] = []
-    for rollout in read_rollouts(home):
+    rollouts = read_rollouts(home)
+    if root_threads is not None:
+        main, children, _ = split_threads(rollouts, root_threads)
+        rollouts = main if source == "main" else children
+    for rollout in rollouts:
         for key, model, stamp, usage in rollout.usage:
             total = _usage_int(usage, "input_tokens")
             cached = _usage_int(usage, "cached_input_tokens")
@@ -480,10 +516,10 @@ def call_failed(call: dict[str, Any]) -> bool:
     return call.get("ended_epoch") is not None and bool(call.get("failed")) and not call.get("stopped_by_signal")
 
 
-def summarize(home: Path) -> dict[str, Any]:
+def summarize(home: Path, *, rollouts: Sequence[Rollout] | None = None) -> dict[str, Any]:
     """Calls by agent, tool use, compactions, models and efforts, and per-call timing."""
     calls = call_records(home)
-    rollouts = read_rollouts(home)
+    rollouts = read_rollouts(home) if rollouts is None else rollouts
     tools: Counter[str] = Counter()
     models: Counter[str] = Counter()
     efforts: Counter[str] = Counter()
@@ -536,9 +572,57 @@ def run_outcome(summary: dict[str, Any]) -> tuple[str, str] | None:
     return None
 
 
+def summarize_children(home: Path, children: Sequence[Rollout]) -> dict[str, Any]:
+    """Built-in spawns and failures from each descendant's own persisted rollout."""
+    summary = summarize(home, rollouts=children)
+    by_thread: dict[str, list[Rollout]] = {}
+    for child in children:
+        by_thread.setdefault(child.thread, []).append(child)
+    calls = []
+    for thread, logs in by_thread.items():
+        errors = [error for log in logs for error in log.errors]
+        unfinished = not logs[-1].completed or logs[-1].truncated
+        calls.append({"call_id": thread, "thread_id": thread, "agent": logs[0].role,
+                      "parent_thread_id": logs[0].parent_thread, "started_epoch": logs[0].started_epoch,
+                      "exit_code": None, "failed": bool(errors) or unfinished, "unfinished": unfinished,
+                      "errors": errors, "usage_limit": any(log.usage_limit for log in logs),
+                      "observed_models": sorted({model for log in logs for model, _ in log.turn_contexts})})
+    summary.update(calls=len(calls), per_call=calls,
+                   calls_by_agent=dict(sorted(Counter(str(c["agent"]) for c in calls).items())),
+                   usage_limit=any(c["usage_limit"] for c in calls))
+    return summary
+
+
+def validate_children(children: Sequence[Rollout], agent_models: Mapping[str, str],
+                      effort: str) -> list[dict[str, Any]]:
+    """Check every built-in child's role, model, effort, tools, and completed rollout."""
+    violations = []
+    for child in children:
+        found: Counter[tuple[str, str, str]] = Counter()
+        expected = agent_models.get(child.role or "")
+        if expected is None:
+            found[("codex_unknown_role", " or ".join(sorted(agent_models)), str(child.role))] += 1
+        for model, got_effort in child.turn_contexts:
+            if expected is None or model != expected:
+                found[("model", expected or "a configured role's model", model)] += 1
+            if got_effort != effort:
+                found[("effort", effort, got_effort)] += 1
+        for tool, count in child.tools.items():
+            if tool.rsplit(".", 1)[-1] in FORBIDDEN_MAIN_TOOLS:
+                found[("forbidden_tool", "not used", tool)] += count
+        if child.errors:
+            found[("codex_call_failed", "no error events", "; ".join(child.errors))] += 1
+        if not child.completed or child.truncated:
+            found[("codex_call_unfinished", "a completed rollout", child.thread)] += 1
+        violations.extend({"kind": k[0], "source": "subagent", "file": child.path.name,
+                           "expected": k[1], "observed": k[2], "count": n} for k, n in sorted(found.items()))
+    return violations
+
+
 def spawn_calls(summary: dict[str, Any]) -> list[dict[str, Any]]:
-    """codex-agent calls in the shape of transcript.summarize_behavior's subagent_spawn_calls."""
-    return [{"source": "main", "subagent_type": c["agent"], "model_arg": None, "observed_models": [],
+    """Codex spawns in the shape of transcript.summarize_behavior's subagent_spawn_calls."""
+    return [{"source": "main", "subagent_type": c["agent"], "model_arg": None,
+             "observed_models": c.get("observed_models", []),
              "timestamp": c["started_epoch"], "harness": "codex"} for c in summary["per_call"]]
 
 
@@ -584,8 +668,7 @@ def leak_scan_files(home: Path) -> list[Path]:
 
 
 # -- Codex as the main agent -----------------------------------------------------------------------
-# Tools of Codex's multi-agent collaboration and its web search; a Codex main agent runs without
-# any of them, as a Claude solo arm runs without the Agent tool.
+# Solo main agents and children cannot use collaboration tools or web search.
 FORBIDDEN_MAIN_TOOLS: frozenset[str] = frozenset({
     "spawn_agent", "send_input", "send_message", "followup_task", "wait_agent", "close_agent", "resume_agent",
     "interrupt_agent", "list_agents", "web_search"})
@@ -677,7 +760,7 @@ def main_round_result(stdout: str, stderr: str, exit_code: int, last_message: Pa
 
 
 def validate_main(summary: dict[str, Any], rollouts: Sequence[Rollout], model: str, effort: str,
-                  thread_ids: Sequence[str]) -> list[dict[str, Any]]:
+                  thread_ids: Sequence[str], *, builtin_subagents: bool = False) -> list[dict[str, Any]]:
     """Violations for a Codex main agent: a turn on another model or
     effort, a forbidden tool, a recorded thread without a session log, or a session log of a thread
     the rounds did not report."""
@@ -688,8 +771,9 @@ def validate_main(summary: dict[str, Any], rollouts: Sequence[Rollout], model: s
                 found[("model", model, got_model)] += 1
             if got_effort != effort:
                 found[("effort", effort, got_effort)] += 1
+    forbidden = {"web_search"} if builtin_subagents else FORBIDDEN_MAIN_TOOLS
     for tool, count in summary["tool_calls"].items():
-        if tool in FORBIDDEN_MAIN_TOOLS:
+        if tool.rsplit(".", 1)[-1] in forbidden:
             found[("forbidden_tool", "not used", tool)] += count
     logged = {r.thread for r in rollouts}
     for thread in sorted(set(thread_ids) - logged):

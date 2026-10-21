@@ -400,11 +400,13 @@ FAKE_CODEX_MAIN = textwrap.dedent(r"""
     if argv == ["features", "list"]:
         config = tomllib.loads((home / "config.toml").read_text())
         for name, enabled in config.get("features", {}).items():
-            print(name, "stable", str(enabled).lower())
+            print(name, "stable", str(enabled.get("enabled", True) if isinstance(enabled, dict) else enabled).lower())
         sys.exit(0)
     if argv == ["debug", "prompt-input"]:
+        config = tomllib.loads((home / "config.toml").read_text())
+        markers = "<multi_agent_role><multi_agent_mode>" if config["features"]["multi_agent"] else ""
         print(json.dumps([{"role": "developer", "content": [{"text":
-            (home / "AGENTS.md").read_text() + f"<cwd>{Path.cwd()}</cwd>"}]}]))
+            (home / "AGENTS.md").read_text() + markers + f"<cwd>{Path.cwd()}</cwd>"}]}]))
         sys.exit(0)
     task = sys.stdin.read()
     if not task:
@@ -436,13 +438,22 @@ FAKE_CODEX_MAIN = textwrap.dedent(r"""
                      "output_tokens": 100, "reasoning_output_tokens": 10, "total_tokens": 1100 * (n + 1)}}}]
     with log.open("a") as f:
         f.write("".join(json.dumps(e) + "\n" for e in entries))
-    if "DELEGATE" in task:  # start a subagent the way the shell tool would
+    if "DELEGATE" in task:  # persist the built-in child's rollout or run a shell-launched Claude child
         import subprocess
         if "CODEX" in task:
             config = tomllib.loads((home / "config.toml").read_text())
-            shell_env = {**os.environ, **config.get("shell_environment_policy", {}).get("set", {})}
-            sub = subprocess.run(["sh", "-c", "codex-agent tester"], input="build it",
-                                 env=shell_env, text=True, capture_output=True)
+            role = tomllib.loads((home / config["agents"]["tester"]["config_file"]).read_text())
+            child = "11111111-2222-3333-4444-555555555555"
+            child_log = log.with_name("rollout-child-" + child + ".jsonl")
+            child_log.write_text("\n".join(json.dumps(e) for e in [
+                {"timestamp": "2026-10-19T13:49:19Z", "type": "session_meta", "payload": {
+                    "id": child, "parent_thread_id": thread, "source": {"subagent": {"thread_spawn": {
+                        "parent_thread_id": thread, "agent_role": "tester", "depth": 1, "agent_path": "/root/test"}}}}},
+                {"type": "turn_context", "payload": {"model": role["model"], "effort": role["model_reasoning_effort"]}},
+                {"timestamp": "2026-10-19T13:49:22Z", "type": "token_usage_record", "payload": {
+                    "response_id": "resp_0", "usage": {"input_tokens": 1000, "output_tokens": 100}}},
+                {"type": "event_msg", "payload": {"type": "task_complete"}}]) + "\n")
+            sub = subprocess.CompletedProcess([], 0, "builtin report", "")
         else:
             sub = subprocess.run(["claude-agent", "implementer"], input="LIMIT" if "LIMIT" in task else "build it",
                                  text=True, capture_output=True)
@@ -487,12 +498,10 @@ def make_world(test, root, prompt, arm="A26", claude_bin=None):
     fake.chmod(fake.stat().st_mode | stat.S_IEXEC)
     arms.generate_arm(arm, root / "arms")
 
-    def fake_prepare(run_dir, codex_config, repo, base_env, subagent_config=None):
+    def fake_prepare(run_dir, codex_config, repo, base_env):
         test.assertTrue(arms.get_arm(arm).codex_main)
         test.assertNotIn("settings.json", {p.name for p in codex_config.parent.iterdir()})  # no Claude Code configuration
         codex.home_for(run_dir).mkdir()
-        if subagent_config is not None:
-            codex.subagent_home_for(codex.home_for(run_dir)).mkdir()
         return {"codex_bin": str(fake), "codex_version": "fake"}
 
     patcher = mock.patch.object(codex, "prepare_home", fake_prepare)
@@ -520,6 +529,7 @@ class CodexMainTest(unittest.TestCase):
         resumed = codex.main_command("/bin/codex", MAIN_MODEL, MAIN_EFFORT, "Run ID: ab12", last, repo, THREAD)
         self.assertEqual(resumed[:5], ["/bin/codex", "exec", "resume", "--json", "--strict-config"])
         self.assertNotIn("-C", resumed)  # resume runs in the caller's working directory
+        self.assertNotIn("--ephemeral", first + resumed)
         self.assertEqual(resumed[-2:], [THREAD, "-"])
         self.assertEqual(run.codex_developer_instructions("ab12"), "Run ID: ab12")
 
@@ -667,14 +677,15 @@ class CodexMainTest(unittest.TestCase):
         self.assertEqual(rec["behavior"]["subagent_spawns"], 1)
         self.assertTrue(rec["validation"]["ok"], rec["validation"])
         self.assertGreater(rec["cost"]["scenarios"]["billed"]["by_model"]["gpt-6-luna"], 0)
-        [sub] = [json.loads(line) for line in (runner.subagent_home / "fake-invocations.jsonl").read_text().splitlines()]
-        self.assertEqual(sub["env"]["CODEX_HOME"], str(runner.subagent_home))
-        self.assertEqual(sub["env"]["CODEX_AGENT_DEPTH"], "1")
-        self.assertTrue((runner.repo / "agent-report.txt").read_text().startswith("0|"))
+        self.assertIsNone(runner.subagent_home)
+        self.assertNotIn("shell_environment_policy", (runner.codex_home / "config.toml").read_text())
+        self.assertEqual(len(codex.read_rollouts(runner.codex_home)), 2)
+        self.assertTrue((runner.codex_home / "roles" / "tester.toml").is_file())
+        self.assertTrue((runner.repo / "agent-report.txt").read_text().startswith("0|builtin report"))
         for round_no in (1, 2):
             self.assertTrue((runner.run_dir / f"codex-main-round{round_no}.last.txt").read_text().strip())
 
-    def test_codex_main_with_codex_subagents_keeps_their_home_apart(self):
+    def test_codex_main_with_builtin_subagents_shares_home(self):
         with tempfile.TemporaryDirectory() as tmp:
             self.check_delegation(self.delegation_world(Path(tmp)))
 

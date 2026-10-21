@@ -79,6 +79,7 @@ HIDDEN_PATHS: tuple[tuple[str, str], ...] = (
                    "solutions; the worktree holds the acceptance packs; the arms dir holds every arm's config"),
     ("~/.claude", "the user's own Claude Code transcripts and settings"),
     ("~/.codex", "the user's own Codex sessions, settings, and login (a Codex arm gets its own CODEX_HOME)"),
+    ("~/.secrets", "the owner's secrets; the harness loads credentials before entering the namespace"),
     ("~/projects/agent-experiments", "the primary checkout holds the acceptance packs"),
     ("/tmp", "scratch space of other sessions, which may hold packs or solutions"),
 )
@@ -504,10 +505,8 @@ class Runner:
         arm = arms.get_arm(cfg.arm)
         self.codex_main = arm.codex_main
         self.codex_home: Path | None = codex.home_for(run_dir) if arm.uses_codex else None
-        # A Codex main agent's Codex subagents run in a CODEX_HOME of their own, so that their
-        # global AGENTS.md is the plain working agreement and their sessions are told apart by directory.
-        self.subagent_home: Path | None = (codex.subagent_home_for(self.codex_home)
-                                           if arm.codex_main and arm.codex and self.codex_home else None)
+        # Built-in children share CODEX_HOME and are identified by rollout ancestry.
+        self.subagent_home: Path | None = None
         self.claude_dir: Path | None = self.arm_root / arms.CLAUDE_DIR if arm.claude_agents else None
         self.codex_bin: str | None = None  # the pinned Codex binary of a Codex main agent, set by prepare_codex
 
@@ -555,10 +554,9 @@ class Runner:
         """For a Codex arm, build and check this run's CODEX_HOME (after the repo exists)."""
         if self.codex_home is None:
             return
-        subagent_config = self.arm_root / arms.CODEX_DIR / arms.CODEX_SUBAGENT_DIR if self.subagent_home else None
         try:
             info = codex.prepare_home(self.run_dir, self.arm_root / arms.CODEX_DIR, self.repo,
-                                      child_env(self.arm_root, include_token=False), subagent_config)
+                                      child_env(self.arm_root, include_token=False))
         except (codex.CodexError, OSError) as exc:
             raise InfraError(f"cannot prepare the Codex home: {exc}") from exc
         self.codex_bin = str(info["codex_bin"])
@@ -627,8 +625,7 @@ class Runner:
         cmd = codex.main_command(self.codex_bin, arm.main_model, arm.main_effort,
                                  codex_developer_instructions(self.run_id), last_message.resolve(),
                                  self.repo.resolve(), thread_id)
-        bin_dirs = ([self.arm_root / arms.CODEX_DIR / "bin"] if arm.codex else []) \
-            + ([self.arm_root / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else [])
+        bin_dirs = [self.arm_root / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else []
         login_file: Path | None = None
         login_owned = False
         try:
@@ -838,7 +835,7 @@ class Runner:
         """The main agent's requests so far, which is the index of the next resume's first request."""
         if self.codex_main:
             assert self.codex_home is not None
-            return len(codex.load_requests(self.codex_home, "main"))
+            return len(codex.load_requests(self.codex_home, "main", root_threads=self.session_ids))
         mains, _ = self.transcripts()
         return cost.main_request_count(mains)
 
@@ -849,7 +846,7 @@ class Runner:
             return False
         if not self.codex_main:
             summary, judge = behavior.get("codex"), codex.run_outcome
-        elif self.subagent_home is not None:
+        elif arms.get_arm(self.cfg.arm).builtin_subagents:
             summary, judge = behavior.get("codex_subagents"), codex.run_outcome
         else:
             summary, judge = behavior.get("claude_agents"), claude_calls.run_outcome
@@ -889,8 +886,7 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     allowlist = f"env -i {' '.join(f'{k}=<{k}>' for k in ENV_ALLOWLIST)} "
     if arm.codex_main:
         env = allowlist + f"CODEX_HOME={shlex.quote(str(codex.home_for(run_dir)))}"
-        bins = ([run_dir / "config" / arms.CODEX_DIR / "bin"] if arm.codex else []) \
-            + ([run_dir / "config" / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else [])
+        bins = [run_dir / "config" / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else []
         if bins:
             env += f" PATH={shlex.quote(':'.join(map(str, bins)))}:<PATH>"
         if arm.claude_agents:

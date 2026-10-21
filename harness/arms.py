@@ -4,9 +4,9 @@
 An arm whose main agent is Claude Code uses its root as CLAUDE_CONFIG_DIR; it holds
 only that arm's settings.json, CLAUDE.md, and either agents/ (Claude Code subagents)
 or codex/ (headless Codex subagents started through the codex-agent command). An arm
-whose main agent is a headless Codex session (solo, no subagents) holds only codex/:
-the Codex configuration and the working agreement as AGENTS.md. Templates live under
-harness/arms/templates/ so they can be reviewed as plain files.
+whose main agent is a headless Codex session holds codex/: the Codex configuration,
+AGENTS.md and any built-in role files, plus claude/ for shell-launched Claude children.
+Templates live under harness/arms/templates/ so they can be reviewed as plain files.
 """
 from __future__ import annotations
 
@@ -73,8 +73,6 @@ CODEX_BASH_MAX_TIMEOUT_MS = 2 * 60 * 60 * 1000
 # every Codex subagent gets, one role prompt per agent, and the launcher.
 CODEX_DIR = "codex"
 CODEX_AGENT_COMMAND = "codex-agent"
-# The codex/ entry holding a Codex main agent's subagents' own CODEX_HOME inputs (config.toml, AGENTS.md).
-CODEX_SUBAGENT_DIR = "subagent"
 # The claude/ entries of a Codex-main arm whose subagents are headless Claude Code sessions: the
 # CLAUDE_CONFIG_DIR inputs (settings.json, CLAUDE.md), the roster, one role prompt per agent, and the
 # claude-agent launcher.
@@ -96,11 +94,11 @@ class ArmSpec:
     agents: tuple[str, ...] = SUBAGENT_NAMES  # subagent definitions written for the arm
     # (agent name, model) pairs overriding subagent_model for those agents.
     agent_models: tuple[tuple[str, str], ...] = ()
-    # "claude": Claude Code subagents through the Agent tool; "codex": headless
-    # Codex sessions started with the codex-agent command, the Agent tool denied.
+    # "claude": Claude Code agents; "codex": Codex children, built-in with a Codex main
+    # or shell-launched with a Claude main (the Claude Agent tool is then denied).
     subagent_harness: str = "claude"
     # "claude": the main agent is Claude Code (main_model a Claude model); "codex": a
-    # headless Codex session (main_model a Codex model), solo and without subagents.
+    # headless Codex session (main_model a Codex model).
     main_harness: str = "claude"
 
     def __post_init__(self) -> None:
@@ -146,7 +144,7 @@ class ArmSpec:
 
     @property
     def codex(self) -> bool:
-        """Whether subagents are headless Codex sessions rather than Claude Code subagents."""
+        """Whether subagents run on Codex, through its built-in runtime or the shell launcher."""
         return self.subagent_harness == "codex"
 
     @property
@@ -165,10 +163,14 @@ class ArmSpec:
         return self.codex_main and self.subagent_model is not None and self.subagent_harness == "claude"
 
     @property
+    def builtin_subagents(self) -> bool:
+        """Whether Codex's built-in V2 runtime starts the Codex children."""
+        return self.codex_main and self.codex
+
+    @property
     def command_subagents(self) -> bool:
-        """Whether subagents are started with a shell command (codex-agent or claude-agent) rather
-        than Claude Code's Agent tool."""
-        return self.codex or self.claude_agents
+        """Whether subagents are started with a shell command (codex-agent or claude-agent)."""
+        return (self.codex and not self.builtin_subagents) or self.claude_agents
 
     @property
     def claude_subagent_models(self) -> frozenset[str]:
@@ -325,13 +327,11 @@ def codex_role_read_only(name: str) -> bool:
 
 
 def build_codex_section(arm: ArmSpec) -> str:
-    """The instructions section that tells the main agent how to start subagents with a command:
-    Codex subagents for a Claude Code main agent (CLAUDE.md), or Codex or Claude Code subagents
-    for a Codex main agent (AGENTS.md), where waiting is described for Codex's shell tool."""
-    assert arm.command_subagents and arm.subagent_model is not None
+    """Instructions for built-in Codex children or shell-launched Codex/Claude children."""
+    assert (arm.command_subagents or arm.builtin_subagents) and arm.subagent_model is not None
     names = CODEX_MODELS if arm.codex else CLAUDE_MODEL_NAMES
     vendor = "OpenAI" if arm.codex else "Anthropic"
-    template = _read_template("codex-main-codex-subagents.md" if arm.codex and arm.codex_main
+    template = _read_template("codex-builtin-subagents.md" if arm.builtin_subagents
                               else "codex-main-claude-subagents.md" if arm.codex_main
                               else "codex-subagents.md")
 
@@ -363,7 +363,7 @@ def _codex_config(model: str, effort: str) -> str:
 def build_main_instructions(arm: ArmSpec) -> str:
     """The AGENTS.md text of an arm whose main agent is Codex: what a Claude main agent of the
     matching arm gets as CLAUDE.md (the working agreement and, with subagents, the arm's delegation
-    paragraph and the section on starting them), with the section written for Codex's shell tool."""
+    paragraph and the section on starting them), using the arm's delegation mechanism."""
     assert arm.codex_main
     if arm.delegation is None:
         return working_agreement()
@@ -374,25 +374,37 @@ def build_main_instructions(arm: ArmSpec) -> str:
 
 
 def build_codex_main_files(arm: ArmSpec) -> dict[str, str]:
-    """Map of path under codex/ to content for an arm whose main agent is Codex: config.toml,
-    and AGENTS.md (see build_main_instructions). With Codex subagents it adds what build_codex_files
-    gives them (agent.json, roles/<name>.md) and subagent/config.toml and subagent/AGENTS.md, the
-    inputs of the subagents' own CODEX_HOME (which, unlike the main agent's, holds the plain working
-    agreement). The launcher itself is copied by generate_arm."""
+    """Main config, AGENTS.md, and built-in role TOMLs for a Codex main agent."""
     assert arm.codex_main
     config = _codex_config(arm.main_model, arm.main_effort)
-    if arm.subagent_model is not None:
+    if arm.claude_agents:
         # Top-level keys precede the first table; the wait applies to the main agent's shell tool.
         anchor = "\n# Subagents cannot start subagents of their own.\n[agents]"
         assert config.count(anchor) == 1
         config = config.replace(anchor, f"\n# Foreground subagent calls can last up to two hours.\n"
                                 f"{CODEX_WAIT_KEY} = {CODEX_BASH_MAX_TIMEOUT_MS}\n{anchor}")
+        config += "\n[features.code_mode]\nenabled = true\ndefault_exec_yield_time_ms = 600000\n"
     files = {"config.toml": config, "AGENTS.md": build_main_instructions(arm)}
-    if arm.codex:
-        for relative, text in build_codex_files(arm).items():
-            if relative in ("config.toml", "AGENTS.md"):
-                relative = f"{CODEX_SUBAGENT_DIR}/{relative}"
-            files[relative] = text
+    if arm.builtin_subagents:
+        assert config.count("[agents]\nenabled = false") == 1
+        assert config.count("multi_agent = false") == 1
+        config = config.replace("# Subagents cannot start subagents of their own.\n[agents]\nenabled = false",
+                                "# Use Codex's default V2 concurrency (root plus three resident children).\n"
+                                "[agents]\nenabled = true")
+        config = config.replace("multi_agent = false", "multi_agent = true")
+        # A feature with options uses its table's enabled field instead of a boolean.
+        config += ("\n[features.multi_agent_v2]\nenabled = true\n"
+                   "default_wait_timeout_ms = 3600000\nmax_wait_timeout_ms = 3600000\n")
+        for name in arm.agents:
+            fields, body = _split_agent_template(name)
+            config += (f"\n[agents.{name}]\ndescription = {json.dumps(fields['description'])}\n"
+                       f'config_file = "roles/{name}.toml"\n')
+            files[f"roles/{name}.toml"] = (
+                f"model = {json.dumps(arm.model_for(name))}\n"
+                f"model_reasoning_effort = {json.dumps(arm.subagent_effort)}\n"
+                f"developer_instructions = {json.dumps(body)}\n"
+                "\n[features]\nmulti_agent = false\n\n[features.multi_agent_v2]\nenabled = false\n")
+        files["config.toml"] = config
     return files
 
 
@@ -443,7 +455,7 @@ def build_codex_files(arm: ArmSpec) -> dict[str, str]:
 
 def build_agents(arm: ArmSpec) -> dict[str, str]:
     """Map of agent file name to content; empty for an arm without Claude Code subagents."""
-    if arm.subagent_model is None or arm.command_subagents:
+    if arm.subagent_model is None or arm.command_subagents or arm.builtin_subagents:
         return {}
     agents: dict[str, str] = {}
     for name in arm.agents:
@@ -488,7 +500,7 @@ def generate_arm(arm_id: str, base_dir: Path = DEFAULT_ARMS_DIR) -> Path:
             target = codex_dir / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text, encoding="utf-8")
-    if arm.codex:
+    if arm.codex and not arm.builtin_subagents:
         _install_launcher(CODEX_AGENT_SCRIPT, codex_dir / "bin" / CODEX_AGENT_COMMAND)
     claude_dir = root / CLAUDE_DIR
     if claude_dir.exists():

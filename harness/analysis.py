@@ -132,17 +132,20 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
     Claude requests as subagent requests, and their calls count as spawns. For a Codex-main
     arm there are no Claude Code main transcripts (mains and sub_dirs are empty): the Codex session
     logs in codex_home hold the main agent's requests, and the CLI's own cost figures do not exist.
-    The subagents of a Codex-main arm are separate sessions: Codex sessions in subagent_home (their
-    own CODEX_HOME), or Claude Code sessions recorded under claude_dir by claude-agent."""
+    Built-in Codex children share codex_home and are split by thread ancestry. Legacy shell-launched
+    Codex sessions use subagent_home; Claude Code calls are recorded under claude_dir."""
     arm = arms.get_arm(record["arm"])
     assert (codex_home is not None) == arm.uses_codex
-    assert (subagent_home is not None) == (arm.codex_main and arm.codex)
+    assert subagent_home is None or arm.builtin_subagents
     assert (claude_dir is not None) == arm.claude_agents
     assert not arm.codex_main or not (mains or sub_dirs)
     main_turns: int | None = None
     incomplete: list[str] = []
     if arm.codex_main:
         record.update(cost=None, validation=None)
+    main_logs: tuple[codex.Rollout, ...] = ()
+    children: tuple[codex.Rollout, ...] = ()
+    unexpected: tuple[codex.Rollout, ...] = ()
     try:
         gaps: tuple[float, ...] | None = None
         warnings: list[str] = []
@@ -154,10 +157,15 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         claude_requests = cost.load_requests(list(mains), list(sub_dirs))
         if arm.codex_main:
             assert not claude_requests
-            main_requests = codex.load_requests(codex_home, "main")
+            logs = codex.read_rollouts(codex_home)
+            roots = record["session_ids"] or [r.thread for r in logs if r.parent_thread is None]
+            main_logs, children, unexpected = codex.split_threads(logs, roots)
+            main_requests = codex.load_requests(codex_home, "main", root_threads=roots)
             main_turns = len(main_requests)
             if subagent_home is not None:
                 agent_requests = codex.load_requests(subagent_home, "subagent")
+            elif arm.builtin_subagents:
+                agent_requests = codex.load_requests(codex_home, "subagent", root_threads=roots)
             elif claude_dir is not None:
                 agent_requests = claude_calls.load_requests(claude_dir)
                 claude_requests = agent_requests
@@ -177,7 +185,7 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
         codex_violations: list[dict[str, Any]] = []
         if codex_home is not None:
             assert arm.uses_codex
-            summary = codex.summarize(codex_home)
+            summary = codex.summarize(codex_home, rollouts=main_logs) if arm.codex_main else codex.summarize(codex_home)
             behavior["codex"] = summary
             if arm.codex_main and (summary["unpriced_usage_records"] or summary["truncated_logs"]):
                 incomplete.append("Codex main session logs contain unpriced or truncated records")
@@ -189,8 +197,12 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
             behavior["compaction_events"] += summary["compaction_events"]
             if arm.codex_main:
                 assert summary["calls"] == 0, "a Codex main agent starts no codex-agent calls in its own home"
-                codex_violations = codex.validate_main(summary, codex.read_rollouts(codex_home), arm.main_model,
-                                                       arm.main_effort, record["session_ids"])
+                checked = main_logs + unexpected + (() if arm.builtin_subagents else children)
+                codex_violations = codex.validate_main(summary, checked, arm.main_model,
+                                                       arm.main_effort, record["session_ids"],
+                                                       builtin_subagents=arm.builtin_subagents)
+                if unexpected:
+                    incomplete.append("Codex session logs contain threads unrelated to the main thread")
             else:
                 behavior["subagent_spawn_calls"] = behavior["subagent_spawn_calls"] + codex.spawn_calls(summary)
                 behavior["subagent_spawns"] += summary["calls"]
@@ -201,8 +213,9 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                 codex_violations = codex.validate(codex_home, summary, {n: arm.model_for(n) for n in arm.agents},
                                                   arm.subagent_effort)
         agent_violations: list[dict[str, Any]] = []
-        if subagent_home is not None:
-            sub = behavior["codex_subagents"] = codex.summarize(subagent_home)
+        if subagent_home is not None or arm.builtin_subagents:
+            sub = behavior["codex_subagents"] = (codex.summarize(subagent_home) if subagent_home is not None
+                                                 else codex.summarize_children(codex_home, children))
             if sub["unpriced_usage_records"] or sub["truncated_logs"]:
                 incomplete.append("Codex subagent session logs contain unpriced or truncated records")
             if sub["unpriced_usage_records"]:
@@ -210,15 +223,17 @@ def update_record(record: dict[str, Any], mains: Sequence[Path], sub_dirs: Seque
                                 "id left unpriced")
             if sub["truncated_logs"]:
                 warnings.append(f"Codex subagent session log(s) cut off mid-line, last line ignored: {sub['truncated_logs']}")
-            agent_violations = codex.validate(subagent_home, sub, {n: arm.model_for(n) for n in arm.agents},
-                                              arm.subagent_effort)
+            models = {n: arm.model_for(n) for n in arm.agents}
+            agent_violations = (codex.validate(subagent_home, sub, models, arm.subagent_effort)
+                                if subagent_home is not None
+                                else codex.validate_children(children, models, arm.subagent_effort))
         elif claude_dir is not None:
             sub = behavior["claude_agents"] = claude_calls.summarize(claude_dir)
             agent_violations = claude_calls.validate(
                 claude_dir, sub, {n: arm.model_for(n) for n in arm.agents}, arm.subagent_effort,
                 [*arms.DENIED_TOOLS, "Agent"])
-        if subagent_home is not None or claude_dir is not None:
-            behavior["subagent_spawn_calls"] = (codex.spawn_calls(sub) if subagent_home is not None
+        if subagent_home is not None or arm.builtin_subagents or claude_dir is not None:
+            behavior["subagent_spawn_calls"] = (codex.spawn_calls(sub) if subagent_home is not None or arm.builtin_subagents
                                                 else claude_calls.spawn_calls(sub))
             behavior["subagent_spawns"] = sub["calls"]
             behavior["subagent_spawns_by_type"] = dict(sub["calls_by_agent"])
