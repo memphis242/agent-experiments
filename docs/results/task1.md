@@ -1,6 +1,6 @@
-# Task 1 results (ut_assert log translator), 240 runs, 2026-10-20
+# Task 1 results (ut_assert log translator), 310 runs, 2026-10-20
 
-All 220 runs of A1 to A17 and A21 to A25 passed acceptance; solo Sonnet 5 (A18, A19) failed the task, with 3 of 10 runs in each arm failing all five rounds (see * below). Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 to A19, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel. The Codex arms A21 and A22 ran all ten repetitions on 2026-10-19, three runs at a time, A23 on 2026-10-20, four at a time, and A24 and A25 the same day with up to eight runs in parallel.
+All 220 runs of A1 to A17 and A21 to A25 passed acceptance, as did all 50 runs of A26 to A30 and all ten of A31. Solo Sonnet 5 (A18, A19) failed the task, with 3 of 10 runs in each arm failing all five rounds (see * below). A32 passed nine of ten; its rep 9 failed all five rounds on the same Markdown check (see the notes). A26 to A32 were run on 2026-10-20 and 2026-10-21 (UTC). Billed cost includes compaction requests (none occurred). Ranges are min to max over the ten repetitions; spend per pass is total spend over all attempts divided by passes. Repetitions 1 to 3 of A1 to A15 were run first; repetitions 4 to 10, and all ten of A16 to A19, were added later from harness revisions whose run code is reviewed as equivalent, with up to nine runs in parallel. The Codex arms A21 and A22 ran all ten repetitions on 2026-10-19, three runs at a time, A23 on 2026-10-20, four at a time, and A24 and A25 the same day with up to eight runs in parallel.
 
 ## Spread across arms
 
@@ -31,18 +31,22 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A15 | Opus 5.5 medium main, Sonnet 5.5 + Haiku 5.5, tiered | task1 | 10/10 | 1.09 | 0.93 to 1.33 | 0.41 | 6.4 to 10.9 | 3 to 11 | 2 to 4 | 1 to 2 | 0 | 48.7 to 61.5 | 79.9 to 105.2 |
 | A16 | solo Haiku 5.5, high effort | task1 | 10/10 | 0.31 | 0.12 to 0.64 | 0.52 | 5.4 to 11.4 | 29 to 80 | 0 | 1 to 2 | 0 | 106.5 to 183.9 | - |
 | A17 | solo Haiku 5.5, xhigh effort | task1 | 10/10 | 0.55 | 0.41 to 0.66 | 0.25 | 7.3 to 13.5 | 40 to 67 | 0 | 1 | 0 | 151.0 to 198.3 | - |
-| A18 | solo Sonnet 5, medium effort | task1 | 7/10* | 2.88 | 0.89 to 4.29 | 3.41 | 5.1 to 21.2 | 39 to 119 | 0 | 2 to 5 | 0 | 68.1 to 176.7 | 40.6 |
-| A19 | solo Sonnet 5, high effort | task1 | 7/10* | 4.96 | 0.96 to 5.62 | 4.66 | 6.5 to 25.8 | 28 to 144 | 0 | 1 to 5 | 0 | 81.3 to 241.3 | - |
+| A18 | solo Sonnet 5, medium effort | task1 | 7/10 | 2.88 | 0.89 to 4.29 | 3.41 | 5.1 to 21.2 | 39 to 119 | 0 | 2 to 5 | 0 | 68.1 to 176.7 | 40.6 |
+| A19 | solo Sonnet 5, high effort | task1 | 7/10 | 4.96 | 0.96 to 5.62 | 4.66 | 6.5 to 25.8 | 28 to 144 | 0 | 1 to 5 | 0 | 81.3 to 241.3 | - |
 | A21 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, eager | task1 | 10/10 | 1.95 | 1.38 to 2.64 | 1.27 | 6.3 to 15.5 | 8 to 18 | 2 to 4 | 1 | 0 | 55.2 to 95.7 | 31.5 to 53.7 |
 | A22 | Claude Code Opus 5.5 high + headless Codex GPT-6.1 Sol high, implementer, tester and secondary debugger | task1 | 10/10 | 1.38 | 1.20 to 1.53 | 0.33 | 5.1 to 7.2 | 4 to 8 | 1 | 1 | 0 | 56.2 to 72.6 | 25.3 to 36.3 |
 | A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task1 | 10/10 | 0.56 | 0.40 to 0.73 | 0.33 | 4.4 to 6.8 | 2 to 18 | 1 to 2 | 1 to 2 | 0 | 22.3 to 36.7 | 30.1 to 36.1 |
 | A24 | Opus 5.5 low main, Codex GPT-6 Luna, tiered | task1 | 10/10 | 0.38 | 0.24 to 0.60 | 0.35 | 2.0 to 131.0 | 1 to 17 | 1 to 3 | 1 to 2 | 0 | 21.6 to 36.7 | 22.3 to 37.3 |
 | A25 | Opus 5.5 low main, Codex GPT-5.6 Sol + GPT-5.6 Luna, tiered | task1 | 10/10 | 1.10 | 0.91 to 1.29 | 0.38 | 6.5 to 9.3 | 2 to 13 | 1 to 2 | 1 to 2 | 0 | 20.4 to 29.9 | 36.5 to 57.0 |
+| A26 | solo Codex GPT-6.1 Sol, high effort | task1 | 10/10 | 0.67 | 0.43 to 0.85 | 0.42 | 7.6 to 12.3 | 26 to 43 | 0 | 2 to 3 | 0 | 64.0 to 104.8 | - |
+| A27 | solo Codex GPT-6 Luna, high effort | task1 | 10/10 | 0.02 | 0.02 to 0.04 | 0.03 | 2.0 to 4.3 | 26 to 58 | 0 | 1 to 3 | 0 | 35.5 to 67.5 | - |
+| A28 | solo Codex GPT-5.6 Sol, high effort | task1 | 10/10 | 1.73 | 1.31 to 3.49 | 2.18 | 4.6 to 8.8 | 25 to 63 | 0 | 1 to 2 | 0 | 92.4 to 162.0 | - |
+| A29 | solo Codex GPT-5.6 Luna, high effort | task1 | 10/10 | 0.10 | 0.07 to 0.21 | 0.14 | 2.8 to 4.6 | 24 to 59 | 0 | 1 to 2 | 0 | 89.2 to 170.2 | - |
+| A30 | Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered | task1 | 10/10 | 0.40 | 0.22 to 0.67 | 0.45 | 2.0 to 7.1 | 25 to 68 | 2 to 6 | 1 to 3 | 0 | 30.8 to 79.4 | 28.7 to 50.2 |
+| A31 | Codex GPT-6.1 Sol low main, Opus 5.5 + Haiku 5.5, tiered | task1 | 10/10 | 1.52 | 0.91 to 2.82 | 1.91 | 5.1 to 32.4 | 29 to 97 | 2 to 9 | 1 to 4 | 0 | 30.3 to 80.1 | 78.1 to 134.5 |
+| A32 | Codex GPT-6.1 Sol low main, Haiku 5.5 subagents, tiered | task1 | 9/10 | 1.13 | 0.45 to 2.13 | 1.68 | 7.4 to 27.8 | 32 to 125 | 2 to 11 | 1 to 5 | 0 | 31.5 to 124.9 | 98.9 to 123.7 |
 
-Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A16 0.21, A24 0.26, A11 0.32, A12
-0.35, A17 0.38, A23 0.38, A14 0.43, A13 0.73, A15 0.75, A25 0.75, A10 0.87, A7 0.90, A9
-0.92, A3 0.92, A22 0.95, A5 1.01, A21 1.34, A4 1.38, A6 1.78, A2 1.88, A8 2.20. A18 and A19
-failed the task and are not ranked; their spend per pass would be 1.97 and 3.40.
+Spend per pass relative to solo Opus 5.5 (A1 = 1.00): A27 0.01, A29 0.07, A16 0.21, A24 0.26, A30 0.27, A11 0.32, A12 0.35, A17 0.38, A23 0.38, A14 0.43, A26 0.46, A13 0.73, A15 0.75, A25 0.75, A32 0.77, A10 0.87, A7 0.90, A9 0.92, A3 0.92, A22 0.95, A5 1.01, A31 1.04, A28 1.18, A21 1.34, A4 1.38, A6 1.78, A2 1.88, A8 2.20. A18 and A19 failed the task and are not ranked; their spend per pass would be 1.97 and 3.40.
 
 Notes:
 
@@ -134,3 +138,10 @@ Notes:
 - A8 reps 7 and 10 originally lost a background subagent to the CLI's ten-minute
   print-mode wait ceiling. Both were rerun with the raised ceiling and the originals
   are excluded (`superseded.json`); A8's spend per pass moves from 2.10 to 2.20 of A1.
+- A26 to A32 are the Codex-main arms. A26 to A29 are solo headless Codex sessions at high effort on GPT-6.1 Sol, GPT-6 Luna, GPT-5.6 Sol and GPT-5.6 Luna; A30 to A32 are GPT-6.1 Sol at low effort directing subagents (A30 built-in Codex agents on GPT-6 Luna, A31 Opus 5.5 and Haiku 5.5 Claude Code sessions, A32 Haiku 5.5 throughout). All of A26 to A30 and A31 passed every run; A32 passed nine of ten.
+- Every A26 run that needed extra rounds failed round one on the same check, the Markdown table and failures section (all ten runs did). In the run I read (7723ab52), the Markdown writer escaped underscores in suite and segment names (`na\_suite`, `widget\_test.c`), so the checker, which matches names literally, found no row for osal_core_UT and no failure line for widget_test.c:41. The agent removed the escapes in round three. The spec asks for GitHub-rendered Markdown and does not mention escaping, and the feedback restated the table requirement without naming escaping. Round one of the Codex main arms missed this check in 10 of 10 A26 runs, 4 of 10 A30 runs, 1 of 10 A31 runs and 8 of 10 A32 runs. Among A1 to A17, seven runs had missed the same check in round one (A5, A14, A15 and A16), so the check is not specific to Codex main agents; the rates are. This is a candidate for the spec-ambiguity review, not yet a finding about the models.
+- A27 (solo GPT-6 Luna) is the cheapest arm in the experiment on Task 1, at 0.02 USD per pass (0.01 of A1), with runs of two to four minutes. Three runs needed a second or third round (reps 2, 3 and 10), on the unreadable-input, strict-parser, failing-log and TSF checks.
+- A28 (solo GPT-5.6 Sol) costs 1.73 per pass (1.18 of A1), the widest spread of any solo arm (1.31 to 3.49 USD). Its rep 3 needed a second round on the strict-mode checks. A29 (solo GPT-5.6 Luna) costs 0.10 per pass; one run (rep 4) needed a second round.
+- Between the two generations the owner can use at work, the newer models are cheaper per pass on this task: GPT-6.1 Sol solo (A26, 0.67) against GPT-5.6 Sol solo (A28, 1.73), and GPT-6 Luna solo (A27, 0.02) against GPT-5.6 Luna solo (A29, 0.10). All four passed all ten runs.
+- Tiered Codex delegation: A30 costs 0.40 per pass, close to A24 (0.38) and 0.71 of A23 (0.56), with two to six subagent spawns per run. A31 costs 1.52 (1.04 of A1), with two to nine spawns per run of Opus 5.5 and Haiku 5.5 Claude Code sessions. A32 costs 1.13 with Haiku subagents throughout, and its one failed run used 1.26 USD over five rounds.
+- Harness history: runs completed before commit 90bf29e carry a different run-code hash, which the aggregate warns about. That commit changed the Codex JSON Lines reader (it split records at U+2028 and U+2029) and which tools a built-in child may use. The six failed attempts those bugs caused are listed in superseded.json with their reruns. The completed runs from before the commit passed the validator and the accounting check, so they stand.

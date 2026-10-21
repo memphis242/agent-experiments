@@ -15,11 +15,16 @@ against a baseline. Started 2026-10-17.
    context plus lost information cost more than it saves?
 3. Cache accounting. How much of total cost does prompt caching remove, and
    what does a 1-hour TTL buy over 5 minutes given real inter-turn pauses?
+4. Other vendors and harnesses. With the same instructions, what do OpenAI's
+   GPT-6.1 and GPT-5.6 models cost per completed task, as Codex main agents
+   (A26 to A29), as subagents of a Claude Code orchestrator (A21 to A25), and as
+   Codex main agents with subagents of their own or of Claude (A30 to A32),
+   compared with the Claude arms?
 
 Question 3 needs no runs of its own: per-request token usage is recorded in
 the session transcript and cost under each TTL scenario is computed offline.
 
-## Experiment A: model tiering (22 arms)
+## Experiment A: model tiering and delegation (32 arms)
 
 | Arm | Main agent | Subagents | Delegation |
 |-----|-----------|-----------|------------|
@@ -45,6 +50,16 @@ the session transcript and cost under each TTL scenario is computed offline.
 | A20 | Sonnet 4.6 (high effort) | none (Agent tool disallowed) | n/a |
 | A21 | Opus 5.5 (Claude Code) | GPT-6.1 Sol, high effort, as headless Codex CLI sessions (all five agents) | eager |
 | A22 | Opus 5.5 (Claude Code) | GPT-6.1 Sol, high effort, as headless Codex CLI sessions (implementer, tester, debugger) | roles, with a secondary debugger |
+| A23 | Opus 5.5 (low effort) | GPT-6.1 Sol implementer; GPT-6 Luna small-implementer and tester (Codex CLI sessions, high effort) | tiered |
+| A24 | Opus 5.5 (low effort) | GPT-6 Luna, all roles (Codex CLI sessions, high effort) | tiered |
+| A25 | Opus 5.5 (low effort) | GPT-5.6 Sol implementer; GPT-5.6 Luna small-implementer and tester (Codex CLI sessions, high effort) | tiered |
+| A26 | GPT-6.1 Sol (high effort) | none (no subagents) | n/a |
+| A27 | GPT-6 Luna (high effort) | none (no subagents) | n/a |
+| A28 | GPT-5.6 Sol (high effort) | none (no subagents) | n/a |
+| A29 | GPT-5.6 Luna (high effort) | none (no subagents) | n/a |
+| A30 | GPT-6.1 Sol (low effort) | GPT-6 Luna, built-in Codex V2 agents with A24's roles (high effort) | tiered |
+| A31 | GPT-6.1 Sol (low effort) | Opus 5.5 implementer; Haiku 5.5 small-implementer and tester (Claude Code sessions, high effort) | tiered |
+| A32 | GPT-6.1 Sol (low effort) | Haiku 5.5, all roles (Claude Code sessions, high effort) | tiered |
 
 A10 asks whether a cheaper frontier model at maximum effort matches solo
 Opus. A12 is the same model at high effort, the owner's everyday choice for
@@ -102,6 +117,15 @@ web search, apps, plugins, memories and fast mode are disabled; `codex-agent`
 refuses to run inside a subagent. The two arms run Task 1 to Task 3 with ten
 repetitions; Task 4 follows if their Task 3 spend per pass is on par with the
 Task 4 finalists.
+
+A23 to A25 are the Codex counterparts of A14 and A24: Opus 5.5 at low effort
+directs headless Codex subagents with A14's tiered delegation text and roster,
+through the same `codex-agent` mechanism and the same no-polling section as A21
+and A22. A23 puts GPT-6.1 Sol on the implementer and GPT-6 Luna on the small
+implementer and tester; A24 runs every subagent on GPT-6 Luna; A25 is A23 on the
+previous generation, GPT-5.6 Sol for the implementer and GPT-5.6 Luna for the
+small implementer and tester. All three run Tasks 1 to 3 with ten repetitions;
+A23 and A24 also run Task 4 with three, and A25 does not run Task 4.
 
 The no-polling instruction comes from the first Codex pilots (rep 1 of Tasks 1
 and 2, 2026-10-19). Three of the four passed in round 1. In the fourth (A22
@@ -220,17 +244,19 @@ descendant thread in the same home, each Claude call from its transcript (source
 cache TTLs as recorded) plus the tokens the call's own `modelUsage` holds beyond
 its transcript.
 
-Codex usage is priced at OpenAI's standard API rates for GPT-6.1 Sol (USD per
-million tokens: input 2.00, cached input 0.10, cache write 2.50, output 10.00;
-above 272K input tokens 4.00, 0.20, 5.00 and 15.00, applied per request, since
-the pricing page states the threshold only as input tokens), one request per model
-response from Codex's session log, with reasoning tokens billed as output. The
+Codex usage is priced at OpenAI's standard API rates for each model (table below),
+one request per model response from Codex's session log, with reasoning tokens
+billed as output. Above 272K input tokens a request is priced at the higher rates
+in the table, applied per request, since the pricing page states the threshold only
+as input tokens. The
 Claude side is priced as in every other arm. Both run on subscriptions (Claude
 and ChatGPT), so the figures are API-equivalent, as everywhere else.
 
 Fixed across arms: full model IDs (`claude-opus-5-5`, `claude-sonnet-5-5`,
-`claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`), effort pinned to `high` for the
-main agent and every subagent (except A10's `xhigh`, A13, A15 and A18's `medium`, A14's `low` and A17's `xhigh` main agent), default auto-compaction window,
+`claude-sonnet-5`, `claude-sonnet-4-6`, `claude-haiku-5-5`, and the Codex IDs
+`gpt-6.1-sol`, `gpt-6-luna`, `gpt-5.6-sol`, `gpt-5.6-luna`), effort pinned to `high` for the
+main agent and every subagent (except A10's `xhigh`, A13, A15 and A18's `medium`, the `low` main
+agents of A14, A23 to A25 and A30 to A32, and A17's `xhigh` main agent), default auto-compaction window,
 `promptCacheTtl` pinned to `1h` and `subagentPromptCacheTtl` to `5m`, same
 subagent roster (explorer, implementer, tester, debugger, reviewer)
 differing only in `model:`. Built-in agents (Explore, Plan,
@@ -250,7 +276,10 @@ counts per run are recorded as the manipulation check.
 
 Runs: 10 repetitions per arm on Tasks 1 to 3 and 3 on Task 4, so 33 runs per arm:
 495 for A1 to A15, plus up to 132 for A16 to A19 (fewer if one stops advancing),
-plus 20 for A20, plus up to 66 for A21 and A22, plus repair rounds.
+plus 20 for A20, plus 162 for A21 to A25 (A25 has no Task 4), plus 210 for A26 to A32
+on Tasks 1 to 3, plus repair rounds. Task 4 for A30 to A32 follows the owner's decision
+on their Task 3 results. The Task 1 gate above applies to A16 to A19 only; A21 to A32
+run the later tasks as the batch schedule specifies.
 
 In print mode the CLI stops background subagents that are still running ten
 minutes after the main agent's last turn, which ends the round with their work
@@ -343,7 +372,7 @@ and pauses the matrix.
   root, OSAL fails to create message queues) and pasta's loopback port
   forwarding is off (it would divert traffic to host ports). Outbound API
   access still works.
-- A Codex arm (A21, A22) also gets its own `CODEX_HOME` under the run dir,
+- Each Codex arm (A21 to A32) also gets its own `CODEX_HOME` under the run dir,
   built from the arm's `codex/` config, with the bundled skills disabled and a
   copy of the user's Codex login, removed when the run ends (written back to
   `~/.codex/auth.json` only if Codex refreshed it). Every `codex-agent` call is a
@@ -366,8 +395,11 @@ and pauses the matrix.
   Codex's resolver is statically linked and sends plain DNS to the host's stub
   resolver, which the namespace cannot reach, so these runs add pasta's
   `--dns-forward` and a private `/etc/resolv.conf` naming its address.
-- Up to 3 runs in parallel. Rate-limit retries are logged; throttled runs are
-  rerun.
+- Up to 16 runs in parallel (`--parallel`), set per launch. In the Task 1 to Task 3
+batch of 2026-10-20 the solo Codex arms A26 to A30 could use all sixteen slots, while
+A31 and A32 were capped at eight and stopped launching at 78 percent of the weekly
+limit, which the owner approved. Rate-limit retries are logged; throttled runs are
+rerun.
 
 ## Metrics per run (one JSON record)
 
@@ -406,6 +438,16 @@ usage (subagent requests are always priced as recorded, at 5m):
   request timestamps, so idle stretches during subagent work, builds and
   acceptance runs turn 1h hits into 5m misses and vice versa.
 
+Codex models (USD per million tokens, OpenAI standard tier; the second group
+applies to a request above 272K input tokens):
+
+| Model | Input | Cached input | Cache write | Output | Above 272K: input, cached, write, output |
+|-------|-------|--------------|-------------|--------|------------------------------------------|
+| GPT-6.1 Sol | 2.00 | 0.10 | 2.50 | 10.00 | 4.00, 0.20, 5.00, 15.00 |
+| GPT-6 Luna | 0.10 | 0.01 | 0.125 | 0.50 | 0.20, 0.02, 0.25, 0.75 |
+| GPT-5.6 Sol | 4.00 | 0.40 | 5.00 | 20.00 | 8.00, 0.80, 10.00, 30.00 |
+| GPT-5.6 Luna | 0.20 | 0.02 | 0.25 | 1.20 | 0.40, 0.04, 0.50, 1.80 |
+
 Human pauses are added offline as a probability of exceeding each TTL,
 measured from the user's own transcripts as the idle time between the last
 assistant entry and the next prompt (not prompt-to-prompt time, which
@@ -432,5 +474,5 @@ agent type and observed model, compaction counts, layer 2 cost.
 - Server-side feature-flag identity per fresh config dir: accepted as noise.
 - Claude Code auto-update during the experiment: accepted; the version is
   recorded per run.
-- Pack validation under heavy parallel load: not pursued; three slots on a
-  32-thread machine.
+- Pack validation under heavy parallel load: not pursued; up to sixteen slots on
+  a 32-thread machine.

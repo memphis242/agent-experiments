@@ -12,7 +12,7 @@ rerun. A13 to A15 were added after that and run with up to nine runs in parallel
 dropped attempts. A16 and A17 run on six slots. Repetitions 4 and up of A1 to A15 run on
 three slots, with up to twelve shortly before a usage-window reset. A1 and A2 have a sixth
 repetition from the start of the extension to ten, which is on hold. The Codex arms (A21,
-A22) ran ten repetitions each on six slots; their cost includes the Codex subagents at
+A22) ran ten repetitions each on six slots; the Codex-main arms A26 to A32 have no Task 3 runs yet (they run after the Task 2 batch); their cost includes the Codex subagents at
 GPT-6.1 Sol API rates. Twenty runs that lost rounds to a defect outside their own code
 have been rerun (see the footnote); each rerun replaces its original here.
 
