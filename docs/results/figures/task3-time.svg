@@ -28,7 +28,7 @@
 <text x="1008.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5.5</text>
 <circle cx="41.0" cy="118.0" r="5" fill="#9ca3af"/>
 <text x="52.0" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
-<circle cx="162.2" cy="118.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
+<circle cx="162.2" cy="118.0" r="4.1" fill="#0d1117" stroke="#f85149" stroke-width="1.8"/>
 <text x="173.2" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
 <rect x="28" y="144.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="232.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
@@ -42,7 +42,9 @@
 <rect x="28" y="936.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="1024.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
 <rect x="28" y="1112.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="1156.0" width="1154.0" height="44" rx="6" fill="#4a1418"/>
 <rect x="28" y="1200.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
+<rect x="28" y="1244.0" width="1154.0" height="44" rx="6" fill="#4a1418"/>
 <rect x="28" y="1288.0" width="1154.0" height="44" rx="6" fill="#161b22"/>
 <line x1="536.0" y1="144.0" x2="536.0" y2="1332.0" stroke="#ffffff" stroke-opacity="0.09" stroke-width="1"/>
 <text x="536.0" y="1352.0" font-size="11" font-weight="400" fill="#9da7b3" text-anchor="middle">0 min</text>
@@ -351,8 +353,20 @@
 <text x="36.0" y="1175.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A27</text>
 <text x="78.0" y="1175.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Codex GPT-6 Luna, high</text>
 <text x="78.0" y="1189.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="536.0" y="1170.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
-<text x="795.0" y="1182.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="112.8" y="1189.0" font-size="11" font-weight="700" fill="#ff7b72" text-anchor="start">failed task*</text>
+<rect x="580.5" y="1170.0" width="136.3" height="16" rx="8.0" fill="#4f46e5" fill-opacity="0.34"/>
+<circle cx="588.5" cy="1178.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="625.7" cy="1173.8" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="632.6" cy="1182.2" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="650.5" cy="1171.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="654.5" cy="1185.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="669.9" cy="1175.9" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="679.9" cy="1180.1" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="682.7" cy="1172.4" r="4.6" fill="#0d1117" stroke="#f85149" stroke-width="1.8"/>
+<circle cx="689.4" cy="1183.6" r="4.6" fill="#0d1117" stroke="#f85149" stroke-width="1.8"/>
+<circle cx="708.8" cy="1178.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<line x1="662.2" y1="1167.0" x2="662.2" y2="1189.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="724.8" y="1182.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">15.2 to 50.0</text>
 <text x="36.0" y="1219.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A28</text>
 <text x="78.0" y="1219.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Codex GPT-5.6 Sol, high</text>
 <text x="78.0" y="1233.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=4</text>
@@ -366,8 +380,20 @@
 <text x="36.0" y="1263.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A29</text>
 <text x="78.0" y="1263.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">solo Codex GPT-5.6 Luna, high</text>
 <text x="78.0" y="1277.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>
-<rect x="536.0" y="1258.0" width="518.0" height="16" rx="8.0" fill="#dc2626"/>
-<text x="795.0" y="1270.0" font-size="12" font-weight="700" fill="#e6edf3" text-anchor="middle">failed to complete task*</text>
+<text x="112.8" y="1277.0" font-size="11" font-weight="700" fill="#ff7b72" text-anchor="start">failed task*</text>
+<rect x="563.8" y="1258.0" width="89.3" height="16" rx="8.0" fill="#4f46e5" fill-opacity="0.34"/>
+<circle cx="571.8" cy="1266.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="577.2" cy="1261.8" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="580.4" cy="1270.2" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="590.2" cy="1259.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="597.8" cy="1273.0" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="608.7" cy="1263.9" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="611.1" cy="1268.1" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="618.2" cy="1260.4" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="625.2" cy="1271.6" r="4.6" fill="#4f46e5" fill-opacity="0.92"/>
+<circle cx="645.1" cy="1266.0" r="4.6" fill="#0d1117" stroke="#f85149" stroke-width="1.8"/>
+<line x1="603.3" y1="1255.0" x2="603.3" y2="1277.0" stroke="#f0f6fc" stroke-width="2.6" stroke-linecap="round"/>
+<text x="661.1" y="1270.0" font-size="12" font-weight="400" fill="#e6edf3" text-anchor="start">10.4 to 31.6</text>
 <text x="36.0" y="1307.0" font-size="14" font-weight="700" fill="#e6edf3" text-anchor="start">A30</text>
 <text x="78.0" y="1307.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered</text>
 <text x="78.0" y="1321.0" font-size="11" font-weight="400" fill="#7d8590" text-anchor="start">n=10</text>

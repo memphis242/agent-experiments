@@ -30,7 +30,7 @@
 <text x="52.0" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Sonnet 5</text>
 <circle cx="162.2" cy="118.0" r="5" fill="#9ca3af"/>
 <text x="173.2" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">Solo Opus 5.5</text>
-<circle cx="283.4" cy="118.0" r="4.1" fill="#0d1117" stroke="#7d8590" stroke-width="1.8"/>
+<circle cx="283.4" cy="118.0" r="4.1" fill="#0d1117" stroke="#f85149" stroke-width="1.8"/>
 <text x="294.4" y="122.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">did not pass</text>
 <text x="1188.0" y="100.0" font-size="12" font-weight="400" fill="#9da7b3" text-anchor="start">max per arm: input / output / cache read / main ctx / subagent ctx</text>
 <rect x="28" y="144.0" width="1534.0" height="44" rx="6" fill="#161b22"/>

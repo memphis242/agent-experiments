@@ -173,19 +173,20 @@ if __name__ == "__main__":
 
 
 class FailedArmTest(unittest.TestCase):
-    def test_failed_arm_draws_a_full_red_bar_and_footnote_and_leaves_the_axis_alone(self):
+    def test_failed_arm_keeps_its_runs_on_a_red_row_with_hollow_red_failed_dots(self):
         ns = "{http://www.w3.org/2000/svg}"
         runs = [run("A1", 1.5, 4.0), run("A18", 9.0, 30.0, passed=False), run("A18", 2.0, 5.0)]
         rows = charts.build_rows(runs, "task1", "cost", "billed", failed=frozenset({"A18"}))
         root = ET.fromstring(charts.render_chart(rows, "T", "cost", "the reason"))
-        red = [r for r in root.iter(ns + "rect") if r.get("fill") == charts.FAILED_COLOR]
-        self.assertEqual(len(red), 1)
+        red_rows = [r for r in root.iter(ns + "rect") if r.get("fill") == charts.FAILED_ROW_COLOR]
+        self.assertEqual(len(red_rows), 1)
         texts = [t.text for t in root.iter(ns + "text")]
         self.assertIn(charts.FAILED_LABEL, texts)
         self.assertIn("* the reason", texts)
-        self.assertNotIn("$10", texts)                       # the failed arm's 9.00 does not set the axis
         dots = [c for c in root.iter(ns + "circle") if float(c.get("r")) == charts.DOT_RADIUS]
-        self.assertEqual(len(dots), 1)                       # only A1's run is drawn as a dot
+        self.assertEqual(len(dots), 3)                       # every run is drawn, the failed arm's too
+        hollow = [c for c in dots if c.get("stroke") == charts.FAILED_DOT_COLOR]
+        self.assertEqual(len(hollow), 1)                     # the run that did not pass
 
     def test_gate_failures(self):
         def gated(arm, passed, used):

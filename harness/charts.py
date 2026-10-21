@@ -2,9 +2,9 @@
 """Render per-arm spread charts (billed cost and wall time per run) as standalone SVG files.
 
 One chart per metric, one row per arm: a range bar from the arm's minimum to maximum, one dot per
-run (hollow when the run did not pass), and a tick at the median. Arms named as failed in the
-notes file (`--notes`) are drawn as a full red bar labelled "failed to complete task*", with the
-task's footnote under the axis. Standard library only; the output is deterministic for a given input.
+run (hollow with a red outline when the run did not pass), and a tick at the median. Arms named as
+failed in the notes file (`--notes`) keep their runs on a dark red row background, marked "failed task*"
+beside the run count, with the task's footnote under the axis. Standard library only; the output is deterministic for a given input.
 """
 from __future__ import annotations
 
@@ -85,9 +85,10 @@ MEDIAN_WIDTH = 2.6
 TINT = 0.48                     # mix toward white for conservative arms
 TARGET_TICKS = 6
 AXIS_HEADROOM = 1.04            # the axis extends at least this far past the maximum value
-FAILED_COLOR = "#dc2626"        # bar of an arm that failed the task
-FAILED_LABEL = "failed to complete task*"
-FAILED_TEXT_SIZE = 12
+FAILED_ROW_COLOR = "#4a1418"    # row background of an arm that failed the task
+FAILED_DOT_COLOR = "#f85149"    # outline of a run that did not pass
+FAILED_TEXT_COLOR = "#ff7b72"
+FAILED_LABEL = "failed task*"
 FOOTNOTE_SIZE = 12
 FOOTNOTE_CHAR_WIDTH = 6.2       # approximate glyph width used to wrap the footnote
 FOOTNOTE_LINE = 17              # footnote line spacing
@@ -146,7 +147,7 @@ class ArmRow:
     color: str          # fill colour for bar and dots
     points: tuple[Point, ...] = field(default_factory=tuple)
     maxima: "Maxima" = field(default_factory=lambda: Maxima())
-    failed: bool = False  # drawn as a full red bar instead of its runs
+    failed: bool = False  # drawn on a dark red row background
 
 
 @dataclass(frozen=True)
@@ -329,8 +330,8 @@ def _text(x: float, y: float, content: str, size: int, fill: str, weight: str = 
 
 
 def legend_entries(rows: Sequence[ArmRow]) -> list[tuple[str, str]]:
-    """(family label, saturated colour) for each family with a drawn (not failed) arm, in FAMILIES order."""
-    present = {row.family for row in rows if not row.failed}
+    """(family label, saturated colour) for each family with an arm in the chart, in FAMILIES order."""
+    present = {row.family for row in rows}
     known = [(f, c) for _, f, c in FAMILIES if f in present]
     return known + ([FALLBACK_FAMILY] if FALLBACK_FAMILY[0] in present else [])
 
@@ -358,7 +359,7 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
     assert unit in ("cost", "time")
     assert footnote or not any(r.failed for r in rows), "failed arms need a footnote"
     prefix, suffix = ("$", "") if unit == "cost" else ("", " min")
-    max_value = max((p.value for r in rows if not r.failed for p in r.points), default=0.0)
+    max_value = max((p.value for r in rows for p in r.points), default=0.0)
     ticks = axis_ticks(max_value)
     limit = ticks[-1]
     step = ticks[1] - ticks[0] if len(ticks) > 1 else 1.0
@@ -416,16 +417,16 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
                 f'r="{LEGEND_SWATCH_RADIUS}" fill="{color}"/>')
         else:
             add(f'<circle cx="{_num(lx + LEGEND_SWATCH_RADIUS)}" cy="{_num(ly)}" r="{LEGEND_SWATCH_RADIUS - 0.9}" '
-                f'fill="{CARD_FILL}" stroke="{FAINT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
+                f'fill="{CARD_FILL}" stroke="{FAILED_DOT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
         add(_text(lx + 2 * LEGEND_SWATCH_RADIUS + 6, ly + 4, label, LEGEND_FONT_SIZE, MUTED_COLOR))
     if annotate:
         add(_text(annot_x, legend_y + 4, ANNOT_HEADER, LEGEND_FONT_SIZE, MUTED_COLOR))
 
     # Row stripes, grid and axis.
-    for i in range(len(rows)):
-        if i % 2 == 0:
+    for i, row in enumerate(rows):
+        if row.failed or i % 2 == 0:
             add(f'<rect x="{left - 8}" y="{_num(rows_top + i * ROW_HEIGHT)}" width="{_num(card_w - 2 * PAD_X + 16)}" '
-                f'height="{ROW_HEIGHT}" rx="6" fill="{ROW_STRIPE_COLOR}"/>')
+                f'height="{ROW_HEIGHT}" rx="6" fill="{FAILED_ROW_COLOR if row.failed else ROW_STRIPE_COLOR}"/>')
     for t in ticks:
         gx = x_of(t)
         add(f'<line x1="{_num(gx)}" y1="{_num(rows_top)}" x2="{_num(gx)}" y2="{_num(rows_bottom)}" '
@@ -452,7 +453,7 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
                     f'fill-opacity="{DOT_OPACITY}"/>')
             else:
                 add(f'<circle cx="{_num(px)}" cy="{_num(py)}" r="{DOT_RADIUS}" fill="{CARD_FILL}" '
-                    f'stroke="{row.color}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
+                    f'stroke="{FAILED_DOT_COLOR}" stroke-width="{HOLLOW_STROKE_WIDTH}"/>')
         mx = x_of(statistics.median(values))
         add(f'<line x1="{_num(mx)}" y1="{_num(cy - MEDIAN_HALF_HEIGHT)}" x2="{_num(mx)}" '
             f'y2="{_num(cy + MEDIAN_HALF_HEIGHT)}" stroke="{MEDIAN_COLOR}" stroke-width="{MEDIAN_WIDTH}" '
@@ -479,14 +480,13 @@ def render_chart(rows: Sequence[ArmRow], title: str, unit: str, footnote: str = 
         assert ARM_ID_WIDTH + len(row.description) * DESC_CHAR_WIDTH + DESC_GAP <= GUTTER_WIDTH, \
             f"{row.arm} description overflows the gutter"
         add(_text(left + ARM_ID_WIDTH, cy - 3, row.description, DESC_SIZE, MUTED_COLOR))
-        add(_text(left + ARM_ID_WIDTH, cy + 11, f"n={len(row.points)}", COUNT_SIZE, FAINT_COLOR))
+        count = f"n={len(row.points)}"
+        add(_text(left + ARM_ID_WIDTH, cy + 11, count, COUNT_SIZE, FAINT_COLOR))
         if row.failed:
-            add(f'<rect x="{_num(plot_left)}" y="{_num(cy - BAR_HEIGHT / 2)}" width="{_num(plot_right - plot_left)}" '
-                f'height="{BAR_HEIGHT}" rx="{BAR_HEIGHT / 2}" fill="{FAILED_COLOR}"/>')
-            add(_text((plot_left + plot_right) / 2, cy + 4, FAILED_LABEL, FAILED_TEXT_SIZE, TEXT_COLOR, "700",
-                      anchor="middle"))
-        else:
-            draw_runs(row, cy)
+            add(_text(left + ARM_ID_WIDTH + (len(count) + 2) * DESC_CHAR_WIDTH, cy + 11, FAILED_LABEL, COUNT_SIZE,
+                      FAILED_TEXT_COLOR, "700"))
+        assert row.points, f"{row.arm} has no runs to draw"
+        draw_runs(row, cy)
         if annotate:
             draw_annotation(row, cy)
     for k, line in enumerate(note_lines):
