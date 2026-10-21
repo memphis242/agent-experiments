@@ -1,4 +1,4 @@
-# Task 4 results (STOR storage app), 18 runs, 2026-10-20
+# Task 4 results (STOR storage app), 24 runs, 2026-10-21
 
 Task 4 was redone from scratch on a corrected pack and spec. The original pack's cFS stubs
 differed from real cFS in ways that decided pass/fail (an existing storage directory was an
@@ -10,7 +10,9 @@ names each failing behaviour.
 The corrected pack ran six arms, three repetitions each: A11 and A14, the cheapest
 passing delegating arms on Tasks 1 to 3, the two Codex arms, A21 and A22, and A23, the
 Codex counterpart of A14 added on 2026-10-20 (Opus 5.5 at low effort, tiered delegation to
-Codex GPT-6.1 Sol and GPT-6 Luna), and A24, A23 with every subagent on GPT-6 Luna. Billed cost
+Codex GPT-6.1 Sol and GPT-6 Luna), and A24, A23 with every subagent on GPT-6 Luna. Two Codex-main arms were added on 2026-10-21: A26
+(solo headless Codex GPT-6.1 Sol at high effort) and A30 (GPT-6.1 Sol at low effort directing
+built-in Codex subagents on GPT-6 Luna). Billed cost
 includes the Codex subagents' API cost. Ranges are min to max over the repetitions; spend
 per pass is total spend over all attempts divided by passes. Runs used four parallel slots.
 
@@ -32,14 +34,17 @@ The cost chart's right-hand columns give, per arm, the largest value seen in any
 | A22 | Opus 5.5 high main, Codex GPT-6.1 Sol high, roles + debugger | task4 | 3/3 | 11.22 | 10.34 to 12.89 | 2.56 | 31.6 to 46.8 | 16 to 108 | 1 to 2 | 1 | 0 | 294.1 to 349.7 | 111.6 to 126.9 |
 | A23 | Opus 5.5 low main, Codex GPT-6.1 Sol + GPT-6 Luna, tiered | task4 | 3/3 | 2.26 | 1.80 to 2.60 | 0.79 | 30.9 to 77.0 | 4 to 17 | 2 to 5 | 1 to 2 | 0 | 36.4 to 71.4 | 134.4 to 212.3 |
 | A24 | Opus 5.5 low main, Codex GPT-6 Luna, tiered | task4 | 3/3 | 2.76 | 2.59 to 3.00 | 0.41 | 61.6 to 75.1 | 26 to 49 | 6 to 8 | 2 to 3 | 0 | 97.4 to 110.1 | 160.6 to 173.8 |
+| A26 | solo Codex GPT-6.1 Sol, high effort | task4 | 3/3 | 1.68 | 1.50 to 1.81 | 0.30 | 26.2 to 31.2 | 70 to 83 | 0 | 1 to 2 | 0 | 164.1 to 179.8 | - |
+| A30 | Codex GPT-6.1 Sol low main, Codex GPT-6 Luna subagents, tiered | task4 | 3/3 | 3.41 | 2.46 to 4.41 | 1.94 | 27.7 to 45.5 | 152 to 225 | 6 to 8 | 2 | 1 to 2 | 132.3 to 219.3 | 172.6 to 179.9 |
 
 Notes:
 
-- All 18 runs passed; all but four passed in round one. On the original pack nearly every
+- All 24 runs passed. All but four of the first 18 passed in round one; five of the six A26
+  and A30 runs needed a second round. On the original pack nearly every
   run needed a second round; the corrected pack removed the stub defects behind most of
   those misses.
 - A23 (Opus 5.5 at low effort, implementer on Codex GPT-6.1 Sol, small implementer and
-  tester on GPT-6 Luna) was the cheapest arm by far, at 2.26 USD per pass (1.80 to 2.60),
+  tester on GPT-6 Luna) was the cheapest Opus-main arm, at 2.26 USD per pass (1.80 to 2.60),
   about a third of A14's. Codex was 67% of its spend; its Opus main agent cost 0.48 to
   1.01 USD per run. Rep 2 needed a second round (unit-test line coverage of one source file
   at 94.8% against 95%, and a missing limitations list in the report). Rep 3 took 77
@@ -63,5 +68,13 @@ Notes:
   the most, 11.22 USD per pass, but it was also the fastest arm, 31.6 to 46.8 minutes.
 - A11 (Sonnet 5.5 main, Haiku 5.5 implementer and tester) cost 10.36 USD per pass, with
   the widest spread (8.20 to 12.12 USD).
+- A26 (solo GPT-6.1 Sol) is now the cheapest arm, at 1.68 USD per pass (1.50 to 1.81),
+  0.74 of A23, and the fastest, 26 to 31 minutes per run. A30 costs 3.41 per pass (2.46 to
+  4.41), about twice A26, with six to eight Luna spawns and one or two compactions per run.
+- Every second round in A26 and A30 had one cause: the round-one report
+  (docs/reports/stor.md) lacked a limitations section, and in three A30 runs a design
+  summary as well. The spec lists limitations among the report's contents, and the
+  feedback named the missing sections; each run fixed them in round two. The code passed
+  every functional check in round one, so the extra rounds cost report work only.
 - No solo Opus 5.5 (A1) baseline ran on the corrected pack, so Task 4 has no spend ratio
   against A1.
