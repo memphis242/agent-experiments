@@ -44,7 +44,7 @@ class BuiltinAgentsTest(unittest.TestCase):
     def write_log(self, thread, lines, suffix=""):
         path = self.home / "sessions" / f"rollout-{thread}{suffix}.jsonl"
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text("".join(json.dumps(line) + "\n" for line in lines))
+        path.write_text("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines))
         return path
 
     def analyze(self):
@@ -140,13 +140,21 @@ class BuiltinAgentsTest(unittest.TestCase):
 
     def test_children_may_report_with_send_message_but_not_spawn(self):
         lines = child_lines()
-        lines.insert(-1, {"type": "response_item", "payload": {
-            "type": "function_call", "name": "collaboration.send_message"}})
+        for name in ("send_message", "list_agents", "wait_agent"):
+            lines.insert(-1, {"type": "response_item", "payload": {
+                "type": "function_call", "name": "collaboration." + name}})
         self.write_log(CHILD, lines)
         self.assertTrue(self.analyze()["validation"]["ok"])
         lines[-2]["payload"]["name"] = "collaboration.spawn_agent"
         self.write_log(CHILD, lines)
         self.assertEqual([v["kind"] for v in self.analyze()["validation"]["violations"]], ["forbidden_tool"])
+
+    def test_unicode_line_separators_inside_strings_do_not_split_records(self):
+        lines = child_lines()
+        lines.insert(-1, {"type": "event_msg", "payload": {"type": "item_completed",
+                                                         "text": "a\u2028b\u2029c\x0cd"}})
+        self.write_log(CHILD, lines)
+        self.assertTrue(self.analyze()["validation"]["ok"])
 
     def test_child_errors_and_incomplete_rollouts_stop_before_acceptance(self):
         cfg = run.RunConfig("A30", "t1", 1, None, self.root / "template", self.root, self.root / "arms",

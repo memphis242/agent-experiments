@@ -320,7 +320,8 @@ def _rollout_entries(path: Path) -> Iterator[tuple[dict, bool]]:
     """(entry, False) per JSON line of a rollout, then (_, True) once if its last line is cut off
     (a Codex process killed mid-write). Invalid JSON anywhere else is an error."""
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        # JSON Lines end at "\n" only: splitlines() would also break inside strings at U+2028 and the like.
+        lines = path.read_text(encoding="utf-8").split("\n")
     except (OSError, UnicodeDecodeError) as exc:
         raise TranscriptError(f"cannot read Codex session log {path}: {exc}") from exc
     while lines and not lines[-1].strip():
@@ -672,8 +673,8 @@ def leak_scan_files(home: Path) -> list[Path]:
 FORBIDDEN_MAIN_TOOLS: frozenset[str] = frozenset({
     "spawn_agent", "send_input", "send_message", "followup_task", "wait_agent", "close_agent", "resume_agent",
     "interrupt_agent", "list_agents", "web_search"})
-# A built-in child reports to its parent with send_message, so it is the one collaboration tool children keep.
-FORBIDDEN_CHILD_TOOLS: frozenset[str] = FORBIDDEN_MAIN_TOOLS - {"send_message"}
+# Built-in children keep the collaboration tools for reporting and waiting, but cannot start or steer agents.
+FORBIDDEN_CHILD_TOOLS: frozenset[str] = FORBIDDEN_MAIN_TOOLS - {"send_message", "list_agents", "wait_agent"}
 USAGE_KEYS: tuple[str, ...] = ("input_tokens", "cached_input_tokens", "output_tokens", "reasoning_output_tokens")
 
 
@@ -708,7 +709,9 @@ def parse_exec_events(stdout: str) -> dict[str, Any]:
     usage: dict[str, int] | None = None
     completed = failed = 0
     errors: list[str] = []
-    for line in stdout.splitlines():
+    for line in stdout.split("\n"):
+        if not line.strip():
+            continue
         try:
             event = json.loads(line)
         except json.JSONDecodeError:
