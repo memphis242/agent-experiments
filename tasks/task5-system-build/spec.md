@@ -1,4 +1,4 @@
-# Task: two-node flight system build (STOR, CMDVAL, TLMO, GW, SFI)
+# Task: two-node flight system build (STOR, CMDVAL, TLMO, GW, SFI, MODE)
 
 ## Background
 
@@ -7,7 +7,8 @@ Operations needs onboard storage with file transfer between nodes and to the
 ground, authenticated command ingest, prioritised telemetry output under a
 bandwidth budget, a gateway that moves software-bus traffic over UDP, TCP
 and serial links, and a system fault identifier that watches every
-application and reports system-level health. Build these as cFS
+application and reports system-level health, and a mode manager that applies
+fault responses and synchronises system mode between nodes. Build these as cFS
 applications and one new library, following the conventions of
 `apps/sample_app` and `libs/sample_lib` (v7 `config/` layout, dispatch,
 events, coverage tests), register them on both processors, deliver unit
@@ -22,7 +23,7 @@ and CI_LAB and TO_LAB are no longer built or started. CMDI and TLMO take
 over the lab apps' UDP ports, so ground tools keep their addresses, but
 from now on every command into a node arrives as an authenticated CMDI
 frame. NASA's DS, FM, CF, HS and SBN apps in this tree solve related
-problems; you may study them, but STOR, CMDVAL, GW and SFI are new code,
+problems; you may study them, but STOR, CMDVAL, GW, SFI and MODE are new code,
 and every interface below is pinned here.
 
 ## How this specification is organised
@@ -40,8 +41,9 @@ check names the subsystem id and the term of this document it concerns.
 | S3 | CMDVAL library and CMDI command ingest app (replaces CI_LAB), frame builder in `tools/udp_harness.py` | `libs/cmdval_lib`, `apps/cmdi`, `tools/udp_harness.py` | C |
 | S4 | TLMO prioritised telemetry output app (replaces TO_LAB) | `apps/tlmo` | C |
 | S5 | GW gateway app | `apps/gw` | C |
-| S6 | SFI system fault identifier app | `apps/sfi` | C (its heartbeat definitions are used by S1, S3, S4, S5) |
-| S7 | System-level tests in CTF, CTF plugins and CCDD definitions | `ctf/` | all |
+| S6 | SFI system fault identifier app | `apps/sfi` | C (its heartbeat definitions are used by S1, S3, S4, S5, S7) |
+| S7 | MODE mode manager and fault response | `apps/mode` | S1-S6 |
+| S8 | System-level tests in CTF, CTF plugins and CCDD definitions | `ctf/` | all |
 
 Because CMDI is the only command path into a node, every live check of
 every subsystem sends its commands as CMDI frames (S3.1), and S3 and S4
@@ -71,8 +73,8 @@ started on either node (C.6).
 MIDs below are given for cpu1. Local MIDs are built from topic IDs with
 `CFE_PLATFORM_CMD_TOPICID_TO_MIDV` / `CFE_PLATFORM_TLM_TOPICID_TO_MIDV`, so
 the same topic yields 0x19xx / 0x09xx on cpu2. Global MIDs (S2) use
-`CFE_GLOBAL_CMD_TOPICID_TO_MIDV` and are identical on both nodes. All
-network traffic is on loopback. CMDI's and TLMO's ports are their base
+`CFE_GLOBAL_CMD_TOPICID_TO_MIDV` and are identical on both nodes. This task uses the native classic MID mapping, not the EDS topic allocator;
+no EDS build is required. All network traffic is on loopback. CMDI's and TLMO's ports are their base
 port (1234, 2234) plus the node ID minus 1, as CI_LAB and TO_LAB computed
 theirs.
 
@@ -95,6 +97,7 @@ distinct and record how in `docs/reports/system.md`.
 | TLMO | `apps/tlmo` | `TLMO_` | `TLMO_AppMain` | `TLMO` | `PriorityTable`, `/cf/tlmo_tbl.tbl` |
 | GW | `apps/gw` | `GW_` | `GW_AppMain` | `GW` | `ConnTable`, `/cf/gw_tbl.tbl` |
 | SFI | `apps/sfi` | `SFI_` | `SFI_AppMain` | `SFI` | `SfiTable`, `/cf/sfi_tbl.tbl` |
+| MODE | `apps/mode` | `MODE_` | `MODE_AppMain` | `MODE` | `ModeTable`, `/cf/mode_tbl.tbl` |
 
 Each app has `fsw/src`, `fsw/inc`, `fsw/tables`, `config/`, `unit-test/` and
 a `DESIGN.md`. CMDI starts as a copy of `apps/ci_lab` and TLMO as a copy of
@@ -122,11 +125,21 @@ Topic macros are `<APP>_MISSION_<NAME>_TOPICID`, MID macros
 
 | App | CMD | SEND_HK | WAKEUP (rate) | HK_TLM | Other |
 |-----|-----|---------|---------------|--------|-------|
-| STOR | 0xC4 / 0x18C4 | 0xC5 / 0x18C5 | 0xC6 / 0x18C6 (1 Hz) | 0xC4 / 0x08C4 | `LIST_TLM` 0xC5 / 0x08C5, `STATS_TLM` 0xC6 / 0x08C6, `XFER_TLM` 0xC7 / 0x08C7; global `XFER_SEG` 0x18 / 0x1878, global `XFER_ACK` 0x19 / 0x1879 |
-| CMDI | 0xD0 / 0x18D0 | 0xD1 / 0x18D1 | 0xD2 / 0x18D2 (10 Hz) | 0xD0 / 0x08D0 | |
-| TLMO | 0xD4 / 0x18D4 | 0xD5 / 0x18D5 | 0xD6 / 0x18D6 (10 Hz) | 0xD4 / 0x08D4 | `CLASS_TLM` 0xD5 / 0x08D5 |
+| STOR | 0xC4 / 0x18C4 | 0xC5 / 0x18C5 | 0xC6 / 0x18C6 (1 Hz) | 0xC4 / 0x08C4 | `LIST_TLM` 0xC5 / 0x08C5, `STATS_TLM` 0xC6 / 0x08C6, `XFER_TLM` 0xC7 / 0x08C7, `FILE_INFO_TLM` 0xC8 / 0x08C8; global `XFER_SEG` 0x18 / 0x1878, global `XFER_ACK` 0x19 / 0x1879 |
+| CMDI | 0xD0 / 0x18D0 | 0xD1 / 0x18D1 | 0xD2 / 0x18D2 (10 Hz) | 0xD0 / 0x08D0 | `SOURCE_TLM` 0xD1 / 0x08D1 |
+| TLMO | 0xD4 / 0x18D4 | 0xD5 / 0x18D5 | 0xD6 / 0x18D6 (10 Hz) | 0xD4 / 0x08D4 | `CLASS_TLM` 0xD5 / 0x08D5, `STREAM_TLM` 0xD6 / 0x08D6 |
 | GW | 0xD8 / 0x18D8 | 0xD9 / 0x18D9 | 0xDA / 0x18DA (10 Hz) | 0xD8 / 0x08D8 | `CONN_TLM` 0xD9 / 0x08D9 |
-| SFI | 0xDC / 0x18DC | 0xDD / 0x18DD | 0xDE / 0x18DE (1 Hz) | 0xDC / 0x08DC | `STATUS_TLM` 0xDD / 0x08DD, `HEARTBEAT` (command) 0xDF / 0x18DF |
+| SFI | 0xDC / 0x18DC | 0xDD / 0x18DD | 0xDE / 0x18DE (1 Hz) | 0xDC / 0x08DC | `STATUS_TLM` 0xDD / 0x08DD, `HEARTBEAT` (command) 0xDF / 0x18DF, `FAULT` (command) 0xF3 / 0x18F3, `FAULT_TLM` 0xDE / 0x08DE; global `HEALTH` (command) 0x1A / 0x187A |
+| MODE | 0xF0 / 0x18F0 | 0xF1 / 0x18F1 | 0xF2 / 0x18F2 (1 Hz) | 0xF0 / 0x08F0 | `STATUS_TLM` 0xF1 / 0x08F1; global `PEER` (command) 0x1B / 0x187B |
+
+GW also owns global command `GW_KEEPALIVE_MID`, topic 0x1C / MID 0x187C.
+All global packets use `CFE_GLOBAL_CMD_TOPICID_TO_MIDV` as in S2; they
+have a command header and function code 0. Their MIDs do not change on
+cpu2. SFI_FAULT_MID is local (0x19F3 on cpu2). Command and telemetry
+spaces are distinct: STOR_FILE_INFO_TLM does not alias CF_CH0_RX.
+The new allocations were checked against the pinned bundle
+`apps/*/{fsw/inc,config}/*topic*`, cFE topic headers and
+`sample_defs/inc/global_sbn_topicids.h`; SBN keeps 0xFA-0xFF.
 
 Command MIDs 0x18E0 to 0x18EF on cpu1 and 0x19E0 to 0x19EF on cpu2 (topics
 0xE0 to 0xEF via `CFE_PLATFORM_CMD_TOPICID_TO_MIDV`) are reserved for
@@ -145,7 +158,13 @@ whatever payload the test chooses, so packet byte offset 16 is payload byte
   length (`<APP>_CMD_LEN_ERR_EID`) and an unexpected MID
   (`<APP>_MID_ERR_EID`). Every accepted command increments
   `CommandCounter`; every rejected one increments `CommandErrorCounter`,
-  sends the named error event, and changes nothing else.
+  sends the named error event, and changes nothing else, except the
+  explicitly described GW SET_ENABLED_MASK partial failure. CommandCounter
+  counts only accepted function-code commands on an app's CMD MID;
+  SEND_HK/WAKEUP, heartbeat/transfer/fault/health/mode protocol packets and
+  sampled streams do not increment it. Malformed protocol packets use
+  their subsystem error rules, increment CommandErrorCounter once where
+  specified, and never increment CommandCounter.
 - Every HK payload begins `uint8 CommandCounter; uint8 CommandErrorCounter;`,
   so `CommandErrorCounter` is byte 17 of every new HK packet.
 - Event texts print values in decimal and MIDs as `0x%04X`. `*_ERR` events
@@ -153,6 +172,14 @@ whatever payload the test chooses, so packet byte offset 16 is payload byte
   Event IDs 1 to 10 are the same in every new app: 1 INIT_INF, 2 CC_ERR,
   3 NOOP_INF, 4 RESET_INF, 5 MID_ERR, 6 CMD_LEN_ERR, 7 PIPE_ERR,
   8 TBL_REG_ERR, 9 TBL_LOAD_ERR, 10 TBL_VAL_ERR.
+- All payload structs use natural alignment, no packing, fixed-width cFS
+  integer types; a packet is its cFE header followed by the named payload.
+  All explicit spare fields and unused telemetry elements are zero. Input
+  spare bytes are ignored unless a subsystem explicitly requires a value;
+  table spares are ignored by validation. Natural-alignment padding on
+  generated packets and table images is zero-filled.
+  RESET_COUNTERS leaves both command counters 0, never resets protocol
+  sequences, replay windows, fault latches, cooldowns or retry caps.
 - Payload and telemetry fields are in host byte order (little-endian here),
   as in the existing apps; the CMDI frame (S3) and stream marker (S5) are
   big-endian where stated.
@@ -174,13 +201,13 @@ typedef struct
 typedef struct { CFE_MSG_CommandHeader_t CommandHeader; SFI_Heartbeat_Payload_t Payload; } SFI_HeartbeatCmd_t; /* code 0 */
 ```
 
-STOR, CMDI, TLMO and GW each send one heartbeat per second on
-`SFI_HEARTBEAT_MID`: STOR on every 1 Hz wakeup, the others on every 10th
+STOR, CMDI, TLMO, GW and MODE each send one heartbeat per second on
+`SFI_HEARTBEAT_MID`: STOR and MODE on every 1 Hz wakeup, the others on every 10th
 10 Hz wakeup, using SFI's `fsw/inc` and `config` headers.
 
 ### C.6 Mission integration
 
-- `sample_defs/targets.cmake`: add `cmdval_lib stor cmdi tlmo gw sfi` to
+- `sample_defs/targets.cmake`: add `cmdval_lib stor cmdi tlmo gw sfi mode` to
   `MISSION_GLOBAL_APPLIST` so they build and install on both processors,
   and remove `ci_lab` and `to_lab` from `cpu1_APPLIST` and `cpu2_APPLIST`
   (each becomes `sch_lab`). CI_LAB and TO_LAB are then neither built nor
@@ -193,15 +220,15 @@ STOR, CMDI, TLMO and GW each send one heartbeat per second on
   and the fixed `to_lab` line with
   `CFE_APP, tlmo,        TLMO_AppMain,       TLMO,         45,   32768, 0x0, 0;`
   (CMDI and TLMO take over the lab apps' startup slots and priorities);
-  and set `CFS_APP_STARTUP_ORDER` to `lc cf ds fm hk hs sc md cs stor gw sfi sbn`
-  (STOR, GW and SFI start with the loop's priority 70 and stack 131072).
+  and set `CFS_APP_STARTUP_ORDER` to `lc cf ds fm hk hs sc md cs stor gw sfi mode sbn`
+  (STOR, GW, SFI and MODE start with the loop's priority 70 and stack 131072).
   The generated `cf/cfe_es_startup.scr` of each node names neither
   `ci_lab` nor `to_lab`.
 - `sample_defs/cpu1/install_custom.cmake` and `cpu2/install_custom.cmake`:
   remove `ci_lab` and `to_lab` from `APP_INCLUDE_TABLE_LIST` and add the
   new apps as `hk` is; remove the `to_lab.table` include and definition
   lines and the `add_cfe_tables(to_lab to_lab_sub_alt.c)` line, and give
-  `tlmo.table`, `stor.table` and `sfi.table` the include directories and
+  `tlmo.table`, `stor.table`, `sfi.table` and `mode.table` the include directories and
   definitions (`APP_INCLUDE_TABLE_LIST`, `APP_DEFINITION_TABLE_LIST`) that
   `to_lab.table` had, since their default tables name other apps' MIDs
   (`CFS_SBN_ENABLED` is defined on this native build).
@@ -210,11 +237,15 @@ STOR, CMDI, TLMO and GW each send one heartbeat per second on
   `CI_LAB_SEND_HK_MID` and `TO_LAB_SEND_HK_MID` entries and the
   `ci_lab_msgids.h` and `to_lab_msgids.h` includes; add STOR SEND_HK 49 and
   WAKEUP 10, CMDI SEND_HK 50 and WAKEUP 1, TLMO SEND_HK 51 and WAKEUP 1, GW
-  SEND_HK 53 and WAKEUP 1, SFI SEND_HK 55 and WAKEUP 10. Slot budget: the
+  SEND_HK 53 and WAKEUP 1, SFI SEND_HK 55 and WAKEUP 10, MODE SEND_HK
+  57 and WAKEUP 10. Slot budget: the
   table holds 22 entries today (20 unconditional, of which 2 are the lab
   apps, plus 2 under `CFS_SBN_ENABLED`, which is defined here); removing the
-  lab entries leaves 20, and the 10 new ones make 30 of SCH_LAB's 32
-  (`SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES`), leaving 2 spare.
+  lab entries leaves 20, and the 12 new ones (two each for STOR, CMDI, TLMO, GW, SFI and
+  MODE) make exactly 32 of SCH_LAB's 32
+  (`SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES`), leaving 0 spare. Keep that
+  limit at 32; health, mode sync, event windows, keep-alives and response
+  timers run inside these wakeups and need no additional schedule slots.
 - `sample_defs/tables/to_lab_sub.c` and the other `to_lab_sub*.c` files are
   no longer built and are left unchanged; the telemetry they routed is
   routed by TLMO's default table (S4.1).
@@ -222,6 +253,32 @@ STOR, CMDI, TLMO and GW each send one heartbeat per second on
   root): update the "Ground interface" section to name CMDI and TLMO on
   their ports and the framed commands, and the "Registering an app" step
   that names `to_lab_sub.c` to name TLMO's table.
+
+### C.7 Evaluation and acceptance timing
+
+All deadline arithmetic uses cFE onboard time; intervals include
+subseconds unless a uint32 Seconds telemetry field is explicitly named.
+For a deadline expressed in seconds, act on the first owner wakeup at or
+after the deadline, never before it. Hidden unit tests use exact synthetic
+time and wakeup counts. Live acceptance allows 2 additional seconds for
+1 Hz consumers and 1 additional second for 10 Hz consumers, plus one
+SEND_HK period when asserting a changed HK value; explicit narrower or
+wider live bounds in a subsystem override these defaults. Status request
+replies must reach TLMO within 2 seconds at a nonzero sufficient budget.
+Healthy recovery after 20 seconds is checked in [20,23] seconds from the
+first MODE healthy wakeup, or [20,25] from SFI's clear report. Tests use
+telemetry timestamps and event receipt bounds, not sleep-only proofs.
+The 57 default TLMO streams fit 64 slots; tests remove streams explicitly
+when they need more than seven additions. Large SFI status, STOR HK and TLMO stream-statistics
+packets use TLMO's 8192-byte maximum; CMDI and GW command frames retain
+their 1024-byte embedded limit.
+
+For S1-S6 live checks that require no autonomous interference, send
+MODE SET_ENABLE 0 and wait for its HK acknowledgement before arranging
+faults or overriding profiles. For SFI/GW tests that configure peer
+paths, explicitly enable/disable both peer monitors as the case needs.
+Counters are reset after setup; protocol serials continue across resets.
+All live commands, including these setup commands, are CMDI frames.
 
 ## S1. STOR storage manager (base)
 
@@ -395,9 +452,39 @@ Event IDs: 1 to 10 as in C.4,
 32 XFER_FAIL_ERR, 33 XFER_ABORT_INF, 34 XFER_RX_INF, 35 XFER_RX_ERR,
 36 XFER_ACTION_ERR.
 
+### S1.6 Quotas, file information and priority accounting
+
+Commands on STOR_CMD_MID extend S1.4:
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 13 | SET_QUOTA | `{ uint32 TelemetryQuotaBytes; uint32 FileQuotaBytes; }` | telemetry quota at least current MaxPacketFileBytes, file quota nonzero; else SET_PARAM_ERR; success SET_PARAM_INF, apply both atomically then purge |
+| 14 | FILE_INFO | `{ uint8 Area; uint8 Spare[3]; char Path[STOR_PATH_LEN]; }` | Area and Path as S2.2; regular closed file required; success one FILE_INFO_TLM and FILE_INFO_INF; invalid path PATH_ERR, other failure FILE_INFO_ERR |
+
+A quota may be reduced below current usage; existing file-area files are
+kept, subsequent additions follow the new quota, and telemetry follows the
+purge and drop rules. Table activation restores both quotas from the table.
+FILE_INFO never changes a file or transfer state. Its payload type is
+STOR_FileInfo_Payload_t; reply STOR_FileInfoTlm_t has payload
+STOR_FileInfoTlm_Payload_t in this order:
+
+```c
+uint8 Area; uint8 Spare[3]; char Path[STOR_PATH_LEN]; uint32 Size; uint32 Crc;
+```
+
+Crc is CRC-32/ISO-HDLC exactly as S2.1, over all file bytes, including a
+packet file's cFE file header; an empty file has CRC 0. No reply on error.
+Append to S1.5 HK `uint32 PriorityBytes[256];`: index p is the bytes in
+telemetry packet files at current priority p, open and archived included;
+unknown MIDs use 0. Their sum equals TelemetryBytesUsed. SET_PRIORITY,
+table load, transfer success actions and purge update this accounting.
+Append events 37 FILE_INFO_INF and 38 FILE_INFO_ERR (C.4 types).
+MODE uses the ordinary TRANSFER command, including its busy rejection,
+segment timing and success actions; it has no privileged transfer path.
+
 ### S1 Acceptance
 
-STOR builds on both nodes and its unit tests pass with the coverage of N.2.
+STOR builds on both nodes and its unit tests pass with the coverage of N.
 Hidden coverage tests compiled against the names above exercise table
 validation, decimation, roll-over, purge order including archived files,
 quota drops, path rejection and the listing packets. Live, acceptance
@@ -406,7 +493,10 @@ a table whose entries name reserved MIDs (C.3) loaded through cFE Table
 Services, verification packets injected as CMDI frames (S3) fill the
 telemetry quota, and the files on disk, purge order, housekeeping and
 statistics (received through TLMO, S4) are checked; the file-area
-commands, sent as CMDI frames, are exercised including quota rejection.
+commands, sent as CMDI frames, are exercised including quota rejection,
+SET_QUOTA atomic validation and reductions, FILE_INFO size and CRC (empty
+and nonempty files), and per-priority accounting across reprioritising,
+archiving and purge. Hidden tests cover these boundaries and I/O errors.
 
 ## S2. STOR transfer
 
@@ -612,7 +702,7 @@ Multi-byte frame fields are big-endian. A frame is exactly 50 + L bytes.
 | 4 | 2 | `SourceId` |
 | 6 | 2 | `CommandLength` L, 8..1024 |
 | 8 | 4 | `TimeSeconds`: onboard seconds (`CFE_TIME_GetTime().Seconds`, the seconds field of telemetry secondary headers, bytes 6 to 9 of a telemetry packet, big-endian) |
-| 12 | 4 | `Sequence`: covered by the MAC, not checked |
+| 12 | 4 | `Sequence`: per-source replay serial (S3.6) |
 | 16 | L | embedded CCSDS command packet |
 | 16+L | 32 | `Mac`: HMAC-SHA-256 with the table key over bytes 0 to 15+L (header and command, not MAC or CRC) |
 | 48+L | 2 | `Crc`: CRC-16/CCITT-FALSE over bytes 0 to 47+L (MAC included) |
@@ -690,10 +780,20 @@ CMDVAL_Status_t CMDVAL_ValidateFrame(const uint8 *Frame, size_t FrameLen, const 
 
 ### S3.3 CMDI table
 
-`typedef struct { CMDVAL_Config_t Validation; } CMDI_ValTable_t;`.
+```c
+typedef struct
+{
+    CMDVAL_Config_t Validation; /* ACTIVE key is Validation.HmacKey */
+    uint8 NextKey[CMDVAL_KEY_LEN];
+    uint8 NextValid; uint8 Spare[3];
+} CMDI_ValTable_t;
+```
+
 Validation rejects an all-zero key, `MaxAgeSeconds` 0 or above 86400,
 `EnableMask` bits above 0x0F, the SOURCE bit with no nonzero source, and
-duplicate nonzero sources. Default: key = the 32 ASCII bytes
+duplicate nonzero sources; NextValid outside 0..1; NextValid 1 with
+an all-zero NextKey or NextKey equal to Validation.HmacKey. With NextValid
+0, NextKey must be all zero. Default: NextValid 0, NextKey all zero; key = the 32 ASCII bytes
 `cFS-cmdval-test-key-0123456789ab`, sources 0x0001 and 0x0002 (others 0),
 `MaxAgeSeconds` 30, `EnableMask` 0x0F.
 
@@ -710,10 +810,11 @@ duplicate nonzero sources. Default: key = the 32 ASCII bytes
   Each is one frame: `FramesReceived`++, then `CMDVAL_ValidateFrame` with
   the active configuration and the current onboard seconds. OK: the
   embedded command is sent with `CFE_SB_TransmitMsg(..., false)`,
-  `FramesAccepted`++, `CMDI_ACCEPT_DBG_EID` naming its MID. Otherwise the
+  `FramesAccepted`++, `CMDI_ACCEPT_DBG_EID` naming its MID, only after
+  the additional S3.6 authentication/replay checks also pass. Otherwise the
   reason's counter is incremented, nothing is sent, and one
-  `CMDI_REJECT_ERR_EID` names the reason (`FORMAT`, `CRC`, `HMAC`, `SOURCE`
-  or `AGE`) and, except for FORMAT, the source ID. Datagrams longer than
+  `CMDI_REJECT_ERR_EID` names the reason (`FORMAT`, `CRC`, `HMAC`, `SOURCE`,
+  `AGE` or `REPLAY`) and, except for FORMAT, the source ID. Datagrams longer than
   1074 bytes are FORMAT rejections.
 - Every 10th WAKEUP sends a heartbeat (C.5).
 - Commands: 0 NOOP, 1 RESET_COUNTERS (command and frame counters),
@@ -784,6 +885,97 @@ given, and prints the frame length and sequence; `recv` gains
 `HarnessError` (library) or exit status 1 with a one-line message (CLI),
 as the existing code does. Update the module docstring accordingly.
 
+### S3.6 Replay windows, key slots and source statistics
+
+CMDVAL_ValidateFrame remains stateless with the same API, enum values and
+validation order. CMDI performs replay checking only after it returns OK,
+before publishing the embedded command. It is mandatory, independent of
+EnableMask. SourceId 0 is always a SOURCE rejection at this stage. Eight
+runtime source slots start empty, are allocated on first otherwise-valid
+frame (even with SOURCE disabled), never evicted; a ninth distinct source
+is a SOURCE rejection. No failed validation or replay consumes a sequence
+or allocates a slot. A successful table activation clears all replay slots;
+RESET_COUNTERS and SWITCH_KEY do not. CMDI app restart clears the slots
+and reloads its default on-disk table, just as node startup does. GW ingress retains stateless
+validation; S3 replay windows apply to CMDI UDP ingress only.
+
+Each source has a 64-bit seen bitmap and uint32 highest serial. Its first
+serial, including 0, is accepted. Let d = (candidate - highest) modulo
+2^32. If 0 < d < 2^31, accept as newer, shift the bitmap left d (clear it
+if d >= 64), set bit 0 and update highest. Otherwise let b =
+(highest - candidate) modulo 2^32: accept only b < 64 and bit b clear,
+then set it. Duplicate, b >= 64 and the exactly-half-range d = 2^31 are
+REPLAY. Thus FFFFFFFF -> 00000000 is newer. Window state is independent
+per node and source; an accepted sequence is consumed even if the target
+app later rejects the embedded command. Count ReplayErrors and emit
+CMDI_REJECT_ERR (12, ERROR) naming REPLAY and source once per rejection;
+FramesReceived includes it, FramesAccepted does not. Changing a key does
+not permit replay of an accepted frame.
+
+Two key slots are ACTIVE (runtime copy of Validation.HmacKey) and NEXT.
+Only ACTIVE validates incoming frames. LOAD_NEXT_KEY is a cFE TBL
+LOAD/VALIDATE/ACTIVATE of CMDI.ValTable, sent through authenticated CMDI
+frames. It replaces both slots with the table values and clears replay
+state, as any successful table activation does; staging must carry the
+current ACTIVE key in Validation.HmacKey to preserve it. There is no
+key-bytes command, no file read outside cFE TBL, and no dual-key grace.
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 4 | SWITCH_KEY | none | reject with KEY_ERR unless NEXT valid; replace ACTIVE with NEXT, zero NEXT and clear NextValid; success KEY_SWITCH_INF |
+| 5 | SEND_SOURCE_STATS | none | one CMDI_SourceTlm_t, SOURCE_STATS_INF |
+
+SWITCH_KEY must itself arrive in a frame with a valid ACTIVE-key HMAC,
+even if HMAC is disabled by EnableMask: after ordinary validation, perform
+that HMAC check before replay checking. Failure is the ordinary HMAC
+frame rejection and executes nothing. Its sequence is consumed before the
+command changes the key. Later frames under the retired key fail HMAC
+when HMAC checking is enabled; disabling that check deliberately permits
+any key for ordinary commands, but never bypasses SWITCH_KEY's mandatory
+HMAC. GW ingress performs that same extra ACTIVE-key HMAC check for a
+frame carrying CMDI SWITCH_KEY, after ordinary validation and before
+publishing; bad MAC is HMAC (GW reason counter, RxErrors and event 25),
+even when the shared EnableMask has HMAC clear. GW's replay exemption
+is unchanged. Authenticated onboard SB producers need no frame.
+Before reading its next UDP datagram, CMDI processes any CMDI_CMD_MID
+command it has just forwarded through its normal SB dispatch. Thus a
+self-command's mask, age or key change applies to the next datagram,
+including datagrams already waiting in the socket. GW shares the active runtime key using the
+CMDI.ValTable working copy: CMDI writes ACTIVE/NEXT changes with
+CFE_TBL_Modified, and GW reads them on its next wakeup. SET_MAX_AGE and
+SET_ENABLE_MASK remain runtime-only in CMDI; SWITCH_KEY modifies only
+key fields in the shared table working copy. A later table activation
+replaces this copy. No disk key file is rewritten.
+
+Append HK, in order: `uint32 ReplayErrors; uint32 KeySwitches; uint8
+NextValid; uint8 SourceSlotsUsed; uint16 Spare2;`. No telemetry or events
+contain key material. RESET_COUNTERS zeroes KeySwitches, ReplayErrors and
+source statistics as well as S3.4 counters, retaining slot identities and
+bitmaps. Source statistics count all frames, even ones rejected before
+slot allocation: a separate array has the eight AllowedSources in table
+order (unused slots have SourceId 0 and zero counters) plus a ninth aggregate OTHER row (SourceId 0, including malformed
+frames without a readable source). It is reset on table activation.
+
+```c
+typedef struct
+{
+    uint16 SourceId; uint16 Spare;
+    uint32 Accepted; uint32 FormatErrors; uint32 CrcErrors; uint32 HmacErrors;
+    uint32 SourceErrors; uint32 AgeErrors; uint32 ReplayErrors;
+} CMDI_SourceStats_t;
+typedef struct { CMDI_SourceStats_t Sources[CMDVAL_MAX_SOURCES + 1]; } CMDI_Source_Payload_t;
+```
+
+For FORMAT errors read SourceId only if FrameLen >= 6; map it to a row
+by equality with a nonzero AllowedSources entry, otherwise OTHER. All
+other failures use the parsed source. Exactly one accepted/reason counter
+in one row changes per datagram. Append event IDs 16 KEY_SWITCH_INF,
+17 KEY_ERR, 18 SOURCE_STATS_INF. Table update validation includes NEXT.
+The frame builder still accepts an explicit sequence; callers of the
+CLI across separate processes must use --sequence with a fresh serial.
+CTF, the harness and acceptance use monotonic per-source sequences for
+an entire node run, including commands issued by different plugins.
+
 ### S3 Acceptance
 
 A hidden unit test linked against `cmdval_lib` checks the CRC check value,
@@ -807,7 +999,15 @@ unframed or in a frame with a bad MAC change nothing; a frame built with
 `send_framed_command` from your harness is accepted. On cpu2 the same
 valid frame sent to UDP 1235 executes there. The startup scripts of both
 nodes are checked for CMDI and TLMO and for the absence of CI_LAB and
-TO_LAB.
+TO_LAB. Hidden tests also cover the 64-bit window (63/64 boundaries,
+out-of-order gaps, half-range, wrap, slot exhaustion), key staging and
+switch order, mandatory SWITCH_KEY authentication, replay retention on
+switch/reset and source attribution at each validation failure. Live
+checks replay an identical accepted frame and an unseen older frame,
+check non-execution and reason/event/statistics, stage NEXT through TBL,
+switch under ACTIVE, verify retired-key rejection and NEXT-key acceptance
+without resetting the sequence window, and observe GW using the new key, including GW
+rejection of unauthenticated SWITCH_KEY while ordinary HMAC is disabled.
 
 ## S4. TLMO prioritised telemetry output
 
@@ -826,21 +1026,26 @@ carried over, because TLMO's output is always on.
 #define TLMO_NUM_CLASSES 4    /* class 0 is the highest priority, 3 the lowest */
 #define TLMO_MAX_QUEUE   64
 #define TLMO_MAX_BUDGET  256
-#define TLMO_MAX_PACKET  1024
+#define TLMO_MAX_PACKET  8192
 
-typedef struct { CFE_SB_MsgId_t MsgId; /* INVALID = unused */ uint8 Class; uint8 Spare[3]; } TLMO_StreamDef_t;
+typedef struct { CFE_SB_MsgId_t MsgId; /* INVALID = unused */ uint8 Class; uint8 Decimation; uint16 Spare; } TLMO_StreamDef_t;
+
+typedef struct { uint16 Budget; uint8 ClassMap[4]; uint16 Spare; } TLMO_ProfileDef_t;
 
 typedef struct
 {
     uint16           BudgetPacketsPerCycle; /* 0..256; 0 holds all output */
     uint16           QueueCapacity;         /* 1..64 packets, shared by all classes */
     TLMO_StreamDef_t Streams[TLMO_MAX_STREAMS];
+    TLMO_ProfileDef_t Profiles[3]; /* NOMINAL, DEGRADED, SAFE */
 } TLMO_PriorityTable_t;
 ```
 
 Validation rejects a budget above 256, a capacity outside 1..64, a class
-above 3 in a used entry, and duplicate used MIDs. Default: budget 16,
-capacity 64, and the streams below with their classes, so that every
+above 3 or Decimation 0 in a used entry, duplicate used MIDs, a profile
+budget above 256 or any profile ClassMap value above 3. Default: budget 16,
+capacity 64, Decimation 1 for every used stream, Profiles budgets
+16, 8, 4 and ClassMaps {0,1,2,3}, {0,1,2,2}, {0,1,1,1}, and the streams below with their classes, so that every
 stream TO_LAB's default subscription table
 (`sample_defs/tables/to_lab_sub.c`) carried still reaches the ground port,
 apart from the lab apps' own `TO_LAB_HK_TLM_MID`, `TO_LAB_DATA_TYPES_MID`
@@ -854,7 +1059,19 @@ and `CI_LAB_HK_TLM_MID`, whose apps no longer run:
 | 3 | `CF_CH0_TX_MID`, `CF_CH1_TX_MID`, `STOR_XFER_TLM_MID`, verification 0xEB |
 | 1 (only under `CFS_SBN_ENABLED`, as in `to_lab_sub.c`) | `SBN_HK_TLM_MID`, `SBN_HKNET_TLM_MID`, `SBN_HKPEER_TLM_MID`, `SBN_HKMYSUBS_TLM_MID`, `SBN_HKPEERSUBS_TLM_MID` |
 
-That is 48 streams on this build (43 without SBN), within
+Also include MODE_HK_TLM_MID and SFI_FAULT_TLM_MID in class 0;
+STOR_FILE_INFO_TLM_MID, CMDI_SOURCE_TLM_MID, TLMO_STREAM_TLM_MID and
+MODE_STATUS_TLM_MID in class 2; SFI_FAULT_MID, SFI_HEALTH_MID and
+MODE_PEER_MID in class 0. These last three are command packets, forwarded
+unchanged like verification streams, so a headless observer sees onset,
+clear, mode and health without accessing a node console.
+
+Default slot order is the listed table rows top to bottom, MIDs left to
+right within each row, followed by the nine added streams in the prose
+order above. Without SBN omit those five slots, not holes. Unused slots
+have INVALID MsgId and zero remaining fields.
+
+That is 57 streams on this build (52 without SBN), within
 `TLMO_MAX_STREAMS`. The verification streams are the reserved command MIDs
 of C.3 for topics 0xE8 to 0xEB (`CFE_PLATFORM_CMD_TOPICID_TO_MIDV`, 0x18E8
 to 0x18EB on cpu1).
@@ -867,11 +1084,12 @@ to 0x18EB on cpu1).
   slot and REMOVE_STREAM empties a slot (S4.3). "Used stream" below means
   a used slot of the runtime list.
 - TLMO subscribes to every used stream with a message limit of 32 on a pipe
-  of depth 48, and sends to 127.0.0.1 port 2234 + node ID - 1, TO_LAB's
+  of depth at least 128, and sends to 127.0.0.1 port 2234 + node ID - 1, TO_LAB's
   port. Output is always on from initialization: no enable command is
   needed, and none exists.
 - Enqueue: each received stream packet (`PacketsReceived`++) is copied into
-  one queue shared by all classes, tagged with the stream's current class.
+  one queue shared by all classes, after decimation (S4.4), tagged with
+  the selected profile's mapping of the stream's base class.
   A packet longer than `TLMO_MAX_PACKET` is dropped and counted as a drop
   of its class. If the queue holds `QueueCapacity` packets: when it holds a
   packet of lower priority (higher class number) than the arriving one, the
@@ -931,6 +1149,60 @@ Event IDs: 1 to 10 as in C.4,
 19 TBL_UPDATE_INF, 20 ADD_STREAM_INF, 21 ADD_STREAM_ERR,
 22 REMOVE_STREAM_INF, 23 REMOVE_STREAM_ERR.
 
+### S4.4 Decimation, profiles and stream statistics
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 7 | SET_DECIMATION | `{ CFE_SB_MsgId_t MsgId; uint8 Decimation; uint8 Spare[3]; }` | used stream and 1..255, else SET_DECIMATION_ERR; success SET_DECIMATION_INF; reset its decimation phase |
+| 8 | SELECT_PROFILE | `{ uint8 Mode; uint8 Spare[3]; }` | 0..2, else PROFILE_ERR; success PROFILE_INF, apply that profile's budget and ClassMap |
+| 9 | SEND_STREAM_STATS | none | one full TLMO_StreamTlm_t snapshot, STREAM_STATS_INF |
+
+Initial profile 0, with BudgetPacketsPerCycle from the table (which may
+differ from Profiles[0].Budget). SELECT_PROFILE applies Profiles[Mode].Budget;
+SET_BUDGET overrides the budget until the next SELECT_PROFILE or table
+activation. SET_CLASS and ADD_STREAM set the base class. Enqueue maps the
+base class through the selected ClassMap; queued packets keep their class
+when either class or profile changes. SEND_CLASS_MAP reports effective
+classes. ADD_STREAM's existing Spare bytes remain zero and it creates a
+stream with Decimation 1. A table activation selects profile 0, installs
+the table budget and resets decimation phases and per-stream counters.
+
+Each used slot has a phase starting at 0. On reception increment
+PacketsReceived and that stream's Received; keep the packet if phase is
+0, then set phase = (phase + 1) % Decimation. Otherwise increment its
+Decimated and do not enqueue or count a class drop. Length checks and
+queue/drop processing apply only to kept packets. Stats track queue
+ownership even after SET_CLASS. Successful UDP sends increment stream
+Sent; overflow, oversize and eviction increment the affected stream's
+Dropped; UDP failure increments stream SendErrors. Queued is the current
+number owned by the stream. Command removal and table discards are not
+drops. RESET_COUNTERS zeroes cumulative stream counters, retaining phase
+and Queued. SEND_STREAM_STATS snapshots all used slots into one full-sized packet,
+entries in ascending slot order, unused tail entries zero. StreamCount 0
+sends the same packet with every entry zero; no empty-list variant.
+Class is the effective mapped class, Decimation the runtime factor and
+Queued the current number of queued packets owned by that slot.
+
+```c
+typedef struct
+{
+    uint16 Slot; uint16 Spare;
+    CFE_SB_MsgId_t MsgId;
+    uint8 Class; uint8 Decimation; uint16 Queued;
+    uint32 Received; uint32 Sent; uint32 Dropped; uint32 Decimated; uint32 SendErrors;
+} TLMO_StreamStats_t;
+typedef struct
+{
+    uint16 StreamCount; uint16 Spare;
+    TLMO_StreamStats_t Streams[TLMO_MAX_STREAMS];
+} TLMO_Stream_Payload_t;
+```
+
+Append HK `uint8 SelectedProfile; uint8 Spare2[3]; uint32
+PacketsDecimated;`. PacketsDecimated is reset with the counters.
+Append events 24 SET_DECIMATION_INF, 25 SET_DECIMATION_ERR,
+26 PROFILE_INF, 27 PROFILE_ERR, 28 STREAM_STATS_INF.
+
 ### S4 Acceptance
 
 Hidden coverage tests exercise enqueue, eviction, drain order, budget 0,
@@ -949,7 +1221,11 @@ ADD_STREAM of an unlisted reserved MID makes its injected packets arrive
 and REMOVE_STREAM stops them, with the error cases; a table update loaded
 through cFE Table Services changes classes and budget and drops added
 streams; SEND_CLASS_MAP reports the runtime map. On cpu2, telemetry of
-cpu2 arrives on UDP 2235.
+cpu2 arrives on UDP 2235. Hidden tests and live injections verify phase
+0 selection, N=1/255, invalid N=0, phase reset, per-stream attribution of
+evictions and send failures, Queued with held output, every profile map
+and budget, unchanged queued classes, table reset and counter reset.
+Each statistics snapshot is checked against injected stream totals.
 
 ## S5. GW gateway
 
@@ -983,10 +1259,21 @@ typedef struct
     uint16         RemotePort;                  /* UDP, TCP: nonzero */
     uint16         Spare;
     char           DevicePath[GW_DEV_PATH_LEN]; /* SERIAL: host path of a PTY slave, e.g. /dev/pts/7 */
+    uint8 KeepAliveEnabled; uint8 PeerNode; uint16 Spare2;
     CFE_SB_MsgId_t Subs[GW_MAX_SUBS];           /* egress MIDs, CFE_SB_INVALID_MSG_ID = unused */
 } GW_ConnDef_t;
 
-typedef struct { GW_ConnDef_t Conns[GW_MAX_CONNECTIONS]; } GW_ConnTable_t;
+#define GW_MAX_ROUTES 16
+typedef struct
+{
+    CFE_SB_MsgId_t MsgId; /* INVALID = unused */
+    uint8 Primary; uint8 Backup; uint16 Spare;
+} GW_RouteDef_t;
+typedef struct
+{
+    GW_ConnDef_t Conns[GW_MAX_CONNECTIONS];
+    GW_RouteDef_t Routes[GW_MAX_ROUTES];
+} GW_ConnTable_t;
 ```
 
 A used definition (table or ADD_CONN) is valid when: `Interface` is 1..3;
@@ -994,7 +1281,11 @@ A used definition (table or ADD_CONN) is valid when: `Interface` is 1..3;
 dotted IPv4 address and `RemotePort` nonzero; for TCP and SERIAL
 `LocalPort` is 0; for SERIAL `DevicePath` is terminated and starts with
 `/`; `Subs` has no duplicate used MID; no two UDP connections share a
-nonzero `LocalPort`. The default table has every slot unused.
+nonzero `LocalPort`. KeepAliveEnabled is 0 or 1; with 1, PeerNode is 1 or 2 and not own node,
+and UDP LocalPort must be nonzero; with 0, PeerNode must be 0. A used route
+has a valid command MID, Primary and Backup distinct in 0..7, both naming
+used connections listing that MID, and no other route uses that MID.
+The default table has every connection and route unused, spares zero.
 
 ### S5.2 Interfaces and behaviour
 
@@ -1035,7 +1326,7 @@ nonzero `LocalPort`. The default table has every slot unused.
   terminal attributes (the other side sets raw mode). GW uses OSAL for file
   and socket I/O; mapping `/dev/pts` into the OSAL file system with
   `OS_FileSysAddFixedMap` is acceptable. Two properties of this path are
-  requirements you must make work and demonstrate (S5 Acceptance, S7),
+  requirements you must make work and demonstrate (S5 Acceptance, S8),
   not assumptions:
   - Reads of a PTY never block GW's main loop: a read when no byte is
     pending returns at once (for example a zero-timeout `OS_TimedRead`, or
@@ -1122,7 +1413,7 @@ nonzero `LocalPort`. The default table has every slot unused.
   (`Enabled` 0, `GW_CONN_DOWN_ERR_EID`). `GW_EGRESS_ERR_EID` /
   `GW_INGRESS_ERR_EID` are sent once per connection until its next
   successful write / read; counters always increment.
-- Connection state: DISABLED 0, UP 1, CONNECTING 2, DOWN 3 (TCP only, see
+- Connection state: DISABLED 0, UP 1, CONNECTING 2, DOWN 3 (TCP connect exhaustion or keep-alive loss, see
   the connect cycle above); reaching UP sends `GW_CONN_UP_INF_EID`,
   entering DOWN sends `GW_CONN_TIMEOUT_ERR_EID`.
 - Every 10th WAKEUP sends a heartbeat (C.5).
@@ -1166,6 +1457,110 @@ Event IDs: 1 to 10 as in C.4,
 22 EGRESS_ERR, 23 INGRESS_ERR, 24 CONN_STATUS_INF, 25 FRAME_REJECT_ERR,
 26 VALTBL_ERR, 27 VALTBL_INF, 28 CONN_TIMEOUT_ERR.
 
+### S5.4 Keep-alives, routing and connection accounting
+
+Keep-alives are enabled per connection, so a ground/PTY test endpoint may
+retain KeepAliveEnabled 0. An enabled UP connection with keep-alives
+sends one GW_KeepAliveCmd_t each 10 GW wakeups, regardless of Subs and
+routes, wrapped in the ordinary authenticated link frame (and marker).
+It uses global GW_KEEPALIVE_MID, function code 0, payload:
+
+```c
+typedef struct
+{
+    uint8 SrcNode; uint8 DstNode; uint8 Reply; uint8 Spare;
+    uint32 Sequence;
+} GW_KeepAlive_Payload_t;
+```
+
+Sequence starts at 1 per open, increments per probe and wraps modulo
+2^32. Reply 0 is a probe; its receiving connection sends Reply 1 with
+the same Sequence, nodes reversed, at once. Valid incoming probes and
+replies (exact payload size and FC 0) from configured PeerNode addressed
+to own node refresh that
+connection's receive time; malformed payloads, wrong nodes and Reply >1
+increment RxErrors and emit FRAME_REJECT_ERR naming KEEPALIVE, without
+refreshing time. GW consumes keep-alives, never publishing them on SB,
+and never replies to a reply. No replay test applies on these links.
+KeepAliveEnabled 0 ignores a well-formed keep-alive after validation.
+
+Timer starts at UP. Six onboard seconds with no valid keep-alive makes
+the connection DOWN on the first GW wakeup at or after the deadline:
+GW_KEEPALIVE_ERR and SFI REPORT_LINK (S6.8) Down 1 once. Keep Enabled 1,
+retain the transport and read it; send probes once per second while DOWN.
+Any valid keep-alive makes it UP, emits CONN_UP_INF and REPORT_LINK Down 0.
+TCP transport failure follows the existing connect cycle; if previously
+UP with keep-alives, also reports link fault immediately, clearing it only
+on a later UP with valid keep-alive. Exhausting a TCP connect cycle keeps
+the existing no-more-connect-attempts rule. UDP/SERIAL open or I/O failures
+still disable the connection per S5.2 and also report link fault when
+keep-alives are enabled. Explicit DISABLE/REMOVE clears that link fault
+and stops timers; administrative disabling is not a fault.
+
+For each used route GW egresses its MID only on the selected connection,
+not on both connections' Subs. Initially choose Primary if UP, else
+Backup if UP, else no connection (0xFF). A selected link not UP switches
+to the other UP link on the same wakeup; if neither is UP, drop/count one
+egress error for each packet. Backup stays selected until Primary has
+been continuously UP for 10 onboard seconds, then fail back on the first
+GW wakeup at or after that deadline. A Primary interruption resets that
+timer. Failover/failback emit ROUTE_INF naming route and old/new index;
+selection changes do not queue or duplicate traffic. Non-routed MIDs
+retain S5.2 fanout. Routes whose endpoint is removed are removed too.
+
+The loop guard has exactly two exceptions: SFI_HEALTH_MID and
+MODE_PEER_MID. GW publishes their validated inbound commands despite
+local Subs, tagging those SB messages as received for its own egress
+handler (bounded cache of the last 64 full packet byte strings, retained
+for 2 onboard seconds). It never egresses a cached inbound packet. The
+originating messages include SrcNode and a sequence; own-node messages
+are ignored by SFI/MODE. Cache comparison includes headers and full
+payload. This permits bidirectional same-MID health subscriptions without
+echoing. STOR's directional subscriptions retain the ordinary loop rule.
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 8 | SET_ROUTE | `{ uint8 Index; uint8 Spare[3]; GW_RouteDef_t Route; }` | index 0..15 and route valid against current connections; INVALID MsgId removes route; success ROUTE_INF, invalid ROUTE_ERR; apply at once |
+| 9 | SET_ENABLED_MASK | `{ uint8 Mask; uint8 Spare[3]; }` | for each used connection, bit i enables/disables slot i; unused bits ignored; unchanged states untouched; otherwise ordinary open/close and report rules; success MASK_INF, open failure MASK_ERR |
+
+SET_ENABLED_MASK is applied in increasing index order. An open failure
+leaves that slot disabled and continues the other slots, increments
+CommandErrorCounter once (not CommandCounter), with MASK_ERR identifying
+the failed-slot mask. This intentional partial outcome is the only
+exception to C.4's rejected-command no-change rule for this command.
+
+Append to GW_ConnStatus_t, in order:
+
+```c
+uint32 TxFrames; uint32 RxFrames; uint32 TxBytes; uint32 RxBytes;
+uint32 LastKeepAliveSeconds; uint32 KeepAliveTimeouts;
+```
+
+TxFrames counts successful complete frame writes; TxBytes their frame
+bytes excluding stream markers. RxFrames counts every complete frame
+received, even invalid; RxBytes counts their bytes, excluding markers.
+A truncated UDP datagram counts one RxFrame and its actual received byte
+length (read buffers must detect oversize datagrams); incomplete stream
+bytes count only when a complete frame is assembled. TxPackets/RxPackets
+retain data-packet meanings and exclude keep-alives; errors include
+keep-alive validation/I/O failures. KeepAliveTimeouts increments only on
+UP -> DOWN by its 6 s timer. LastKeepAliveSeconds is 0 before any valid
+keep-alive. Append to GW_Conn_Payload_t after Conns:
+`uint8 RouteSelected[GW_MAX_ROUTES];` (unused/no UP = 0xFF).
+Append HK `uint32 KeepAliveTimeouts; uint32 RouteSwitches;`.
+RESET_COUNTERS zeroes all cumulative additions, retaining timers,
+LastKeepAliveSeconds and selection. Append events 29 KEEPALIVE_ERR,
+30 ROUTE_INF, 31 ROUTE_ERR, 32 MASK_INF, 33 MASK_ERR.
+
+Command 10 SET_PREFERENCE payload is `{ uint8 Index; uint8
+PreferBackup; uint16 Spare; }`. A used route and PreferBackup 0..1 are
+required (ROUTE_ERR otherwise). Success ROUTE_INF. With 1, choose
+Backup whenever UP, otherwise Primary when UP, otherwise 0xFF; the
+ordinary automatic failback is held. With 0, resume S5.4 and start a new
+10 s primary-stability interval if currently on Backup. RELOAD/table
+activation resets preferences to 0. Append `uint8
+RoutePreferBackup[GW_MAX_ROUTES];` after RouteSelected in GW_CONN_TLM.
+
 ### S5 Acceptance
 
 Hidden coverage tests, linked against the `cmdval_lib` stubs, exercise
@@ -1198,7 +1593,15 @@ for GW) and answers housekeeping requests with nothing pending on the PTY; GW is
 START_APP after a SERIAL connection was used, and a new SERIAL connection
 on a fresh PTY pair then carries traffic both ways; DISABLE, ENABLE,
 REMOVE, RELOAD, the error cases, the loop rule, HK and the status packet
-behave as specified.
+behave as specified. Hidden tests cover every new route/table bound,
+keep-alive timer edge, recovery and echo suppression. Live paired UDP
+links check frame/byte counts in both directions, bad and absent
+keep-alives, DOWN 6 s after last valid receipt (live [5,8] s from a
+steady-link relay cut), SFI LINK reports, backup-only egress,
+no duplicates, recovery and failback in 10.0-12.0 s. Both nodes enter
+DEGRADED within 10 s of a primary cut while the backup carries health and mode.
+The no-listener TCP test uses KeepAliveEnabled 0 and retains its 18-26 s
+exhaustion bound; old endpoint tests need not implement keep-alives.
 
 ## S6. SFI system fault identifier
 
@@ -1213,8 +1616,13 @@ status packet.
 #define SFI_MAX_WATCHES 16
 #define SFI_HISTORY_LEN 16
 
-typedef enum { SFI_Rule_UNUSED = 0, SFI_Rule_STALL = 1, SFI_Rule_RATE = 2 } SFI_Rule_Enum_t;
-typedef struct { char AppName[CFE_MISSION_MAX_API_LEN]; } SFI_AppDef_t; /* empty = unused */
+typedef enum { SFI_Rule_UNUSED = 0, SFI_Rule_STALL = 1, SFI_Rule_RATE = 2,
+               SFI_Rule_LIMIT = 3 } SFI_Rule_Enum_t;
+typedef struct
+{
+    char AppName[CFE_MISSION_MAX_API_LEN]; /* empty = unused */
+    uint8 Enabled; uint8 EventRateEnabled; uint8 EventLimit; uint8 EventWindowSec;
+} SFI_AppDef_t;
 
 typedef struct
 {
@@ -1223,6 +1631,8 @@ typedef struct
     uint8          Width;      /* 1, 2 or 4 bytes, host byte order */
     uint8          Rule;       /* SFI_Rule_Enum_t */
     uint32         Limit;      /* STALL: packets without change; RATE: maximum increase per packet */
+    uint32 Min; uint32 Max; /* LIMIT inclusive bounds */
+    uint8 Persistence; uint8 AppIndex; uint8 Severity; uint8 Enabled;
 } SFI_WatchDef_t;
 
 typedef struct
@@ -1234,18 +1644,35 @@ typedef struct
     uint16 Spare2;
     SFI_AppDef_t   Apps[SFI_MAX_APPS];
     SFI_WatchDef_t Watches[SFI_MAX_WATCHES];
+    uint8 PeerEnabled; uint8 PeerTimeoutSec; uint16 Spare3;
 } SFI_Table_t;
 ```
 
 Validation rejects values outside these ranges, unterminated or duplicate
-app names, and a used watch with width not 1, 2 or 4, `Limit` 0, or
-`ByteOffset` + `Width` above 1024. Default: N 3, W 5, H 60; apps `STOR`,
+app names, and a used watch with width not 1, 2 or 4, or
+`ByteOffset` + `Width` above 1024. Additionally reject Rule outside 0..3 or a used watch with invalid MsgId;
+a used app's Enabled/EventRateEnabled outside 0..1, EventLimit outside
+1..64 or EventWindowSec outside 1..60; a used watch's Enabled outside
+0..1, Severity outside 1..2, AppIndex neither a used app index nor 0xFF;
+LIMIT Min > Max, Max not representable in Width, or Persistence outside
+1..255; PeerEnabled outside 0..1 or PeerTimeoutSec outside 3..60. LIMIT
+uses Min/Max/Persistence and requires Limit 0; other used rules require
+Limit nonzero and Min/Max/Persistence 0. UNUSED watches are ignored.
+Default: N 3, W 5, H 60; apps `STOR`,
 `CMDI`, `TLMO`, `GW` and the verification names `SFI_T1`, `SFI_T2`,
-`SFI_T3`; watches (MID, offset, width, rule, limit): `STOR_HK_TLM_MID`,
+`SFI_T3`, `MODE` (indices 0..7 in that order); watches (MID, offset, width, rule, limit): `STOR_HK_TLM_MID`,
 `CMDI_HK_TLM_MID`, `TLMO_HK_TLM_MID` and `GW_HK_TLM_MID` each 17, 1, RATE,
 2; reserved MID 0xEC (`CFE_PLATFORM_CMD_TOPICID_TO_MIDV(0xEC)`, 0x18EC on
 cpu1) 16, 4, STALL, 3; reserved MID 0xED (0x18ED on cpu1) 16, 2, RATE, 5.
-Offset 16 of a verification packet is its payload byte 8 (C.3).
+Add watch index 6: reserved MID 0xEF (0x18EF on cpu1), offset 16, width
+4, LIMIT, Limit 0, Min 10, Max 20, Persistence 3. For watches 0..3
+AppIndex equals the matching app index 0..3; other watches use 0xFF.
+Default Severity 1 except watch 6 Severity 2. All used watches Enabled 1.
+All used apps Enabled 1, EventRateEnabled 1, EventLimit 5,
+EventWindowSec 10. Unused fields/elements are zero. PeerEnabled 1,
+PeerTimeoutSec 10. MODE is a real heartbeat source, the three SFI_T names
+are armed only by injected heartbeats. Offset 16 of a verification packet
+is its payload byte 8 (C.3).
 
 ### S6.2 Heartbeats
 
@@ -1254,7 +1681,7 @@ Offset 16 of a verification packet is its payload byte 8 (C.3).
   `TotalHeartbeats`++. Other names count in `UnknownHeartbeats` with
   `SFI_HB_UNKNOWN_DBG_EID` and are otherwise ignored.
 - Every SFI WAKEUP (1 Hz), for each armed app: heard since the previous
-  wakeup sets `MissedCycles` to 0, otherwise `MissedCycles`++; the heard
+  wakeup sets `MissedCycles` to 0, otherwise `MissedCycles`++ (saturating at 255); the heard
   flag is then cleared. An app never heard is UNARMED (0) and not evaluated.
 - When `MissedCycles` reaches N the app becomes MISSING (2): its onset time
   is `CFE_TIME_GetTime()` at that wakeup, `TotalMisses`++ for the app,
@@ -1307,8 +1734,13 @@ compared with the previous value:
 - RATE: delta = new - previous, or the new value itself if it is smaller
   than the previous (counter reset). Delta above `Limit` puts the watch in
   FAULT: `RateFaults`++, `SFI_RATE_ERR_EID` naming MID, offset and delta.
+- LIMIT: every packet, including the first, compares the value with
+  inclusive Min..Max. Outside increments a consecutive count (saturates
+  at Persistence); inside resets it. Reaching Persistence enters FAULT,
+  LimitFaults++ and LIMIT_ERR. Clear on the first in-range value. A first
+  LIMIT packet also sets its baseline and LastValue.
 - A watch in FAULT returns to OK on the first packet that does not trigger
-  its rule (a changed value; a delta at most `Limit`), with
+  its rule (a changed value; a delta at most `Limit`; an in-range LIMIT value), with
   `SFI_WATCH_CLEAR_INF_EID`. No repeated events while in FAULT.
 
 ### S6.5 Commands and telemetry
@@ -1365,6 +1797,213 @@ Event IDs: 1 to 10 as in C.4,
 15 STALL_ERR, 16 RATE_ERR, 17 WATCH_CLEAR_INF, 18 CLUSTER_ERR,
 19 SET_PARAM_INF, 20 SET_PARAM_ERR, 21 STATUS_INF, 22 HISTORY_CLEAR_INF.
 
+### S6.6 Fault reports, log and latching
+
+Enumerations in default_sfi_msgdefs.h: SFI_FaultType_NONE 0, _HEARTBEAT
+1, _STALL 2, _RATE 3, _LIMIT 4, _EVENT_RATE 5, _LINK 6, _NODE_LOSS 7;
+SFI_Severity_WARNING 1 and _CRITICAL 2. Each source has independent
+physical Active and retained Latched flags. An inactive -> active edge
+sets Latched 1, stores onset time, logs and publishes one report. An
+active -> inactive edge logs and publishes one clear with the original
+onset and current change time, retaining Latched. Repeated triggering
+samples do not report again. ACK_FAULT clears Latched only if inactive;
+active ACK is rejected and has no effect. A later new onset re-latches.
+Existing app/watch State fields describe physical state, not latching.
+
+```c
+#define SFI_FAULT_LOG_LEN 64
+typedef struct
+{
+    uint32 ReportSequence; /* 1 at app start, +1 per report, modulo 2^32 */
+    uint8 FaultType; uint8 SourceIndex; uint8 Severity; uint8 Active;
+    uint8 Latched; uint8 NodeId; uint8 Spare[2];
+    char AppName[CFE_MISSION_MAX_API_LEN];
+    uint32 OnsetSeconds; uint32 OnsetSubsecs;
+    uint32 ChangeSeconds; uint32 ChangeSubsecs;
+} SFI_Fault_Payload_t;
+```
+
+Publish SFI_FaultCmd_t, FC 0, on local SFI_FAULT_MID, then
+SFI_FaultTlm_t on SFI_FAULT_TLM_MID with the identical payload. MODE
+subscribes to the former; the latter is ground telemetry. SourceIndex is
+the table app slot for HEARTBEAT/EVENT_RATE, watch slot for STALL/RATE/
+LIMIT, connection index for LINK, 0 for NODE_LOSS. AppName is the source
+app, the watch's AppIndex name if associated, `GW` for LINK, or empty
+for an unassociated watch/NODE_LOSS. HEARTBEAT, EVENT_RATE, LINK and
+NODE_LOSS are WARNING; watches use their table Severity. NodeId is the
+reporting node, including NODE_LOSS (its source is the peer).
+
+Fault slots 0..56 are fixed: heartbeat = AppIndex; watch = 16 + watch
+index; event rate = 32 + AppIndex; link = 48 + connection index; peer =
+56. Rule type changes on table activation retain this slot mapping.
+Arrays indexed by these slots describe every current fault, including
+inactive latched faults. Log is a ring of the last 64 reports (onsets and
+clears, oldest overwritten); ACKs are not reports. All source metadata
+is recorded when an edge occurs. CLEAR_HISTORY clears clustering only;
+RESET_COUNTERS clears cumulative counters only; neither clears fault
+state, log, report serial or latches.
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 6 | ACK_FAULT | `{ uint8 Slot; uint8 Spare[3]; }` | 0..56, inactive and Latched 1, else CONTROL_ERR; success clears latch, ACK_INF |
+| 7 | SET_APP_ENABLE | `{ uint8 Index; uint8 Enabled; uint16 Spare; }` | used app index, Enabled 0..1, else CONTROL_ERR; success CONTROL_INF |
+| 8 | SET_WATCH_ENABLE | same fields as SET_APP_ENABLE | used watch index, Enabled 0..1, else CONTROL_ERR; success CONTROL_INF |
+| 9 | DUMP_FAULT_LOG | none | write /cf/sfi_faults.bin as below, DUMP_INF or DUMP_ERR |
+| 10 | SET_PEER_ENABLE | `{ uint8 Enabled; uint8 Spare[3]; }` | 0..1, else CONTROL_ERR; success CONTROL_INF |
+| 11 | reserved | none | rejected with CC_ERR |
+| 12 | REPORT_LINK | `{ uint8 Index; uint8 Down; uint16 Spare; }` | index 0..7, Down 0..1, else CONTROL_ERR; success updates LINK Active with edge rules, no success event |
+
+Disabling an app clears its active heartbeat and event-rate faults with
+reports, retains latches, sets State UNARMED, clears heard/miss flags and
+event timestamps, and ignores subsequent heartbeats/events for it (not
+UnknownHeartbeats). Re-enabling starts unarmed with empty windows.
+Disabling a watch clears its physical fault with a report, retains its
+latch, and starts baseline-pending when re-enabled; it ignores samples
+while disabled. Table activation applies these same clear/reset rules
+for all configured apps/watches, retains latches, log and history, then
+uses the new defaults; old-active clears precede new configuration.
+Table activation also disarms health monitoring, clears NODE_LOSS with
+a report if active, resets PeerLastSeconds to 0, and applies new
+PeerEnabled/PeerTimeoutSec. LINK states are independent of SfiTable and
+are retained, including latches. No ACK is implied by table activation.
+A no-change enable command succeeds without resetting an enabled source.
+Peer disable clears NODE_LOSS and disarms; re-enable waits for a first
+valid health message. Runtime enables are overridden by table activation.
+
+Dump format is little-endian: 16-byte header `uint32 Magic` 0x5346494C,
+`uint16 Version` 1, `uint16 RecordSize` sizeof(SFI_Fault_Payload_t),
+`uint32 Count` 0..64, `uint32 LastSequence`; then Count report payloads
+in oldest-first order. LastSequence is 0 before the first report. No cFE
+file header, trailer or unused records. Snapshot at command receipt;
+OSAL create/truncate/write/close must finish before DUMP_INF, which names
+path, count and bytes. Any failure deletes a partial output and emits
+DUMP_ERR, command error once. Dumping again replaces that one file. The
+file is outside STOR's managed roots; STOR ADD_FILE can copy it into the
+file area and TRANSFER can send it to ground. No direct ground file read
+is needed to verify the dump.
+
+### S6.7 Event-rate detection and combined cluster attribution
+
+Subscribe to CFE_EVS_LONG_EVENT_MSG_MID (limit 64, pipe depth at least
+256). Match the long event payload AppName and EventType ==
+CFE_EVS_EventType_ERROR to enabled table apps with EventRateEnabled 1;
+ignore all other types/apps, including SFI's own reports. Timestamp on
+receipt using cFE time, not the event's embedded timestamp. For each app
+retain the most recent EventLimit+1 timestamps within the half-open
+window (now - EventWindowSec, now]; older/equal lower-bound timestamps
+expire. The observed count is capped at EventLimit+1. Above EventLimit
+enters EVENT_RATE fault on that received event; at most EventLimit clears
+it on a later receipt or wakeup. This remains exact for the threshold
+predicate even during a larger burst. Count includes unarmed but enabled apps; heartbeat arming is independent.
+EventRateFaults counts onsets;
+EVENT_RATE_ERR names app, capped count and window. SFI-generated ERRORs
+are never eligible even if a table names SFI.
+
+The history consumed by S6.3 now contains onsets of HEARTBEAT and watch
+faults together (STALL/RATE/LIMIT); clears, event-rate, LINK and NODE_LOSS
+do not enter it. Each new onset appends one entry to the same 16-entry
+ring, even if that source has had an earlier onset. RecentMisses is the
+number of these recent combined entries, despite its name. Preserve
+SFI_ComputeClusters exactly, including const input and result layout.
+For attribution, sort a local copy of records by full onset, then by
+insertion order for ties, and apply that function's same gap rule.
+Largest cluster ties choose earliest onset then earliest insertion.
+Membership includes every source appearing in that chosen cluster;
+repeat onsets count toward size but set a membership bit only once.
+LargestAppsMask includes heartbeat app indices and watch AppIndex when
+not 0xFF; LargestWatchesMask includes watch indices. Both are 0 with no
+recent records. CLEAR_HISTORY empties records and both masks without
+changing fault Active/Latched state. CLUSTER_ERR keeps its S6.3 trigger.
+
+Extend SFI_MissRecord_t by appending `uint8 FaultType; uint8 SourceIndex;
+uint16 Spare2;`. For a heartbeat AppIndex is its index; a watch uses its
+associated AppIndex or 0xFF. Seconds/Subsecs remain the onset. Existing
+fields and SFI_ComputeClusters signature remain unchanged. The history
+includes faults even when a prior occurrence remains latched. Records retain
+their onset-time slot indices across table activation; history and masks
+are not remapped if app/watch definitions move. CLEAR_HISTORY starts a
+new history for the new slot assignment.
+
+### S6.8 Cross-node health
+
+Each SFI wakeup sends SFI_HealthCmd_t, code 0, on global SFI_HEALTH_MID:
+
+```c
+typedef struct
+{
+    uint8 SrcNode; uint8 DstNode; uint8 ActiveFaults; uint8 LatchedFaults;
+    uint32 Sequence; uint32 Seconds;
+} SFI_Health_Payload_t;
+```
+
+DstNode is 3 - own node ID. Sequence starts at 1 and increases modulo
+2^32 each publication; Seconds is current onboard seconds. Subscribe to
+the same global MID; own SrcNode is ignored. Require correct packet size,
+FC 0, SrcNode equal the other node and DstNode equal own node, otherwise
+CONTROL_ERR and no refresh. A first valid peer packet arms monitoring;
+no NODE_LOSS is raised before first contact, so a standalone node with
+no GW connection is supported. No application-level sequence freshness
+check is applied (CMDI replay or GW frame validation is the ingress
+boundary); the sequence is diagnostic. With PeerEnabled 1, losing valid
+health for PeerTimeoutSec (default 10) onboard seconds enters NODE_LOSS
+on the first SFI wakeup at/after that deadline; first valid packet clears
+it. GW routes health on both directions as S5.4. LatchedFaults counts
+all slots with Latched 1, ActiveFaults all slots with Active 1.
+
+Every SFI 1 Hz wakeup, after queued input processing, evaluates heartbeat
+misses, expires event windows, evaluates peer health loss, computes
+clusters, then publishes health. Within each phase process indices
+ascending; heartbeat reports precede event-rate reports, then NODE_LOSS.
+Watch faults are evaluated on packet receipt. MODE's 1 Hz wakeup first
+evaluates peer-mode expiry and cap exhaustion, then mode/profile changes,
+then response attempts/restart continuation, then peer publication and
+heartbeat. An in-progress restart gets its continuation before new
+restart-bearing response attempts, so freeing it is visible that wakeup.
+
+### S6.9 Expanded telemetry and events
+
+Append HK, in order:
+
+```c
+uint32 LimitFaults; uint32 EventRateFaults; uint32 LinkFaults; uint32 NodeLossFaults;
+uint32 FaultReports; uint32 FaultLogDumps;
+uint16 LargestAppsMask; uint16 LargestWatchesMask;
+uint8 ActiveFaults; uint8 LatchedFaults; uint8 PeerArmed; uint8 PeerLost;
+uint32 PeerLastSeconds; uint32 HealthSequence;
+```
+
+Append SFI_AppStatus_t `uint8 Enabled; uint8 EventCount; uint16 Spare2;`;
+append SFI_WatchStatus_t `uint8 Enabled; uint8 PersistenceCount; uint16
+Spare2;`. A disabled watch keeps State BASELINE_PENDING (unused remains
+UNUSED). Append to SFI_Status_Payload_t, after Watches:
+
+```c
+uint16 LargestAppsMask; uint16 LargestWatchesMask;
+uint8 Active[57]; uint8 Latched[57]; uint16 Spare;
+SFI_Fault_Payload_t Faults[57];
+```
+
+AppsMonitored counts used enabled app slots, AppsMissing counts enabled
+MISSING apps; WatchesInFault counts enabled physically faulted watches. Watch State
+FAULT clears exactly as S6.4; PersistenceCount is the current consecutive
+out-of-range LIMIT count, 0 for all other rules. EventCount is the
+current capped event-window count, 0 when event monitoring is disabled.
+FaultReports increments per report (including clears); FaultLogDumps per
+successful dump. LinkFaults/NodeLossFaults count onsets. HealthSequence
+is the latest sent sequence, 0 before the first publication; PeerLastSeconds
+is onboard receipt time, not the peer's Seconds field.
+Faults[slot] is its latest edge report, all zero before any edge; ACK
+updates only Latched[], not that historical report. This status exceeds
+1024 bytes: SEND_STATUS sends one full cFE packet and TLMO_MAX_PACKET is
+raised to 8192 (GW_MAX_PACKET and frame limit remain 1024). No truncation
+or alternate packet layouts. All cumulative additions reset with
+RESET_COUNTERS, not PeerLastSeconds/HealthSequence or state.
+Append events 23 LIMIT_ERR, 24 EVENT_RATE_ERR, 25 ACK_INF, 26 CONTROL_INF,
+27 CONTROL_ERR, 28 DUMP_INF, 29 DUMP_ERR, 30 NODE_LOSS_ERR,
+31 NODE_RESTORED_INF, 32 LINK_ERR, 33 LINK_CLEAR_INF. Link/node onset
+and clear events accompany their reports; REPORT_LINK counts accepted
+commands under C.4, even if it reports unchanged state.
+
 ### S6 Acceptance
 
 A hidden unit test calls `SFI_ComputeClusters` on chosen onset sets (empty,
@@ -1372,7 +2011,8 @@ single, equal times, gaps of exactly W and just above W, unsorted input);
 hidden coverage tests exercise arming, the miss and restore transitions,
 the STALL and RATE rules including counter reset, and the commands. Live,
 acceptance runs its own headless checks against your build, with every
-command sent as a CMDI frame. On cpu1: the four real apps are OK after
+command sent as a CMDI frame. MODE SET_ENABLE 0 is issued first for isolated legacy SFI checks.
+On cpu1: the five real heartbeat apps are OK after
 startup with no misses; stopping GW with the cFE ES STOP_APP command gives
 one miss event naming GW within N + 2 seconds, `AppsMissing` 1 and an
 onset time in the status packet, and starting it again with ES START_APP
@@ -1381,9 +2021,366 @@ heartbeats injected as CMDI frames for `SFI_T1`, `SFI_T2` and `SFI_T3`,
 then stopped for two of them at once, give a cluster of size 2 and
 CLUSTERED, and after CLEAR_HISTORY two misses more than W apart give
 UNCORRELATED; verification packets injected as CMDI frames on reserved
-MIDs 0xEC and 0xED raise and clear the STALL and RATE faults.
+MIDs 0xEC and 0xED raise and clear the STALL and RATE faults. Hidden
+and live checks cover LIMIT persistence/bounds, each onset/clear report,
+ACK active rejection and retained latches, enable controls, mixed
+heartbeat/watch clusters and tie attribution, ERROR-only sliding windows
+and boundary expiry, NODE_LOSS arming/deadline/clear, link reports and
+binary log chronology/wrap. A dumped log is copied by STOR and reassembled
+from ground transfer telemetry; payloads and CRC match observed reports.
+No live check depends on access to the dump on the node filesystem.
 
-## S7. System-level tests in CTF
+## S7. MODE system mode manager and fault response
+
+MODE is an onboard SB command producer, not a network ingest path. Its
+commands to ES, TLMO, STOR and GW use the target app's normal command MID,
+function code, payload and CFE_SB_TransmitMsg(..., false). They do not
+need CMDI frames. Ground operations, including ground commands to MODE,
+still enter only through CMDI frames; GW link acceptance probes retain
+S5's authenticated link ingress. MODE never opens a command socket.
+
+### S7.1 Table and profiles
+
+```c
+#define MODE_NUM_MODES 3
+#define MODE_NUM_FAULT_CLASSES 7
+#define MODE_NUM_FAULT_SLOTS 57
+#define MODE_MAX_RESTART_APPS 4
+typedef enum { MODE_NOMINAL = 0, MODE_DEGRADED = 1, MODE_SAFE = 2 } MODE_Mode_t;
+typedef struct
+{
+    uint8 TlmProfile; uint8 PurgeThreshold; uint8 GwEnabledMask; uint8 Spare;
+} MODE_ProfileDef_t;
+typedef struct
+{
+    char AppName[CFE_MISSION_MAX_API_LEN]; /* empty = unused */
+    char EntryPoint[CFE_MISSION_MAX_API_LEN];
+    char FileName[CFE_MISSION_MAX_PATH_LEN];
+    uint32 StackSize; uint16 Priority; uint16 Spare;
+} MODE_RestartDef_t;
+typedef struct
+{
+    uint8 TargetMode; uint8 Restart; uint8 SetPriority; uint8 Transfer;
+    uint8 SwitchRoute; uint8 RouteIndex; uint8 PreferBackup; uint8 Priority;
+    uint16 CooldownSec; uint8 RetryCap; uint8 Spare;
+    CFE_SB_MsgId_t RecordMid;
+    STOR_Transfer_Payload_t Dump;
+} MODE_ResponseDef_t;
+typedef struct
+{
+    uint8 Enabled; uint8 PeerEnabled; uint8 PeerTimeoutSec; uint8 RecoverySec;
+    MODE_ProfileDef_t Profiles[MODE_NUM_MODES];
+    MODE_RestartDef_t RestartApps[MODE_MAX_RESTART_APPS];
+    MODE_ResponseDef_t Responses[MODE_NUM_FAULT_CLASSES]; /* fault type - 1 */
+} MODE_ModeTable_t;
+```
+
+Validation rejects Enabled/PeerEnabled outside 0..1, PeerTimeoutSec
+outside 3..60, RecoverySec outside 1..120; a profile TlmProfile above 2
+or PurgeThreshold outside 1..100; used restart entries with empty or
+unterminated strings, FileName not absolute, Priority outside 1..255,
+StackSize outside 16384..262144, duplicate names, or names other than
+STOR/CMDI/TLMO/GW. Each used name requires exactly its listed entry point
+and /cf/<app>.so path below; other executable or entry-point strings are
+rejected. Every response requires TargetMode 1..2, boolean
+Restart/SetPriority/Transfer/SwitchRoute/PreferBackup, CooldownSec
+10..300, RetryCap 1..5; with SetPriority, RecordMid valid and Priority
+1..255; with SwitchRoute, RouteIndex 0..15; with Transfer, Dump must
+have Area FILE, Destination 0, SuccessAction KEEP and a terminated,
+nonempty relative Path satisfying S1.3, with DestPath empty. Disabled
+action fields need not validate except the booleans; all default spares
+are zero. There is no table-configured arbitrary ES executable target.
+
+Defaults: Enabled 1, PeerEnabled 1, PeerTimeoutSec 10, RecoverySec 20.
+Profiles indexed by mode:
+
+| Mode | TlmProfile | PurgeThreshold | GwEnabledMask |
+|------|------------|----------------|---------------|
+| NOMINAL | 0 | 80 | 0xFF |
+| DEGRADED | 1 | 65 | 0xFF |
+| SAFE | 2 | 50 | 0x03 |
+
+Connections 0 and 1 are reserved by mission configuration for the
+primary/backup health path when peer links are configured; SAFE retains
+both. The default GW table is empty; profile masks ignore unused slots.
+MODE does not create connections. In two-node tests the pack configures
+them through CMDI and verifies that its routes carry health and mode.
+
+RestartApps, in order: STOR, CMDI, TLMO, GW; EntryPoint APP_AppMain,
+FileName /cf/app.so (lowercase library base name), StackSize
+131072/32768/32768/131072, Priority 70/40/45/70. Pin the concrete strings
+STOR_AppMain, CMDI_AppMain, TLMO_AppMain, GW_AppMain and /cf/stor.so,
+/cf/cmdi.so, /cf/tlmo.so, /cf/gw.so. Restart ExceptionAction is always 0.
+
+Every response has CooldownSec 30, RetryCap 3, TargetMode DEGRADED,
+RecordMid CFE_EVS_HK_TLM_MID, Priority 200, RouteIndex 0, PreferBackup 1,
+Dump = {FILE, ground, KEEP, 0, "mode/response.bin", ""}. Enabled actions:
+
+| Fault type | Restart | SetPriority | Transfer | SwitchRoute | TargetMode |
+|------------|---------|-------------|----------|-------------|------------|
+| HEARTBEAT | 1 | 1 | 0 | 0 | DEGRADED |
+| STALL | 0 | 1 | 0 | 0 | DEGRADED |
+| RATE | 0 | 1 | 0 | 0 | DEGRADED |
+| LIMIT | 0 | 1 | 0 | 0 | SAFE |
+| EVENT_RATE | 0 | 1 | 1 | 0 | DEGRADED |
+| LINK | 0 | 0 | 0 | 1 | DEGRADED |
+| NODE_LOSS | 0 | 0 | 0 | 1 | DEGRADED |
+
+Transfer sends the configured existing file to ground. MODE does not
+create that file or replace a missing file: STOR rejects a
+missing source with XFER_ERR. Tests of that action first ADD_FILE a
+fixture at mode/response.bin. The independent fault-log workflow uses
+SFI DUMP, STOR ADD_FILE and TRANSFER (S8.6).
+
+### S7.2 State transitions and precedence
+
+Subscribe to SFI_FAULT_MID and MODE_PEER_MID at initialization (limits
+64 and 8; main pipe depth at least 128), plus command/HK/wakeup. A fault
+report is valid only with exact length, FC 0, own NodeId, FaultType 1..7,
+SourceIndex valid for that type, Severity 1..2, Active/Latched 0..1 and
+terminated AppName. Invalid reports emit FAULT_ERR and count one command
+error; no state changes. Reports from the other node on this local MID
+are ignored. The latest accepted report serial is tracked per slot:
+accept its first report or a modulo-2^32 newer serial with distance in
+1..2^31-1, otherwise ignore as a duplicate/stale report. Onset and clear
+from a given slot retain S6's original onset identity.
+
+On initialization current mode is NOMINAL; apply that profile once.
+On every mode entry, in order, send TLMO SELECT_PROFILE, STOR
+SET_PURGE_THRESHOLD, then GW SET_ENABLED_MASK with that mode's values;
+emit TRANSITION_INF with old/new mode and cause. A same-mode request
+succeeds without profile reapplication, transition count or resetting an
+already-running healthy interval. SET_MODE DEGRADED starts an interval
+only when entering DEGRADED from another mode while healthy. APPLY_PROFILE
+explicitly reapplies it. Table activation replaces configuration and
+reapplies current profile on the next wakeup; it does not clear latches,
+report serials, response attempts or cooldowns. On the initial profile
+application wait until TLMO, STOR and GW are registered with ES, then
+apply on the next wakeup, never later than 2 MODE wakeups after that.
+Failure to transmit any profile command increments ActionErrors and
+emits ACTION_ERR naming MID/FC; continue the remaining commands.
+
+Input decisions occur on the next MODE wakeup after input receipt;
+process commands/reports to completion before evaluating that wakeup.
+While enabled, every accepted onset also records a one-wakeup minimum
+mode demand (the maximum of its severity and response target). A clear
+before the next wakeup cancels its actions but does not erase that mode
+demand; a transient CRITICAL onset therefore still enters SAFE. Consume
+and clear this demand after that decision. Disabled monitoring does not
+accumulate stale demands; re-enable evaluates the currently active set.
+If multiple triggers are pending, use this precedence, highest first:
+
+| Trigger/guard | Result |
+|---------------|--------|
+| Current SAFE with no accepted exit command | remain SAFE, regardless of clear or peer recovery |
+| SET_MODE SAFE, any active CRITICAL report, an active fault targeting SAFE, a pending SAFE demand, or any exhausted response slot | SAFE |
+| Any active WARNING report, pending DEGRADED demand, or armed peer mode/health loss | at least DEGRADED |
+| SET_MODE NOMINAL with no active faults and no peer loss | NOMINAL immediately |
+| SET_MODE DEGRADED with no SAFE trigger | DEGRADED; start a healthy timer only on entry, preserve one already running |
+| DEGRADED, no active faults/peer loss continuously for RecoverySec | NOMINAL on first wakeup at/after deadline |
+| Otherwise | retain current mode |
+
+Severity CRITICAL always requires SAFE, even if its response table row
+targets DEGRADED. Latched but inactive SFI faults do not block automatic
+recovery. A clear starts the healthy interval on the first MODE wakeup
+observing all guards clear; any new active report/loss resets it. A
+commanded exit from SAFE is allowed only to NOMINAL when all guards are
+clear, or to DEGRADED when no CRITICAL/SAFE-target fault or cap exhaustion
+remains; otherwise SET_MODE is rejected with MODE_ERR. Thus SAFE never
+automatically unlatches. SET_MODE received during an active fault cannot
+override its required minimum mode. On conflicting SET_MODE commands
+before a wakeup the last accepted command is the requested mode; fault
+and SAFE precedence still applies. Manual NOMINAL ends a healthy
+DEGRADED interval at once. Disabled automatic response (SET_ENABLE 0)
+retains monitoring and fault state but suspends automatic transitions,
+responses and recovery; explicit SET_MODE/APPLY_PROFILE still work.
+Re-enable evaluates existing state on the next wakeup.
+
+### S7.3 Responses, cooldowns and restart protocol
+
+For each slot, maintain Active, Attempts, Exhausted and NextEligibleSeconds.
+An onset makes its response pending; a clear cancels pending retries but
+retains Attempts and cooldown. At the first eligible MODE wakeup while
+Active and enabled, dispatch one response attempt, then set
+NextEligibleSeconds = now + CooldownSec and increment Attempts. A
+recurrence in the same slot shares that cooldown and cap across clears,
+ACKs and RESET_COUNTERS. No action before eligibility; one attempt per
+slot per wakeup. Slots are processed ascending. At most one ES restart
+sequence is in progress; another restart-bearing response waits without
+consuming an attempt until that sequence finishes. Non-restart responses
+may run meanwhile. Missing RestartApps match skips only Restart, emits
+ACTION_ERR, and still consumes an attempt; it never restarts MODE itself.
+
+Each attempt sends enabled actions in this order: restart protocol,
+STOR SET_PRIORITY (RecordMid/Priority), STOR TRANSFER (Dump), GW
+SET_PREFERENCE (RouteIndex/PreferBackup). Mode entry/profile commands
+precede these actions. Non-restart actions follow the initial restart
+step in that same wakeup; they do not wait for STOP/START completion.
+A failure of one transmission never skips later non-restart actions. ResponsesSent counts attempts (RESPONSE_INF once each), ActionsSent counts
+successful SB command transmissions (including profiles), ActionErrors
+counts transmit errors or restart-sequence timeouts. Target app command
+acceptance/rejection remains visible in that app's events/HK and is not
+claimed as a successful action result. No response requires CMDI frames.
+A clear for LINK/NODE_LOSS with SwitchRoute sends SET_PREFERENCE 0 once
+to release the override, even when no attempt is due; ordinary 10 s
+failback then applies. If multiple active slots prefer the same route,
+release only when the last such active slot clears.
+
+For Restart, query CFE_ES_GetAppIDByName. If present, send ES STOP_APP
+FC 5 with CFE_ES_AppNameCmd_Payload_t.Application = target; poll presence
+at each MODE wakeup. If still present after 5 onboard seconds, terminate
+this sequence with ACTION_ERR. If absent initially or after STOP, send
+ES START_APP FC 4 on the next MODE wakeup with
+CFE_ES_StartAppCmd_Payload_t fields Application, AppEntryPoint,
+AppFileName, StackSize, ExceptionAction 0, Priority from RestartApps.
+Reserved fields zero; these are the bundle's native payload types, not
+private replacements. Finish the sequence when the app is registered,
+or 5 onboard seconds after START if it never appears (ACTION_ERR).
+STOP transmission failure ends the restart sequence at once with
+ACTION_ERR, no presence wait and no START. START transmission failure
+also ends the sequence at once with ACTION_ERR, no registration wait.
+Either failure consumes the response attempt and obeys normal cooldown;
+no intra-attempt retransmission. WAIT_STOP begins after a successful
+STOP transmission or for the initial-absence delay below; WAIT_START
+begins only after successful START.
+For an initially absent target, queue START for the following wakeup
+(RestartPhase WAIT_STOP until then, with no STOP-timeout timer), rather
+than sending it in the onset wakeup. For a successfully transmitted STOP, absence detected on a
+later wakeup sends START on the next wakeup. A timeout deadline is tested
+after checking app presence, so disappearance/registration at the exact
+deadline succeeds. ActionErrors counts each transmit failure or timeout
+once. A clear cancels pending future retries, not a restart sequence
+already in progress; disabling MODE cancels that sequence.
+RestartsSent counts successfully transmitted START commands, not STOP
+or failed transmissions. Recovery of the physical
+fault is confirmed only by SFI's clear report, not ES registration.
+Stopping an already absent app sends no STOP. SET_ENABLE 0 cancels a
+pending restart sequence and sends no further START; re-enable may retry
+at eligibility subject to its consumed attempt.
+
+After RetryCap attempts, do not dispatch another. If Active is still 1
+at its full-precision next-eligible deadline, mark Exhausted 1, emit RETRY_ERR once and enter
+SAFE. Thus a successful restart clearing its fault does not exhaust a
+cap merely by being its third attempt. A later recurrence after the cap
+marks Exhausted on its first eligible wakeup without sending a command.
+Exhausted persists until RESET_RESPONSE on an inactive slot; clearing
+SFI latches or counters never resets it. Cooldown deadlines retain full cFE time internally; NextEligibleSeconds
+exports the Seconds field of that deadline. HealthySinceSeconds and
+ModeSinceSeconds similarly export the Seconds part of their full-time
+instants. No fractional interval is rounded down to shorten a cooldown
+or recovery. All elapsed comparisons use those full-time values. Attempt errors do not bypass cooldown/cap.
+
+### S7.4 Peer mode synchronisation
+
+Every MODE wakeup sends MODE_PeerCmd_t, FC 0, on global MODE_PEER_MID:
+
+```c
+typedef struct
+{
+    uint8 SrcNode; uint8 DstNode; uint8 Mode; uint8 ActiveFaults;
+    uint32 Sequence; uint32 Seconds;
+} MODE_Peer_Payload_t;
+```
+
+SrcNode own, DstNode 3 - own, Mode current; Sequence starts 1 at app
+start, +1 per publication modulo 2^32; Seconds current onboard seconds.
+A correctly sized FC 0 message with peer SrcNode, own DstNode and Mode
+0..2 arms the peer-mode timer and updates PeerMode/PeerLastSeconds;
+ignore own SrcNode, reject all other malformed messages with PEER_ERR.
+A receive from the peer is not retransmitted (S5.4). No separate mode
+freshness check is applied. PeerMode reports the peer state but does not
+force matching local mode; faults are evaluated locally to avoid a
+self-sustaining DEGRADED feedback loop.
+
+PeerEnabled 1 uses two independent armed timers: MODE peer message and
+SFI health NODE_LOSS reports. No peer-mode loss before first valid mode
+message; after arming, PeerTimeoutSec (default 10) without one sets
+PeerLost 1 and PEER_LOSS_ERR once, requiring DEGRADED. First valid packet
+clears PeerLost with PEER_RESTORED_INF. SFI NODE_LOSS independently blocks
+recovery while active. Disabling peer monitoring disarms the mode timer
+and clears PeerLost, but does not disable SFI health monitoring; use
+SFI SET_PEER_ENABLE too for an isolated-node test. Mode messages are
+published even when response/peer monitoring is disabled.
+
+### S7.5 Commands, telemetry and events
+
+| Code | Name | Payload | Rules |
+|------|------|---------|-------|
+| 0 | NOOP | none | C.4 |
+| 1 | RESET_COUNTERS | none | command counters, Transitions, ResponsesSent, ActionsSent, ActionErrors, RestartsSent, PeerLosses; not protocol or response state |
+| 2 | SET_ENABLE | `{ uint8 Enabled; uint8 Spare[3]; }` | 0..1, else MODE_ERR; success CONTROL_INF |
+| 3 | SET_MODE | `{ uint8 Mode; uint8 Spare[3]; }` | 0..2 and S7.2 guards; success CONTROL_INF, error MODE_ERR |
+| 4 | SEND_STATUS | none | one MODE_StatusTlm_t, STATUS_INF |
+| 5 | SET_PEER_ENABLE | `{ uint8 Enabled; uint8 Spare[3]; }` | 0..1; success CONTROL_INF, error MODE_ERR |
+| 6 | RESET_RESPONSE | `{ uint8 Slot; uint8 Spare[3]; }` | 0..56 and inactive, else MODE_ERR; clears Attempts, Exhausted and NextEligibleSeconds for that slot, CONTROL_INF |
+| 7 | APPLY_PROFILE | none | apply current profile at next wakeup, CONTROL_INF |
+
+SET_MODE guards are evaluated at receipt and again on the decision
+wakeup; if a newly received fault supersedes a previously accepted
+request, the higher-priority transition wins without another command
+counter change. Applies to both command sources, ground and onboard.
+
+```c
+/* MODE_HkTlm_Payload_t */
+uint8 CommandCounter; uint8 CommandErrorCounter; uint8 Mode; uint8 Enabled;
+uint8 ActiveFaults; uint8 ExhaustedFaults; uint8 PeerMode; uint8 PeerLost;
+uint32 Transitions; uint32 ResponsesSent; uint32 ActionsSent; uint32 ActionErrors;
+uint32 RestartsSent; uint32 PeerLosses; uint32 ModeSinceSeconds;
+uint32 HealthySinceSeconds; uint32 PeerLastSeconds; uint32 PeerSequence;
+
+typedef struct
+{
+    uint8 Active; uint8 Attempts; uint8 Exhausted; uint8 Pending;
+    uint32 NextEligibleSeconds; uint32 LastReportSequence;
+} MODE_ResponseStatus_t;
+typedef struct
+{
+    uint8 Mode; uint8 Enabled; uint8 PeerEnabled; uint8 PeerArmed;
+    uint8 PeerMode; uint8 PeerLost; uint8 RestartSlot; uint8 RestartPhase;
+    uint32 ModeSinceSeconds; uint32 HealthySinceSeconds; uint32 PeerLastSeconds;
+    MODE_ProfileDef_t Profile;
+    MODE_ResponseStatus_t Faults[MODE_NUM_FAULT_SLOTS];
+} MODE_Status_Payload_t;
+```
+
+HK PeerSequence is the last received peer MODE sequence, 0 before
+contact; the local publication sequence is carried by MODE_PEER itself.
+Initial PeerMode 0xFF, PeerArmed/PeerLost 0; RestartSlot 0xFF when idle.
+RestartPhase 0 IDLE, 1 WAIT_STOP, 2 WAIT_START. Pending is exactly Active && !Exhausted && Attempts < RetryCap
+(using the current response row), including while automatic response is
+suspended; Attempts remain visible after a clear; Active becomes 0. The
+profile field is the configured current-mode profile, even if a ground
+command subsequently overrides a target app. HealthySinceSeconds is 0
+unless a healthy recovery interval is running. MODE sends the C.5
+heartbeat each 1 Hz wakeup, even if automatic response is disabled.
+
+Event IDs 1..10 C.4; 11 SUB_ERR, 12 TRANSITION_INF, 13 CONTROL_INF,
+14 MODE_ERR, 15 RESPONSE_INF, 16 ACTION_ERR, 17 RETRY_ERR,
+18 PEER_LOSS_ERR, 19 PEER_RESTORED_INF, 20 STATUS_INF, 21 FAULT_ERR,
+22 PEER_ERR. RESPONSE_INF names fault type, slot and attempt number;
+RETRY_ERR names slot and cap; no event repeats while exhaustion persists.
+
+### S7 Acceptance
+
+Build, unit tests, per-source coverage and DESIGN.md meet N. Hidden
+tests exercise table boundaries, simultaneous trigger precedence, SAFE
+latching, quiet recovery and reset semantics, serial wrap/duplicate
+reports, each action's exact MID/FC/payload, STOP/START presence and
+timeouts, cooldown across clears, cap exhaustion and explicit reset,
+peer arming/timeout/recovery and command error paths. Live through CMDI
+and TLMO: stop GW, observe SFI onset/clear and MODE DEGRADED, automatic
+START with pinned parameters, response/cooldown telemetry, then NOMINAL
+after 20 healthy seconds. Recurrent stopped GW faults exhaust three
+attempts without a fourth START; SAFE persists through clear until
+RESET_RESPONSE and SET_MODE. LIMIT forces SAFE; warning/command
+precedence and all three profiles are verified in target HK/stats.
+Fixture files exercise the configured STOR TRANSFER action to ground;
+GW preference/masks and missing peer messages are exercised on two
+nodes. MODE disabled isolates the existing S1-S6 checks; MODE live
+checks enable it explicitly after setup. No live check requires raw SB
+injection, an unframed command or a MODE-private control channel.
+
+## S8. System-level tests in CTF
 
 Deliver the system-level tests as CTF test scripts under `ctf/tests/`, one
 script per demonstrated behaviour, run with `ctf/run_ctf.sh` (CTF v1.11 on
@@ -1391,10 +2388,10 @@ Python 3.12 with this fixture's shims, set up by `ctf/setup_ctf.sh`; see
 `ctf/README.md`) against a tree built with `make native_std.install`. Add
 CCDD definitions for every new app's commands and telemetry, and, where CTF
 lacks a capability the tests need, add it as a CTF plugin or as an update
-to an existing CTF module (S7.1). No standalone Python system scripts are
+to an existing CTF module (S8.1). No standalone Python system scripts are
 required; acceptance runs its own headless checks against your build.
 
-### S7.1 Where CTF code goes
+### S8.1 Where CTF code goes
 
 - `ctf/CTF/` and `ctf/venv/` are git-ignored and recreated by
   `ctf/setup_ctf.sh` from the pinned CTF commit, so nothing you change
@@ -1415,7 +2412,7 @@ required; acceptance runs its own headless checks against your build.
   on, as CTF's `end_test_on_fail = false` intends); it never raises out of
   the plugin. Instruction names are unique across plugins, as CTF requires.
 
-### S7.2 Two nodes in one CTF run
+### S8.2 Two nodes in one CTF run
 
 CTF's cfs plugin already supports several targets, each configured by a
 section of `mission.ini`; a test registers and starts the targets it needs
@@ -1428,7 +2425,7 @@ and names one in each instruction's `target`. Configure:
   `cmd_udp_port = 1235`, `tlm_udp_port = 2235`, `CCSDS_target = set2`.
   Both also carry `cmdi_key_hex` (default: the hex of the default table
   key of S3.3) and `cmdi_source_id` (default 1), read by the plugins of
-  S7.3. The existing `[mission]` section stays, equivalent to `[cpu1]`, so
+  S8.3. The existing `[mission]` section stays, equivalent to `[cpu1]`, so
   single-node scripts may keep using it; a script registers either
   `mission` or `cpu1`, never both.
 - `ctf/ccdd/json/mission_mids.json`: a second target `set2` listing every
@@ -1445,7 +2442,7 @@ and names one in each instruction's `target`. Configure:
   CTF deletes a target's `cfs_ram_drive_path` before starting it, which
   must never be the live RAM disk of the other node (C.1).
 
-### S7.3 Required capabilities, plugins and instructions
+### S8.3 Required capabilities, plugins and instructions
 
 The plugin directory names, class names and instruction names below are
 pinned so that reviewers can find them; the `data` keys listed are the
@@ -1454,11 +2451,12 @@ takes `target` (`cpu1`, `cpu2` or `mission`).
 
 | Capability | Plugin (`ctf/plugins/<dir>`, class) | Instructions |
 |------------|-------------------------------------|--------------|
-| Build and send CMDI frames from the table key | `cmdi_plugin`, `CmdiPlugin` | `SendCmdiCommand`, `SendCmdiRawPacket` |
-| Drive two nodes in one test | CTF's own cfs plugin, configured as in S7.2 | CTF's `RegisterCfs`, `StartCfs`, `ShutdownCfs`, `CheckTlmValue`, `CheckEvent`, ... with `target` |
+| Build and send CMDI frames from the table key | `cmdi_plugin`, `CmdiPlugin` | `SendCmdiCommand`, `SendCmdiRawPacket`, `ReplayCmdiFrame` |
+| Drive two nodes in one test | CTF's own cfs plugin, configured as in S8.2 | CTF's `RegisterCfs`, `StartCfs`, `ShutdownCfs`, `CheckTlmValue`, `CheckEvent`, ... with `target` |
 | Record telemetry arrival order on a node's TLMO port | `tlm_order_plugin`, `TlmOrderPlugin` | `StartTlmRecording`, `CheckTlmOrder`, `StopTlmRecording` |
-| UDP and TCP endpoints and PTY pairs facing GW, carrying CMDI frames with stream framing | `link_plugin`, `LinkPlugin` | `OpenUdpLink`, `OpenTcpServer`, `WaitLinkConnected`, `OpenPtyPair`, `SendLinkCmdiCommand`, `SendLinkPacket`, `CheckLinkPacket`, `CheckNoLinkPacket`, `CloseLink` |
+| UDP and TCP endpoints and PTY pairs facing GW, carrying CMDI frames with stream framing | `link_plugin`, `LinkPlugin` | `OpenUdpLink`, `OpenTcpServer`, `WaitLinkConnected`, `OpenPtyPair`, `SendLinkCmdiCommand`, `SendLinkPacket`, `CheckLinkPacket`, `CheckNoLinkPacket`, `CloseLink`, `OpenGwRelay`, `SetGwRelayEnabled` |
 | Stop and start an app through ES commands and wait on events | `es_app_plugin`, `EsAppPlugin` | `StopApp`, `StartApp`, `WaitForEvent` |
+| Reassemble ground STOR transfers from the raw TLMO listener tap | `stor_ground_plugin`, `StorGroundPlugin` | `StartStorGroundCapture`, `CheckStorGroundTransfer` |
 | Check and compare files in a node's run directory | `node_file_plugin`, `NodeFilePlugin` | `CheckNodeFile`, `CompareNodeFiles`, `RemoveNodeFile` |
 
 **`cmdi_plugin`.** CTF's `SendCfsCommand` sends unframed packets, which
@@ -1467,7 +2465,8 @@ CMDI rejects, so every command in these tests goes through this plugin.
 - `SendCmdiCommand`: `target`, `mid`, `cc`, `args`, with the same names and
   argument encoding as CTF's `SendCfsCommand` (from the target's CCDD
   definitions, macros and `$variables$` resolved); optional `source_id`,
-  `key_hex`, `time_offset` (seconds added to the onboard time, may be
+  `key_hex`, `save_frame` (user variable name receiving the complete encoded
+  frame as hex), `time_offset` (seconds added to the onboard time, may be
   negative), `sequence`, and `corrupt`: `none` (default), `mac` (one MAC
   bit flipped, CRC recomputed), `crc` (one CRC bit flipped), or `magic`,
   `version`, `flags`, `length` (that header field made invalid, MAC and CRC
@@ -1489,16 +2488,23 @@ CMDI rejects, so every command in these tests goes through this plugin.
   sends each copy as its own frame. This is how tests inject verification
   packets (C.3) and other packets without CCDD definitions.
 
-**Two nodes.** No new instruction: the configuration of S7.2 plus
+- `ReplayCmdiFrame`: `target`, `variable`; sends the complete frame saved
+  by SendCmdiCommand's save_frame unchanged, with no new timestamp,
+  sequence, MAC or CRC. Fails if the variable is absent or not a complete
+  frame. All automatic sequence allocation is shared per target/source
+  across cmdi, es_app and link plugins; explicit sequences advance the
+  allocator if newer by S3.6 serial arithmetic. Replaying does not.
+
+**Two nodes.** No new instruction: the configuration of S8.2 plus
 `target` on every instruction, CTF's and the plugins'. If CTF's cfs plugin
 needs a change to run two local targets side by side, it is a patch
-(S7.1).
+(S8.1).
 
 **`tlm_order_plugin`.** CTF's telemetry listener owns the target's
 telemetry port and drops packets whose MID has no telemetry definition,
 including command-type verification packets, and it keeps no order across
 MIDs. This plugin taps the raw datagrams in arrival order before that
-filtering (which may need a patch to CTF's listener, S7.1). CTF's listener
+filtering (which may need a patch to CTF's listener, S8.1). CTF's listener
 must also keep working when command-type or short datagrams arrive on a
 telemetry port, as they do whenever TLMO forwards verification packets or
 STOR segments; patch it if it does not.
@@ -1559,6 +2565,38 @@ server.
   embedding that MID arrives.
 - `CloseLink`: `name`.
 
+- `OpenGwRelay`: `name`, `port_a`, `node_a_port`, `port_b`,
+  `node_b_port`, `target_a`, `target_b`; binds two UDP sockets on loopback.
+  A datagram on port_a is verified with target_a's configured key and
+  forwarded unchanged to node_b_port; port_b similarly verifies target_b
+  and forwards to node_a_port. Polling is in the plugin, never a cFS
+  task. No reframing, echo or spontaneous keep-alive replies. Errors fail
+  the owning instruction/test. Initially enabled.
+- `SetGwRelayEnabled`: `name`, `enabled` boolean; false consumes and
+  discards datagrams in both directions while keeping sockets open, true
+  resumes forwarding. This cuts a link without an ICMP error or a new
+  connection, so GW's keep-alive timer, rather than host behaviour,
+  detects loss. CloseLink closes both relay sockets and its worker.
+
+**`stor_ground_plugin`.** Uses the raw TLMO tap of tlm_order_plugin,
+never another socket bound to the telemetry port.
+
+- `StartStorGroundCapture`: `target`, `name`; starts collecting local
+  SFI_FAULT_TLM reports and STOR_XFER_TLM segments received after this
+  instruction. Retains all bytes, not CCDD-decoded strings.
+- `CheckStorGroundTransfer`: `target`, `name`, `timeout`, optional
+  `expected_hex`, `fault_log` (default false). Waits for one complete
+  ground transfer, verifies SrcNode, DstNode 0, identical id/metadata,
+  contiguous indices/offsets, segment count and zero padding, file size
+  and ISO-HDLC CRC. Duplicate/conflicting segments fail. Saves the
+  reconstructed file as <CTF log directory>/<name>.bin, exposes its size
+  and CRC as variables <name>_size and <name>_crc. With expected_hex,
+  compare all bytes. With fault_log true, parse the exact S6.6 header and
+  record sizes and require at least one onset and matching clear observed
+  since capture, equal byte-for-byte to captured fault report payloads,
+  records strictly in report serial order (modulo wrap), and Count <=64.
+  Malformed/partial transfers fail with a reason and no success artifact.
+
 **`es_app_plugin`.** Sends its ES commands as CMDI frames, as
 `SendCmdiCommand` does. Add `CFE_ES_START_APP_CC` (code 4,
 `CFE_ES_StartAppCmd_Payload_t`) and `CFE_ES_STOP_APP_CC` (code 5,
@@ -1587,20 +2625,21 @@ rejected.
 - `RemoveNodeFile`: `target`, `path`; removes the file if present and
   passes when it is absent afterwards (for clean-up).
 
-### S7.4 CCDD definitions
+### S8.4 CCDD definitions
 
 Under `ctf/ccdd/json/`, following `ctf/ccdd/README.md`: every command
-message of STOR, CMDI, TLMO, GW and SFI with all its function codes
+message of STOR, CMDI, TLMO, GW, SFI and MODE with all its function codes
 (including the `SEND_HK` and `WAKEUP` MIDs, and `SFI_HEARTBEAT_MID`,
-`STOR_XFER_SEG_MID` and `STOR_XFER_ACK_MID`), every telemetry message
+`STOR_XFER_SEG_MID`, `STOR_XFER_ACK_MID`, `SFI_FAULT_MID`,
+`SFI_HEALTH_MID`, `MODE_PEER_MID` and `GW_KEEPALIVE_MID`), every telemetry message
 (HK and the other packets of C.3), their MIDs in both `set1` and `set2`,
-and the two ES commands of S7.3. Add probe lines for every new message to
+and the two ES commands of S8.3. Add probe lines for every new message to
 `ctf/ccdd/tools/layout_probe.c` (and include paths to `probe_layout.sh`)
 so that `ccdd/tools/probe_layout.sh | ccdd/tools/check_layout.py` covers
 them, and make that check pass. The `ci_lab_*` and `to_lab_*` definitions
 may stay.
 
-### S7.5 Test scripts and run order
+### S8.5 Test scripts and run order
 
 Each script registers and starts the nodes it needs and shuts them down
 (each script has its own `RegisterCfs` ... `ShutdownCfs`, as
@@ -1623,6 +2662,10 @@ nonzero if any fails.
 | 6 | `st_gw_serial.json` | a GW SERIAL connection on a PTY pair opened by the test egresses a verification packet as a marker-framed CMDI frame and ingests a SAMPLE_APP NOOP sent with `SendLinkCmdiCommand` split across writes after garbage bytes, which executes |
 | 7 | `st_sfi_heartbeat.json` | stopping GW with ES STOP_APP makes SFI report GW missing (event and `AppsMissing` 1); starting it again with ES START_APP (`/cf/gw.so`, `GW_AppMain`, priority 70, stack 131072) restores it |
 | 8 | `st_stor_transfer.json` | with cpu1 and cpu2 running, GW UDP connections on both nodes carry `STOR_XFER_SEG_MID` from cpu1 to cpu2 and `STOR_XFER_ACK_MID` back, as CMDI frames each GW validates; a file added on cpu1 is transferred to node 2 with DELETE; it is byte-identical on cpu2, gone on cpu1, and `XfersCompleted` is 1 |
+| 9 | `st_mode_fault_response.json` | pinned fault-to-response and quiet recovery sequence below |
+| 10 | `st_gw_failover.json` | pinned two-node primary cut, backup selection and failback sequence below |
+| 11 | `st_cmdi_replay.json` | replay an identical frame, rejection accounting and non-execution below |
+| 12 | `st_fault_log_transfer.json` | fault onset/clear, binary log dump and byte-checked STOR transfer to ground below |
 
 `st_gw_commands.json` is the single CTF test an earlier revision of this
 task required as `gw_udp.json`. The two fixture scripts
@@ -1630,23 +2673,92 @@ task required as `gw_udp.json`. The two fixture scripts
 unframed commands and enable TO_LAB, which no longer runs: port them to
 `cmdi_plugin` (and drop the TO_LAB enable step) so that every script in
 `ctf/tests/` passes against your build; `run_system_tests.sh` runs them
-before the eight above. Update `ctf/README.md` for the CMDI command path,
+before the twelve above. Update `ctf/README.md` for the CMDI command path,
 the always-on TLMO output, the two targets and the plugins.
 
-### S7 Acceptance
+### S8.6 Required integrated script contents
+
+The following sequences are normative script contents, in addition to
+S8.5 setup/cleanup. Every observation is from TLMO; no script edits a
+running node's files to simulate a fault. The scripts use C.7 timing
+bounds, timeouts up to 30 s for recovery and up to 15 s for transfer, and
+finish within 180 s each. All scripts 1..8 and the smoke scripts first
+send MODE SET_ENABLE 0; new scripts enable it only as specified. The
+SFI heartbeat script therefore retains its explicit StartApp step.
+
+1. `st_mode_fault_response.json`: start cpu1; keep peer monitors unarmed,
+   MODE enabled. Wait for all five real SFI apps OK; RESET_COUNTERS on
+   MODE and GW, record mode/response status. StopApp GW, without a manual
+   StartApp. Observe SFI HB_MISS_ERR (12) and an active HEARTBEAT report
+   for GW, then MODE TRANSITION_INF (12) to DEGRADED and RESPONSE_INF
+   (15), ES START_INF (6) naming GW, GW INIT_INF (1) and SFI
+   HB_RESTORED_INF (13)/clear report. Require one MODE START, Attempts 1
+   for slot 3, no extra START during the 30 s cooldown, DEGRADED profile
+   TLMO budget 8 and STOR threshold 65, GW heartbeats restored, and
+   NOMINAL only after the continuous 20 s healthy interval (S7.2).
+   Then NOMINAL budget 16 and threshold 80; the final START count is 1.
+   Record events before StopApp so an early event is not missed.
+2. `st_gw_failover.json`: start both nodes, MODE disabled during setup.
+   Configure two UDP connections per node, indices 0 primary/1 backup,
+   KeepAliveEnabled 1, PeerNode other node. Primary: cpu1 LocalPort 3101,
+   RemotePort 3201, cpu2 LocalPort 3102, RemotePort 3202. Backup:
+   cpu1 LocalPort 3111, RemotePort 3211, cpu2 LocalPort 3112, RemotePort
+   3212. All addresses 127.0.0.1. OpenGwRelay primary uses ports
+   3201/3101/3202/3102 and backup 3211/3111/3212/3112 (port_a,
+   node_a_port, port_b, node_b_port). Each node's Subs list its own
+   verification topic 0xE7 plus SFI_HEALTH_MID and MODE_PEER_MID. Set
+   routes 0 health, 1 mode, 2 own verification MID, all Primary 0,
+   Backup 1. On each TLMO ADD_STREAM the other node's verification MID
+   (class 2). Enable MODE, wait for both links UP and both peer monitors
+   armed, then cut only the primary relay. Within 5-8 s of the cut both connections
+   0 are DOWN (6 s from each last valid keep-alive receipt); within 10 s SFI LINK slot 48 is active and both modes
+   DEGRADED (GW detection plus SFI/MODE wakeup pipeline). All
+   three routes select 1. Inject one unique E7 packet per node through
+   CMDI, require exactly one copy at the opposite TLMO. Backup keeps
+   health/mode fresh: neither node has PeerLost or NODE_LOSS. Restore
+   primary relay, require LINK clears, no premature failback, then
+   automatic selection 0 after 10 continuous healthy seconds measured
+   from release of MODE's preference for route 0; other routes use
+   S5.4's primary-UP timer. Require NOMINAL after 20 s quiet recovery
+   on both. Close both relays on cleanup.
+3. `st_cmdi_replay.json`: cpu1, MODE disabled. Reset CMDI and SAMPLE_APP
+   counters using source 2; use source 2 for all setup and observations in
+   this script, and source 1 only for the two NOOPs and their replays.
+   SendCmdiCommand SAMPLE_APP NOOP with automatic fresh serial
+   and save_frame `replay_frame`; confirm one accepted command. Invoke
+   ReplayCmdiFrame twice within the 30 s age window. Read CMDI HK and
+   SEND_SOURCE_STATS: Accepted rose once, ReplayErrors twice for source
+   1, CMDI_REJECT_ERR names REPLAY twice, SAMPLE_APP CommandCounter
+   remains 1. A new fresh-serial NOOP executes and raises that counter
+   to 2. Account separately for authenticated commands used to request
+   statistics; they use source 2, so source-1 statistics stay exact.
+4. `st_fault_log_transfer.json`: cpu1, MODE disabled; start raw ground
+   capture before the stimulus. Send SFI SET_WATCH_ENABLE index 6,
+   Enabled 1; inject three values 9 on topic 0xEF payload byte 8, then
+   one value 10. Require one CRITICAL LIMIT onset and one clear in
+   SFI_FAULT_TLM, Latched slot 22 still 1. Send DUMP_FAULT_LOG and wait
+   DUMP_INF (28). STOR ADD_FILE SourcePath /cf/sfi_faults.bin, DestPath
+   fault/log.bin, FILE_INFO FILE fault/log.bin, TRANSFER FILE to ground,
+   KEEP. CheckStorGroundTransfer with fault_log true: exact log header,
+   report bytes/order and matching CRC/size from FILE_INFO telemetry.
+   Require XfersCompleted 1, then delete fault/log.bin, ACK_FAULT 22 and
+   verify latch clear. Remove /cf/sfi_faults.bin with RemoveNodeFile
+   path cf/sfi_faults.bin during cleanup.
+
+### S8 Acceptance
 
 On a clean build of your repository, `ctf/setup_ctf.sh` creates a fresh
 CTF checkout and venv (applying your patches), the CCDD layout check of
-S7.4 is run and must pass, and CTF's plugin listing
-(`ctf --pluginInfo`) must name every pinned plugin instruction of S7.3.
-Each script of S7.5, and each ported smoke script, is then run by name
+S8.4 is run and must pass, and CTF's plugin listing
+(`ctf --pluginInfo`) must name every pinned plugin instruction of S8.3.
+Each script of S8.5, and each ported smoke script, is then run by name
 with `ctf/run_ctf.sh`, in a private network namespace with nothing else
 running, with `CFS_RUN_DIR` and `CFS_RUN_DIR_CPU2` pointing at scratch
 copies of the installed trees and a 300-second limit per script, and must
 pass; `ctf/run_system_tests.sh` must exist and run them in order. The
 scripts, plugins and patches are also read in human review for whether
 they test what the table says. Acceptance runs its own headless checks
-against your build for the live behaviour of S1 to S6; those do not use
+against your build for the live behaviour of S1 to S7; those do not use
 your CTF code.
 
 ## N. Non-functional requirements
@@ -1657,27 +2769,37 @@ your CTF code.
   differs from the mission README's). Existing apps, including
   `apps/ci_lab` and `apps/to_lab`, are unchanged; the files you change
   outside the new apps and library are those of C.6, the run scripts of
-  C.1, `tools/udp_harness.py` (S3.5) and the CTF files of S7.
+  C.1, `tools/udp_harness.py` (S3.5) and the CTF files of S8.
 - Unit tests: one coverage test file per source module of each new app in
   `apps/<app>/unit-test/coveragetest/coveragetest_<module>.c` (the build
   requires it) and for the library in `libs/cmdval_lib/unit-test/coveragetest/`.
   Provide `ut-stubs` for `cmdval_lib` so CMDI's and GW's tests can stub it.
 - Coverage: line coverage of every source file of `stor`, `cmdi`, `tlmo`,
-  `gw`, `sfi` and `cmdval_lib` at least 95 percent (the project convention
+  `gw`, `sfi`, `mode` and `cmdval_lib` at least 95 percent (the project convention
   is 100), measured from the gcov data the unit-test build produces, for
   example `gcov --json-format` on the coverage objects under
   `build-native_std`; lcov is not installed. This covers all of CMDI's
   and TLMO's sources, including the code they inherited from CI_LAB and
   TO_LAB.
 - Design notes: `DESIGN.md` in each of `apps/stor`, `apps/cmdi`,
-  `apps/tlmo`, `apps/gw`, `apps/sfi` and `libs/cmdval_lib`, at most 80 lines
+  `apps/tlmo`, `apps/gw`, `apps/sfi`, `apps/mode` and `libs/cmdval_lib`, at most 80 lines
   each: purpose, data flow, main data structures, timing (what runs on which
   wakeup), error handling, and the decisions you made where this document
   left a choice.
+- MODE DESIGN.md additionally records transition precedence, profile commands,
+  restart protocol, slot mapping/cooldown/cap lifetime and both peer timers.
+  SFI DESIGN.md records latch versus physical state, mixed cluster history,
+  event-window saturation and fault-log format. CMDI/GW notes cover shared
+  runtime key ownership and CMDI replay-state lifetime. Required unit tests
+  exercise these behaviours and error paths with synthetic cFE time, not
+  host sleeps; line coverage for MODE is per source file as for every app.
 - Report at `docs/reports/system.md` with the sections `Design summary`,
   `Interfaces`, `Unit tests` (counts per app and library), `Coverage` (per
   source file), `System tests` (results of `ctf/run_system_tests.sh`, and
-  the CTF plugins and patches you added) and `Limitations`.
+  the CTF plugins and patches you added) and `Limitations`. `Interfaces` includes the full MID/topic inventory,
+  mode/fault transitions and profiles; `System tests` includes all twelve
+  st_ scripts and both smoke scripts; `Design summary` includes scheduler
+  arithmetic (32 used, 0 spare) and peer/replay/key lifetimes.
 - Commit the work.
 
 ### N Acceptance
@@ -1688,7 +2810,7 @@ checked for presence, length and sections, and are read in human review.
 
 ## Acceptance summary
 
-Each subsystem (S1 to S7, and N) is scored on its own Acceptance paragraph;
+Each subsystem (S1 to S8, and N) is scored on its own Acceptance paragraph;
 the task passes when all pass. A live check starts the nodes it needs from
 your build in a scratch copy of the installed tree, so state you left in
 `build-native_std/exe/*/cf` does not matter. Every live check commands a
@@ -1699,6 +2821,7 @@ verification packets are injected on the reserved command MIDs of C.3.
 Every unit sent to or received from a GW connection is a CMDI frame
 (marker-framed on TCP and SERIAL) validated or built with the default
 table key; GW, like CMDI, executes nothing that fails validation.
-The live checks of S1 to S6 are acceptance's own headless checks and use
-GW only in S5; S7 runs your CTF scripts. Feedback on a failing check names
+The live checks of S1 to S7 are acceptance's own headless checks;
+GW is used in S5 and the peer-health/mode checks of S6/S7. S8 runs your
+CTF scripts. MODE automation is disabled for isolated S1-S6 checks (C.7). Feedback on a failing check names
 the subsystem and the term of this document involved.
