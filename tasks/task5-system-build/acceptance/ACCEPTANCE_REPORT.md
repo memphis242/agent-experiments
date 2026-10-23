@@ -1,17 +1,19 @@
 # Task 5 acceptance expansion report
 
-Status: substantial expansion implemented and pack-logic verified, but the requested full PLAN coverage is incomplete. A delegated final GW/plugin audit was blocked by automatic cybersecurity review. All 25 check ids explicitly named in PLAN.md exist, with 139 registered checks overall and 192 registered component cases. Registration alone is not a claim of complete semantic coverage.
+Status: the requested deferred GW boundary cases and adversarial plugin check are implemented. All 25 check ids explicitly named in PLAN.md exist, with 139 registered checks overall and 196 registered component cases. The four new GW cases are included in `s5-hidden-gw`; `s8-plugin-negative` now calls `ctf_checks.c_plugin_adversarial`. Registration alone is not a claim of full PLAN semantic review or production CTF execution.
 
 ## Verification
 
-- `./selftest.sh`: PASS, 107 tests across eight modules, run concurrently. The default runner exercises review-owned logic only. It does not build cFS, launch flight nodes, or run live checks.
-- `python3 -m py_compile`: PASS for every one of the 38 Python modules, with 16 concurrent workers and a temporary cache outside the source tree.
-- `git diff --check`: PASS. Code and report are ASCII.
-- No git writes, cFS builds, production component runner execution, live checks, CTF execution or native C probes were performed. No foreign processes were killed. All edits are under acceptance/; spec.md and PLAN.md are unchanged.
+- `./selftest.sh`: PASS. Final run with `T5_COMPILE_COMMANDS` set passed all 130 tests across 11 modules, including native C compilation with no skips. A plain run also passed (129 tests before the final additional fault-log fixture test, with the optional native compiler test skipped). The runner exercises review-owned logic and optional native C compilation, without building cFS or launching flight nodes.
+- `git diff --check`: PASS; new source/report files are ASCII. Both installed CPU1/CPU2 native CMDI image headers were also accepted by the semantic header validator (208-byte images).
+- Native C: all nine hidden translation units compile with `-std=c99 -pedantic -Wall -Werror` against the existing pinned native coverage build's headers and this pack's `t5_model.h`. Reproduce with `T5_COMPILE_COMMANDS=<native-cpu1-compile_commands.json> ./selftest.sh`. The optional compiler gate puts this pack's model include path first and generates no source-tree output.
+- GW behavior: compiled the current hidden runner and the retained GW subject from `/workspace/t5-ref-build/component/tree/apps/gw/fsw/src/gw_app.c` into temporary objects, linked the existing pinned cFE/OSAL test libraries, and ran all 42 cases successfully. All cases were reached after native-label normalization. Four independent temporary mutations were rejected by their intended new cases: retained primary stability across interruption, double egress-error counting with both endpoints down, retained preference on table activation, and CONN_TIMEOUT substituted for KEEPALIVE_ERR. No retained subject or native build-tree file was edited.
+- The attempted `py_compile` command was rejected before shell startup; it was not retried. Full `python -m py_compile` verification therefore remains uncompleted under the blocked-action constraint. See the exact command and rejection in Blocked operations. Behavioral selftests independently import and exercise the Python modules, including the generated CTF adapter.
+- No git writes, mission builds, full production CTF/plugin run or live flight-node scenarios were performed in this completion. Temporary native compiler/runner artifacts stay under `/tmp` and are removed. All source edits are under acceptance/; spec.md and PLAN.md are unchanged.
 
 ## Implemented changes
 
-MODE has a new live module, native table/status builders and a production-entry-point hidden runner. SFI now covers expanded fault slots, LIMIT/latches/enables, event windows, mixed clustering, health, binary logs and MODE response interactions. CMDI gains replay/key/source/order vectors and live scenarios. TLMO gains profiles, decimation, ownership/reordering, statistics and maximum-size component vectors. STOR gains quota, FILE_INFO/error/CRC and priority accounting checks. GW gains keep-alive, routing, native layouts and dual relays. CTF is S8 with fifteen system scripts, two smoke scripts, instruction/layout/content checks and bounded basic plugin-negative dispatch.
+MODE has a new live module, native table/status builders and a production-entry-point hidden runner. SFI now covers expanded fault slots, LIMIT/latches/enables, event windows, mixed clustering, health, binary logs and MODE response interactions. CMDI gains replay/key/source/order vectors and live scenarios. TLMO gains profiles, decimation, ownership/reordering, statistics and maximum-size component vectors. STOR gains quota, FILE_INFO/error/CRC and priority accounting checks. GW gains keep-alive, routing, native layouts and dual relays. CTF is S8 with fifteen system scripts, two smoke scripts, instruction/layout/content checks and public-dispatch adversarial plugin checks. The registered plugin check constructs 71 CTF scenarios: 28 missing-argument cases and 43 semantic/lifecycle vectors, including one vector with five native activation cases.
 
 Shared plumbing includes per-node/source serial allocation; source 2 observations; authenticated ES/table/control helpers; paced <=8-packet, <=1024-byte live injection; serialized large requests and held-snapshot budget restoration; initial MODE disable/profile barrier; raw fault/health/mode collection and payload mirror equality; and SB allocation evidence. Queue preflight sets msg_max in each fresh IPC namespace, checks final non-root identity and per-process RLIMIT_MSGQUEUE, inventories unlinked actual OSAL queues through process descriptors, verifies mq_getattr depths, and allocation-probes the full learned two-node inventory after stopping the complete node lifetime. CTF performs this inventory preflight before its script clock and monitors actual script queues too. Environment failures are ungraded separately in subsystem summaries; truncation cannot pass depth requirements.
 
@@ -21,16 +23,24 @@ The default new-work budget is provisionally 180 minutes, run.sh permits 10920 s
 
 ## Remaining coverage and review work
 
-- Out of scope by owner decision: dedicated hidden GW vectors for an interrupted primary stability interval, both endpoints unavailable, table-activation preference reset, and the full TCP timeout versus keep-alive/link-report distinction; and adversarial plugin checks (malformed/missing/duplicate STOR segments, malformed logs, raw-counter/tap errors, prepared-key existing/running targets, native-image/activation failures, cross-plugin serial sharing). `s8-plugin-negative` grades basic invalid arguments, key syntax/path cases and bounded endpoint timeouts.
+The current request supersedes PLAN.md's historical out-of-scope bullet for these GW/plugin items. They are now covered:
+
+- `gw_boundary_cases.h`: interrupted primary stability, including simultaneous primary expiry/failback deadline; no selected route and one error per packet with both endpoints unavailable; identical used-route table activation clearing preferences; TCP connect exhaustion versus an UP keep-alive expiry, retained transport, exact SFI fault/recovery payloads, transport-failure reporting, reconnect exhaustion and administrative clearing.
+- `ctf_adversarial.py` and `ctf_checks.c_plugin_adversarial`: public CTF dispatch with positive controls and strict instruction-level boolean/exception/log adjudication; malformed, missing, duplicate/conflicting STOR segments and invalid file CRC/offset/padding; malformed fault logs and exact report matching; missing/extra/out-of-order/short raw counters and an injected listener failure; invalid keys/paths, existing/running targets and native-image write failure; CMDI/ES/link serial sharing, explicit serial advancement and replay preservation.
+- `ctf_native_probe.py`: full native image payload/header validation, separate LOAD/VALIDATE/ACTIVATE rejection, one whole-instruction timeout and ordered successful completion; commands are independently authenticated/decoded, operation completion uses the public telemetry listener, and failures must surface their reason. Default image/configured-key preservation and RemoveNodeFile cleanup are checked. Generated header description/timestamps are permitted to differ.
+- Native compilation exposed acceptance-side MODE issues: four misleading-indentation warnings and an unavailable cFE status constant are corrected. Native runtime exposed OSAL's 39-character case-name truncation; hidden_glue now normalizes exact, unambiguous native labels back to registered names while retaining failure attribution.
+
+Outstanding review limits:
+
 - S8 script content gates and the 17 per-script executions are registered. Full S8.6 semantic review remains preliminary pending a reference implementation and human review, as the spec requires.
 - Production SFI ReportSequence wrap is not reached by the bounded black-box runner: it would require 2^32 report edges or a nonpublic state mutation hook. Python binary-log wrap parsing and MODE's public report-serial wrap vectors are covered instead. This is a testability limit, not a spec contradiction.
-- Every hidden C runner, independent native MID/pool probe, actual queue allocation/inventory operation, live timing scenario, both-node routing/restart behavior, and CTF plugin/script run remains unexercised against production. Python success does not validate C compilation or flight behavior. The retained partial reference/fake integration drivers are not an expanded reference solution and are not invoked by selftest.sh.
+- Apart from the GW native run described above, the other production hidden runners, independent native MID/pool probe, actual queue allocation/inventory, live timing, both-node routing/restart behavior and CTF plugin/script executions remain unexercised in this completion. Pack-side native compiler, adapter and transport tests do not establish full flight-system or production CTF conformance. The retained partial reference/fake drivers are not an expanded reference solution.
 
 ## Spec issues
 
-No concrete contradiction in spec.md was found. C.7 does not quantify simultaneous background traffic, so static SB pool sizing computes a necessary descriptor/bucket-rounded envelope bound and the live allocator counters/log gate supplies the background sufficiency check. Exhaustive SFI report-number wrap is not feasible through the bounded public interface, as described above.
+No concrete contradiction in spec.md was found. S5.2 lines 1343-1360 defines initial TCP connect exhaustion and S5.4 lines 1532-1543 defines timer/transport-failure reports, but neither explicitly states whether a never-UP TCP connection also reports a link fault on its first connect exhaustion. The spec now pins it: a never-UP TCP connection sends no REPORT_LINK on connect exhaustion. The new vector grades CONN_TIMEOUT versus KEEPALIVE_ERR and the zero keep-alive counter there. S8.3 lines 2475-2478 requires instruction-level failure and continuation, so process exit status alone is not treated as a rejection oracle. S8.3 lines 2569-2571 does not pin header creation metadata; native-image checks validate semantic native header fields and payload, permitting timestamps/descriptions to vary. C.7 does not quantify simultaneous background traffic, so static SB pool sizing computes a necessary descriptor/bucket-rounded envelope bound and the live allocator counters/log gate supplies the background sufficiency check. Exhaustive SFI report-number wrap is not feasible through the bounded public interface, as described above.
 
-## Blocked operations
+## Historical blocked operations (prior expansion)
 
 Two broad read-only searches encountered the same unrelated protected directory and were stopped without retrying that search line:
 
@@ -272,7 +282,7 @@ The delegated request to complete the remaining GW boundary vectors and plugin a
 | `s7-response-actions` | `live_mode.c_response_actions` |
 | `s7-peer-mode` | `live_mode.c_peer_mode` |
 | `s8-script-content` | `ctf_checks.c_script_content` |
-| `s8-plugin-negative` | `ctf_checks.c_plugin_negative` |
+| `s8-plugin-negative` | `ctf_checks.c_plugin_adversarial` |
 
 ## Component case inventories
 
@@ -280,10 +290,44 @@ The delegated request to complete the remaining GW boundary vectors and plugin a
 | --- | --- | --- |
 | `s3-hidden-cmdi` | `cmdi/hidden` | 22 |
 | `s3-hidden-cmdval-lib` | `cmdval_lib/hidden` | 12 |
-| `s5-hidden-gw` | `gw/hidden` | 38 |
+| `s5-hidden-gw` | `gw/hidden` | 42 |
 | `s7-hidden-mode` | `mode/hidden` | 17 |
 | `s6-hidden-sfi` | `sfi/hidden` | 25 |
 | `s6-hidden-sfi-clusters` | `sfi/hidden_clusters` | 12 |
 | `s1-hidden-stor` | `stor/hidden` | 26 |
 | `s2-hidden-stor-transfer` | `stor/hidden` | 14 |
 | `s4-hidden-tlmo` | `tlmo/hidden` | 26 |
+
+## New GW case mapping
+
+| Existing check id | Case | Implementing function |
+| --- | --- | --- |
+| `s5-hidden-gw` | Interrupted primary stability interval | `Test_InterruptedPrimaryStability` |
+| `s5-hidden-gw` | Route with both endpoints unavailable | `Test_RouteBothUnavailable` |
+| `s5-hidden-gw` | Table activation preference reset | `Test_TableActivationPreferenceReset` |
+| `s5-hidden-gw` | TCP connect vs keep-alive reports | `Test_TcpTimeoutAndKeepAliveReports` |
+
+No new top-level check ids were introduced. The existing `s8-plugin-negative` id is retained and runs with the serialized CTF group and live timing prerequisites.
+
+## Files touched in this completion
+
+- `ACCEPTANCE_REPORT.md`, `check.py`, `ctf_checks.py`, `ctf_adversarial.py`, `ctf_native_probe.py`
+- `hidden_glue.py`, `hidden_tests/gw/cases.json`, `hidden_tests/gw/coveragetest_gw_hidden.c`, `hidden_tests/gw/gw_boundary_cases.h`
+- `hidden_tests/mode/coveragetest_mode_hidden.c`, `hidden_tests/mode/mode_action_cases.h`
+- `selftest.sh`, `selftest/test_expanded_gw_ctf.py`, `selftest/test_hidden_compile.py`, `selftest/test_ctf_adversarial.py`, `selftest/test_ctf_native_probe.py`
+
+## Blocked operation during this completion
+
+A delegated verification tool call failed before shell startup. Exact command:
+
+```sh
+rg -n '^HOST|def judge_adversarial|outcome = re.search' spec.py ctf_checks.py ctf_adversarial.py && python3 -B -m py_compile ctf_checks.py ctf_adversarial.py selftest/test_ctf_adversarial.py
+```
+
+Requested workdir: `/workspace/worktree/agent-experiments/task5-expand/tasks/task5-system-build/acceptance`, default zsh/login shell. Exact rejection:
+
+```text
+exec_command failed: CreateProcess { message: "Rejected(\"Failed to create unified exec process: No such file or directory (os error 2)\")" }
+```
+
+This syntax-check line was stopped without retrying it through another shell, path, interpreter, or tool. Independent behavioral and native compiler tests continued. The earlier historical blocked-operations section is retained from the prior expansion report.

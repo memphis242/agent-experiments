@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Pack logic only: no mission builds, nodes, live scenarios or git operations.
+# Pack logic: no mission builds, nodes, live scenarios or git operations.
+# T5_COMPILE_COMMANDS enables optional native C syntax checks using an existing build.
 # Independent unittest modules run concurrently; generated output stays in /tmp.
 set -u
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

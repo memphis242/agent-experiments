@@ -632,7 +632,7 @@ CHECKS += [
     C("s7-response-actions", "S7", "S7.3 Response action payloads and lifetime", "STOR priority/KEEP and GW preference/release must use exact targets; WAIT_STOP table activation must retain the attempt snapshot and cooldown.", l7.c_response_actions, "isolated", live=True),
     C("s7-peer-mode", "S7", "S7.4 Independent peer-mode timer", "MODE_PEER-only loss must cause DEGRADED at its independent 10 s deadline without NODE_LOSS; primary relay loss and recovery must match both-node profiles.", l7.c_peer_mode, "isolated", live=True),
     C("s8-script-content", "S8", "S8.6 System script review", "All fifteen system scenarios must contain their required fault, replay, key, route, profile and binary-log assertions, with authenticated commands and bounded execution.", cc.c_script_content, "misc"),
-    C("s8-plugin-negative", "S8", "S8.3 Plugin errors and timeouts", "Pinned instructions must reject invalid arguments and terminate missing-response waits with actionable failures.", cc.c_plugin_negative, "isolated"),
+    C("s8-plugin-negative", "S8", "S8.3 Plugin errors and timeouts", "Pinned instructions must reject malformed transfers/logs, raw-counter/tap errors and invalid key-image operations with actionable bounded failures; native activation and shared command serials must follow S8.3.", cc.c_plugin_adversarial, "isolated", live=True),
 ]
 
 BY_ID = {c.check_id: c for c in CHECKS}
@@ -680,7 +680,7 @@ for _lane, _ids in RUN_ORDER.items():
 # the one set-up ctf/ tree (its venv and patched checkout), so they run one after another in one group as well.
 # Every other isolated check is a group of its own. Groups are started longest first.
 SHARED_GROUPS = {
-    "ctf": ["s8-listener-probe"] + [f"s8-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
+    "ctf": ["s8-listener-probe"] + [f"s8-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM] + ["s8-plugin-negative"],
     "tlmo-hold": ["s4-hold-drop-arithmetic", "s4-drain-order", "s4-set-class", "s4-set-budget"],
     "gw-udp": ["s5-udp-egress", "s5-udp-ingress", "s5-ingress-rejections", "s5-loop-drop"],
     "gw-serial": ["s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe"],

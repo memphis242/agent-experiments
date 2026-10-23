@@ -73,11 +73,19 @@ class ExpandedGateway(unittest.TestCase):
         for case in cases:
             self.assertIn(json.dumps(case), source)
         for case in ("Keep-alive exact deadline and recovery", "Bounded inbound health and mode cache",
-                     "Mandatory switch HMAC with mask disabled", "Route selection failback and preference"):
+                     "Mandatory switch HMAC with mask disabled", "Route selection failback and preference",
+                     "Interrupted primary stability interval", "Route with both endpoints unavailable",
+                     "Table activation preference reset", "TCP connect vs keep-alive reports"):
             self.assertIn(case, cases)
 
 
 class ExpandedCtf(unittest.TestCase):
+    def test_adversarial_check_is_registered_and_serialized_with_ctf(self) -> None:
+        import check
+        self.assertIs(check.BY_ID["s8-plugin-negative"].fn, ctf.c_plugin_adversarial)
+        self.assertTrue(check.BY_ID["s8-plugin-negative"].live)
+        self.assertIn("s8-plugin-negative", check.SHARED_GROUPS["ctf"])
+
     def test_pinned_run_order_and_required_instructions(self) -> None:
         self.assertEqual(len(ctf.SYSTEM), 15)
         self.assertEqual(len(ctf.SMOKE + ctf.SYSTEM), 17)

@@ -151,7 +151,8 @@ static void Test_StartupProfiles(void)
 static void Test_TableBounds(void)
 {
     mtbl_t good,t;int field,i;uint8 *r;
-    if(!mode_boot())return;defaults(&good);
+    if(!mode_boot())return;
+    defaults(&good);
     UtAssert_True(t5_tbl_validate("ModeTable",good.b)==0,"all pinned defaults validate");
     for(field=0;field<8;field++)
     {
@@ -257,7 +258,8 @@ static void Test_RestartSnapshotAndOrder(void)
 static void Test_CooldownCap(void)
 {
     const uint8 *s,*h;int iteration,from;
-    if(!mode_boot())return;present[3]=false;
+    if(!mode_boot())return;
+    present[3]=false;
     from=t5_ntx;
     for(iteration=0;iteration<3;iteration++)
     {
@@ -281,7 +283,8 @@ static void Test_CooldownCap(void)
 static void Test_PeerTimers(void)
 {
     const uint8 *s,*h;int from;
-    if(!mode_boot())return;tick(200,0);h=mhk();if(h)UtAssert_True(h[7]==0,"no peer loss before first contact");
+    if(!mode_boot())return;
+    tick(200,0);h=mhk();if(h)UtAssert_True(h[7]==0,"no peer loss before first contact");
     from=t5_nev;peer(1,2,0,0,12,1);peer(3,1,0,0,12,1);peer(2,2,0,0,12,1);peer(2,1,3,0,12,1);peer(2,1,0,1,12,1);peer(2,1,0,0,11,1);
     UtAssert_True(t5_count_ev(22,from)==5,"own peer ignored; malformed peers rejected once");
     t5_now_sec=300;peer(2,1,2,0,12,77);tick(309,0xFFFFFFFFu);s=mstatus();if(s)UtAssert_True(s[0]==0&&s[4]==2&&s[5]==0,"peer SAFE diagnostic never forces local mode and no early expiry");
@@ -303,7 +306,8 @@ static void Test_PeerTimers(void)
 static void Test_CommandCounters(void)
 {
     const uint8 *h;uint8 junk[4]={0};int from;
-    if(!mode_boot())return;mcmd(1,NULL,0);from=t5_nev;
+    if(!mode_boot())return;
+    mcmd(1,NULL,0);from=t5_nev;
     mcmd(99,NULL,0);mcmd(0,junk,4);mcontrol(2,2);mcontrol(3,3);mcontrol(5,2);mcontrol(6,57);
     h=mhk();if(h)UtAssert_True(h[0]==0&&h[1]==6,"each rejected command increments only error counter once");
     UtAssert_True(t5_count_ev(2,from)==1&&t5_count_ev(6,from)==1&&t5_count_ev(14,from)==4,"unknown,length,control event IDs");

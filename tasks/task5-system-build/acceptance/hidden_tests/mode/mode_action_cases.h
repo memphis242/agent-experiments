@@ -39,7 +39,7 @@ static void selective_transmit(void *ud,UT_EntryKey_t key,const UT_StubContext_t
 {
     const uint8 *p=(const uint8 *)UT_Hook_GetArgValueByName(ctx,"MsgPtr",const CFE_MSG_Message_t *);
     (void)ud;
-    if(t5_msg_mid(p)==(uint32)fail_mid&&p[6]==fail_fc){t5_ret(key,CFE_SB_PIPE_FULL);return;}
+    if(t5_msg_mid(p)==(uint32)fail_mid&&p[6]==fail_fc){t5_ret(key,CFE_SB_INTERNAL_ERR);return;}
     t5_capture(p);t5_ret(key,CFE_SUCCESS);
 }
 static void Test_TransmissionFailures(void)

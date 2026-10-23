@@ -1537,7 +1537,9 @@ Any valid keep-alive makes it UP, emits CONN_UP_INF and REPORT_LINK Down 0.
 TCP transport failure follows the existing connect cycle; if previously
 UP with keep-alives, also reports link fault immediately, clearing it only
 on a later UP with valid keep-alive. Exhausting a TCP connect cycle keeps
-the existing no-more-connect-attempts rule. UDP/SERIAL open or I/O failures
+the existing no-more-connect-attempts rule. A TCP connection that has never been UP sends no
+REPORT_LINK when its connect cycle is exhausted: link reports mark edges
+from UP only. UDP/SERIAL open or I/O failures
 still disable the connection per S5.2 and also report link fault when
 keep-alives are enabled. Explicit DISABLE/REMOVE clears that link fault
 and stops timers; administrative disabling is not a fault.

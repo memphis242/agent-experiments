@@ -2172,8 +2172,14 @@ static void Test_SwitchMandatoryHmac(void)
                   "GW SWITCH_KEY requires ACTIVE HMAC even when shared HMAC enable mask is clear, before publication");
 }
 
+#include "gw_boundary_cases.h"
+
 void UtTest_Setup(void)
 {
+    UtTest_Add(Test_InterruptedPrimaryStability, Setup, Teardown, "Interrupted primary stability interval");
+    UtTest_Add(Test_RouteBothUnavailable, Setup, Teardown, "Route with both endpoints unavailable");
+    UtTest_Add(Test_TableActivationPreferenceReset, Setup, Teardown, "Table activation preference reset");
+    UtTest_Add(Test_TcpTimeoutAndKeepAliveReports, Setup, Teardown, "TCP connect vs keep-alive reports");
     UtTest_Add(Test_HealthCache, Setup, Teardown, "Bounded inbound health and mode cache");
     UtTest_Add(Test_SwitchMandatoryHmac, Setup, Teardown, "Mandatory switch HMAC with mask disabled");
     UtTest_Add(Test_ExpandedBounds, Setup, Teardown, "Expanded route and keep-alive bounds");

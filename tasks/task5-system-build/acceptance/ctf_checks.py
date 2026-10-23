@@ -426,8 +426,13 @@ def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float
     if not label.startswith("plugin-negative-"):
         started_targets = set()
         for ins in script_instructions(json.loads(script.read_text())):
-            if ins["instruction"] == "StartCfs":
-                targets = ins.get("data", {}).get("target", [])
+            data = ins.get("data", {})
+            instruction = ins["instruction"]
+            if instruction == "AcceptanceDispatch" and data.get("instruction") == "StartCfs":
+                data = data.get("data", {})
+                instruction = "StartCfs"
+            if instruction == "StartCfs":
+                targets = data.get("target", [])
                 if isinstance(targets, str):
                     targets = [targets]
                 started_targets.update("cpu1" if name == "mission" else name for name in targets)
@@ -627,36 +632,92 @@ def c_script_content(ctx: "Ctx") -> None:
     p.raise_if()
 
 
-def c_plugin_negative(ctx: "Ctx") -> None:
-    """Execute bad inputs and timeouts against production plugins through CTF dispatch."""
+def c_plugin_adversarial(ctx: "Ctx") -> None:
+    """Drive adversarial plugin boundary cases through production CTF dispatch."""
+    from ctf_adversarial import ADAPTER_SOURCE, adversarial_vectors, judge_adversarial_outcome
+
     env = ctf_env(ctx)
     env.setup()
-    bad_key = {"target": "cpu1", "path": "cf/negative.tbl", "active_key_hex": "01" * 32, "next_key_hex": "02" * 32}
-    vectors = [(name, {}, []) for name in INSTRUCTIONS]
-    for override in ({"active_key_hex": "zz"}, {"next_key_hex": "00" * 32}, {"next_key_hex": "01" * 32},
-                     {"path": "../escape.tbl"}, {"path": "/tmp/escape.tbl"}):
-        vectors.append(("PrepareCmdiKeyTable", dict(bad_key, **override), []))
-    vectors += [("WaitLinkConnected", {"name": "timeout", "timeout": 0.05},
-                 [{"instruction": "OpenTcpServer", "data": {"name": "timeout", "port": 3349}, "wait": 0}]),
-                ("CheckLinkPacket", {"name": "timeout", "mid": 0x18E7, "target": "cpu1", "timeout": 0.05},
-                 [{"instruction": "OpenUdpLink", "data": {"name": "timeout", "local_port": 3349, "remote_port": 3350}, "wait": 0}]),
-                ("CheckTlmCounters", {"target": "cpu1", "name": "absent", "mid": 0x18EA, "counter_offset": 16, "values": [1]}, [])]
+    adapter = env.ctf / "plugins" / "acceptance_dispatch" / "acceptance_dispatch_plugin.py"
+    adapter.parent.mkdir(parents=True, exist_ok=True)
+    (adapter.parent / "__init__.py").write_text("")
+    adapter.write_text(ADAPTER_SOURCE.replace("__ACCEPTANCE_PACK__", repr(str(PACK))))
     p = Problems()
-    for number, (instruction, data, setup) in enumerate(vectors):
+    vectors = [{"id": f"missing-required-{name}", "instruction": name, "data": {}, "setup": [],
+                "expected": False} for name in INSTRUCTIONS] + adversarial_vectors()
+    for number, vector in enumerate(vectors):
         doc = dict(LISTENER_PROBE)
-        doc["test_script_name"] = f"negative_{number}.json"
-        doc["tests"] = [{"test_number": "NEG", "description": f"reject {instruction}", "instructions":
-                         [{"instruction": "RegisterCfs", "data": {"target": ["cpu1"]}, "wait": 0}] + setup +
-                         [{"instruction": instruction, "data": data, "wait": 0},
-                          {"instruction": "ShutdownCfs", "data": {"target": "cpu1"}, "wait": 0}]}]
-        script = ctx.work / f"ctf-negative-{number}.json"
+        doc["test_script_name"] = f"adversarial_{number}.json"
+        def dispatch(case_id, instruction, data, expected, wait=0, inject_hex=None):
+            return {"instruction": "AcceptanceDispatch", "data": {"case_id": case_id,
+                    "instruction": instruction, "data": data, "expected": expected,
+                    "inject_hex": inject_hex or []}, "wait": wait}
+        instructions = [{"instruction": "RegisterCfs", "data": {"target": ["cpu1"]}, "wait": 0}]
+        setup_ids = []
+        if vector.get("prepare_before_start"):
+            for i, item in enumerate(vector["setup"]):
+                setup_id = f"{vector['id']}-setup-{i}"
+                setup_ids.append((setup_id, item["instruction"]))
+                instructions.append(dispatch(setup_id, item["instruction"], item["data"], True))
+        if (vector.get("start_before") or vector.get("native_probe") or
+                any(item["instruction"] == "StartTlmRecording" for item in vector["setup"])):
+            start_id = f"{vector['id']}-start-cfs"
+            instructions.append(dispatch(start_id, "StartCfs", {"target": ["cpu1"]}, True, wait=3))
+            setup_ids.append((start_id, "StartCfs"))
+        if not vector.get("prepare_before_start"):
+            for i, item in enumerate(vector["setup"]):
+                setup_id = f"{vector['id']}-setup-{i}"
+                setup_ids.append((setup_id, item["instruction"]))
+                instructions.append(dispatch(setup_id, item["instruction"], item["data"], True,
+                                              inject_hex=[packet.hex() for packet in item.get("packets", [])]))
+        instructions.append(dispatch(vector["id"], vector["instruction"], vector["data"], vector["expected"],
+                                     vector.get("stimulus_wait", 0),
+                                     [packet.hex() for packet in vector.get("packets", [])]))
+        if (any(item["instruction"] == "StartTlmRecording" for item in vector["setup"]) or
+                vector.get("start_before") or vector.get("native_probe")):
+            instructions.append({"instruction": "ShutdownCfs", "data": {"target": "cpu1"}, "wait": 1})
+        doc["tests"] = [{"test_number": vector["id"], "description": vector["id"], "instructions": instructions}]
+        script = ctx.work / f"ctf-adversarial-{number}.json"
         script.write_text(json.dumps(doc))
-        rc, out = run_ctf_script(ctx, script, f"plugin-negative-{number}", limit=15)
-        p.check(rc > 0, f"{instruction} accepted invalid arguments or an unsatisfied timeout: {data}")
-        p.check(ctx.cache["ctf-elapsed-" + f"plugin-negative-{number}"] <= 18, f"{instruction} negative path exceeded 15 s plus cleanup")
-        p.check("Traceback (most recent call last)" not in out, f"{instruction} raised out of the plugin instead of returning failure: {short(out, 500)}")
-        p.check(re.search(r"error|invalid|fail|timeout|timed out|missing|unknown|not found", out, re.I) is not None,
-                f"{instruction} failed without an actionable logged reason: {short(out, 300)}")
+        rc, out = run_ctf_script(ctx, script, f"plugin-adversarial-{number}", limit=20)
+        elapsed = ctx.cache["ctf-elapsed-plugin-adversarial-" + str(number)]
+        p.check(elapsed <= 23, f"{vector['id']} exceeded its timeout plus cleanup")
+        p.check(rc == 0, f"{vector['id']} CTF process aborted with exit {rc}: {short(out, 700)}")
+        p.check("Traceback (most recent call last)" not in out,
+                f"{vector['id']} raised out of the plugin: {short(out, 500)}")
+        p.check(f"ADVERSARIAL_EXCEPTION|{vector['id']}|" not in out,
+                f"{vector['id']} raised through CTF dispatch: {short(out, 500)}")
+        for setup_id, setup_instruction in setup_ids:
+            p.check(judge_adversarial_outcome(out, setup_id, setup_instruction, True),
+                    f"{setup_id} did not succeed through public dispatch: {short(out, 500)}")
+        p.check(judge_adversarial_outcome(out, vector["id"], vector["instruction"], vector["expected"]),
+                f"{vector['id']} did not report the expected instruction-level outcome (process exit {rc}): {short(out, 500)}")
+        if vector["expected"] is False:
+            p.check(any(line.startswith(f"ADVERSARIAL_LOG|{vector['id']}|") for line in out.splitlines()),
+                    f"{vector['id']} returned False without a scoped actionable plugin log: {short(out, 500)}")
+        if vector["instruction"] == "CheckStorGroundTransfer" and isinstance(vector["data"].get("name"), str):
+            artifact_state = bool(vector["expected"])
+            p.check(f"ADVERSARIAL_STOR_ARTIFACT|{vector['id']}|{artifact_state}" in out,
+                    f"{vector['id']} artifact state did not match its instruction result: {short(out, 500)}")
+            if vector["expected"] is True:
+                p.check(f"ADVERSARIAL_STOR_SUCCESS|{vector['id']}|True|True" in out,
+                        f"{vector['id']} did not create byte-exact output and matching size/CRC variables: {short(out, 600)}")
+        prepare_state = vector["data"].get("_acceptance_prepare_state")
+        if prepare_state is not None:
+            p.check(f"ADVERSARIAL_PREPARE_STATE|{vector['id']}|{prepare_state}|True" in out,
+                    f"{vector['id']} changed or created a prepared image after rejection: {short(out, 500)}")
+        if vector.get("require_tap_fault_marker"):
+            p.check(f"ADVERSARIAL_TAP_REACHED|{vector['id']}" in out,
+                    f"{vector['id']} did not reach the injected telemetry tap failure: {short(out, 500)}")
+        if vector.get("native_probe"):
+            reports = [line.split("|", 2)[2] for line in out.splitlines()
+                       if line.startswith(f"NATIVE_PROBE_REPORT|{vector['id']}|")]
+            try:
+                report = json.loads(reports[0]) if len(reports) == 1 else {}
+            except ValueError:
+                report = {}
+            p.check(report.get("ok") is True and len(report.get("cases", [])) == 5 and not report.get("errors"),
+                    f"{vector['id']} did not complete the five native activation cases: {short(out, 900)}")
     p.raise_if()
 
 

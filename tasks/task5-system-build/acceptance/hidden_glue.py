@@ -85,6 +85,18 @@ def parse_output(out: str) -> tuple[list[str], dict[str, list[str]]]:
     return seen, failed
 
 
+def normalize_case_output(seen: list[str], failed: dict[str, list[str]],
+                          names: list[str]) -> tuple[list[str], dict[str, list[str]]]:
+    """Resolve the pinned OSAL runner's 39-character case labels to their registered names."""
+    aliases: dict[str, str] = {}
+    for name in names:
+        label = name[:39].rstrip()
+        assert label not in aliases or aliases[label] == name, f"ambiguous OSAL case label {label!r}"
+        aliases[label] = name
+    return ([aliases.get(name, name) for name in seen],
+            {aliases.get(name, name): failures for name, failures in failed.items()})
+
+
 def feedback_for(spec: CaseSpec, failed: list[str], label: str) -> str:
     parts = [spec.cases[c] for c in failed if c in spec.cases]
     unknown = [c for c in failed if c not in spec.cases]
@@ -201,6 +213,9 @@ class HiddenTests:
             res.output = out or ""
         res.ran = True
         res.seen_cases, res.failed_cases = parse_output(res.output)
+        names = [name for cid, spec in self.specs.items()
+                 if HIDDEN_CHECKS[cid] == (comp, unit) for name in spec.cases]
+        res.seen_cases, res.failed_cases = normalize_case_output(res.seen_cases, res.failed_cases, names)
 
     # -- verdicts -------------------------------------------------------------
     def verdict(self, check_id: str, label: str, timeout_for) -> None:  # noqa: ANN001

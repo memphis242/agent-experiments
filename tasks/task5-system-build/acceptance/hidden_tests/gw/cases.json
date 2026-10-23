@@ -41,7 +41,11 @@
       "Route selection failback and preference": "S5.4 selects primary/backup in same wakeup, suppresses routed fanout, fails back at exactly ten seconds continuously UP, supports preference/release with a fresh stability interval, and clears selection/preference on reload.",
       "Enabled mask partial failure and no-op preservation": "S5.4 applies mask in ascending index order, preserves unchanged states, continues after open failure leaving that slot disabled, emits MASK_ERR and increments one command error without CommandCounter.",
       "Bounded inbound health and mode cache": "S5.4 permits inbound HEALTH/PEER despite subscriptions, suppresses egress of full-byte cached packets, limits cache to64 entries and expires at exact2s; header changes are not cache hits.",
-      "Mandatory switch HMAC with mask disabled": "S3.6/S5 require extra ACTIVE-key HMAC validation of embedded CMDI SWITCH_KEY even when shared EnableMask disables ordinary HMAC, before SB publication."
+      "Mandatory switch HMAC with mask disabled": "S3.6/S5 require extra ACTIVE-key HMAC validation of embedded CMDI SWITCH_KEY even when shared EnableMask disables ordinary HMAC, before SB publication.",
+      "Interrupted primary stability interval": "Primary keep-alive loss at the first ten-second failback deadline cancels that interval; the backup remains selected until ten continuous onboard seconds after the next primary recovery, with deadlines evaluated before route selection.",
+      "Route with both endpoints unavailable": "When both endpoints are not UP, RouteSelected is 0xFF and each routed packet counts exactly one egress error without duplication or queued replay; backup recovery selects it immediately and a recovered primary must complete its stability interval.",
+      "Table activation preference reset": "Activating a valid native ConnTable with the same used endpoints and route resets every preference to zero, reopens the table endpoints and initially selects the UP primary; subsequent data egress confirms the reset without duplicate fanout.",
+      "TCP connect vs keep-alive reports": "A keep-alive-enabled TCP connection remains CONNECTING through four attempts and reaches DOWN at 20 seconds with CONN_TIMEOUT but no KeepAliveTimeouts; an UP connection expires at six seconds with only KEEPALIVE_ERR and one exact SFI link fault, retains its transport, recovers on a valid probe, and reports transport loss immediately without duplicating its fault on reconnect exhaustion."
     }
   }
 }
