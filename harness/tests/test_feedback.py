@@ -192,7 +192,10 @@ class NetnsTest(unittest.TestCase):
 
     def test_wrap_quotes_through_all_layers(self):
         steps, argv = self.peel(run.wrap_netns(self.CMD))
-        self.assertEqual(steps, ["mount -t tmpfs tmpfs /dev/shm"])
+        self.assertIn("printf '%s\\n' 512 > /proc/sys/fs/mqueue/msg_max", steps[0])
+        self.assertIn('test "$(cat /proc/sys/fs/mqueue/msg_max)" -ge 512', steps[0])
+        self.assertIn("failed to raise POSIX mqueue msg_max", steps[0])
+        self.assertEqual(steps[-1], "mount -t tmpfs tmpfs /dev/shm")
         self.assertEqual(argv, self.CMD)
 
     def test_wrap_with_hiding(self):
@@ -319,6 +322,16 @@ class CommandTest(unittest.TestCase):
         self.assertNotIn("--max-budget-usd", cmd)
         self.assertEqual(cmd[-2:], ["--disallowedTools", "Agent"])
         self.assertEqual(cmd[cmd.index("--autocompact") + 1], "100000")
+
+    def test_compact_percentage_is_a_labeled_run_variant(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "task1-utlog-translator").mkdir()
+            _, cfg = run.parse_args(["--arm", "A1", "--task", "task1", "--rep", "1", "--compact-pct", "50",
+                                     "--tasks-dir", tmp])
+        self.assertEqual(arms.arm_label(cfg.arm, cfg.compact_pct), "A1@c50")
+        self.assertEqual(run.child_env(Path("/run/config"), base={}, compact_pct=50)
+                         ["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"], "50")
+        self.assertEqual(run.compact_token_limit(50), 237_500)
 
 
 class AcceptanceTimeoutTest(unittest.TestCase):

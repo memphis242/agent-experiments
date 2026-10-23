@@ -289,6 +289,12 @@ class ArmsTest(unittest.TestCase):
         with self.assertRaises(arms.ArmError):
             arms.get_arm("A99")
 
+    def test_compaction_variant_label_resolves_to_base_arm(self):
+        self.assertEqual(arms.arm_label("A26", 50), "A26@c50")
+        self.assertEqual(arms.get_arm("A26@c50").arm_id, "A26")
+        with self.assertRaises(arms.ArmError):
+            arms.get_arm("A26@c0")
+
     def test_effort_map(self):
         self.assertEqual(dict(arms.effort_map(arms.ARMS["A1"])), {"claude-opus-5-5": "high"})
         self.assertEqual(dict(arms.effort_map(arms.ARMS["A10"])), {"claude-sonnet-5-5": "xhigh"})

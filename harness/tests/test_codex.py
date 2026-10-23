@@ -642,6 +642,19 @@ class CodexMainTest(unittest.TestCase):
             self.assertTrue(rec["validation"]["ok"], rec["validation"])
             self.assertFalse((run_dir / "transcripts").exists())
 
+    def test_compact_percentage_sets_codex_limit_and_arm_identity(self):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.dict(os.environ):
+            os.environ.pop(run.TOKEN_ENV, None)
+            root = Path(tmp)
+            argv = self.make_world(root, "Do the task.")
+            self.assertEqual(run.main([*argv, "--compact-pct", "50"]), 0)
+            (run_dir,) = [p for p in (root / "runs").iterdir() if p.is_dir()]
+            rec = json.loads((run_dir / "run.json").read_text())
+            self.assertEqual((rec["arm"], rec["compact_pct"]), ("A26@c50", 50))
+            first, _ = self.invocations(run_dir)
+            self.assertIn(["-c", "model_auto_compact_token_limit=237500"],
+                          [first["argv"][i:i + 2] for i in range(len(first["argv"]) - 1)])
+
     def delegation_world(self, root, netns=False):
         arm = arms.generate_arm("A30", root / "arms")
         run_dir = root / "runs" / "review"

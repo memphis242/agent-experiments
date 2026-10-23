@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import stat
 import sys
@@ -240,10 +241,24 @@ class ArmError(Exception):
 
 
 def get_arm(arm_id: str) -> ArmSpec:
+    """Resolve a base arm ID or a run label such as ``A26@c50``."""
+    match = re.fullmatch(r"([A-Z][0-9]+)(?:@c([1-9][0-9]?|100))?", arm_id)
+    if match is None:
+        raise ArmError(f"unknown arm {arm_id!r}; known arms: {', '.join(ARMS)}")
+    arm_id = match.group(1)
     try:
         return ARMS[arm_id]
     except KeyError:
         raise ArmError(f"unknown arm {arm_id!r}; known arms: {', '.join(ARMS)}") from None
+
+
+def arm_label(arm_id: str, compact_pct: int | None = None) -> str:
+    """Return the run identity label for an arm and optional compaction variant."""
+    arm = get_arm(arm_id)
+    if compact_pct is None:
+        return arm.arm_id
+    assert 1 <= compact_pct <= 100
+    return f"{arm.arm_id}@c{compact_pct}"
 
 
 def _read_template(relative: str) -> str:

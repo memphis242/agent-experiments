@@ -62,6 +62,8 @@ PASTA_PREFIX = ("pasta", "--config-net", "--quiet", "-t", "none", "-u", "none", 
 # pasta forwards queries sent to this address to the host's resolver, and the namespace's
 # /etc/resolv.conf names it.
 DNS_FORWARD_ADDR = "169.254.1.1"
+CODEX_CONTEXT_WINDOW = 475_000
+MQUEUE_MSG_MAX = 512
 STRAY_PROCESS_NAMES = frozenset({"core-cpu1"})
 # The Claude login of a Codex main agent's claude-agent subagents. wrap_netns reads it from this
 # variable of its own environment into a file in the namespace's private /dev/shm, and removes the
@@ -224,9 +226,11 @@ class RunConfig:
     claude_bin: str
     task_dir: str = ""
     netns: bool = True
+    compact_pct: int | None = None
 
     def __post_init__(self) -> None:
         assert self.rep >= 1 and self.max_rounds >= 1
+        assert self.compact_pct is None or 1 <= self.compact_pct <= 100
         arms.get_arm(self.arm)
 
 
@@ -280,7 +284,11 @@ def wrap_netns(cmd: Sequence[str], hide_run_dir: Path | None = None,
     """
     mapped = (f"unshare -U --map-user={os.getuid()} --map-group={os.getgid()} "
               f"sh -c {shlex.quote(shlex.join(cmd))}")
-    steps = ["mount -t tmpfs tmpfs /dev/shm"]
+    steps = [f"printf '%s\\n' {MQUEUE_MSG_MAX} > /proc/sys/fs/mqueue/msg_max || "
+             "{ printf 'failed to raise POSIX mqueue msg_max to 512\\n' >&2; exit 1; }; "
+             f'test "$(cat /proc/sys/fs/mqueue/msg_max)" -ge {MQUEUE_MSG_MAX} || '
+             "{ printf 'POSIX mqueue msg_max is below 512\\n' >&2; exit 1; }",
+             "mount -t tmpfs tmpfs /dev/shm"]
     if credentials:
         steps.append(f'( umask 077 && printf %s "${CREDENTIALS_SOURCE_ENV}" > {CREDENTIALS_FILE} )')
         mapped = f"exec env -u {CREDENTIALS_SOURCE_ENV} {mapped}"
@@ -343,7 +351,7 @@ def check_netns(runs_dir: Path, claude_bin: str = "claude", extra_bins: Sequence
 
 
 def child_env(config_dir: Path, base: dict[str, str] | None = None, include_token: bool = True,
-              codex_home: Path | None = None) -> dict[str, str]:
+              codex_home: Path | None = None, compact_pct: int | None = None) -> dict[str, str]:
     """Allowlisted environment for claude (token included) and acceptance packs (token excluded).
     With codex_home (a Codex arm's claude), CODEX_HOME is set and the codex-agent command
     is put first on PATH."""
@@ -353,6 +361,9 @@ def child_env(config_dir: Path, base: dict[str, str] | None = None, include_toke
         env[TOKEN_ENV] = source[TOKEN_ENV]
     env.update(ENV_FIXED)
     env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+    if compact_pct is not None:
+        assert 1 <= compact_pct <= 100
+        env["CLAUDE_AUTOCOMPACT_PCT_OVERRIDE"] = str(compact_pct)
     if codex_home is not None:
         assert include_token, "acceptance packs never get Codex"
         env["CODEX_HOME"] = str(codex_home)
@@ -375,6 +386,12 @@ def codex_main_env(codex_home: Path, base: dict[str, str] | None = None, bin_dir
     if credentials_file is not None:
         env[CREDENTIALS_FILE_ENV] = credentials_file
     return env
+
+
+def compact_token_limit(compact_pct: int) -> int:
+    """Codex token threshold for a percentage of the Sol context window."""
+    assert 1 <= compact_pct <= 100
+    return CODEX_CONTEXT_WINDOW * compact_pct // 100
 
 
 def kill_stray_processes(run_dir: Path, names: frozenset[str] = STRAY_PROCESS_NAMES) -> list[int]:
@@ -529,7 +546,8 @@ class Runner:
         task_root = self.cfg.tasks_dir / self.cfg.task_dir
         self.record = {
             "schema_version": SCHEMA_VERSION,
-            "run_id": self.run_id, "arm": self.cfg.arm, "task": self.cfg.task, "task_dir": self.cfg.task_dir,
+            "run_id": self.run_id, "arm": arms.arm_label(self.cfg.arm, self.cfg.compact_pct),
+            "task": self.cfg.task, "task_dir": self.cfg.task_dir,
             "rep": self.cfg.rep,
             "status": "running", "started_at": _iso(started), "finished_at": None,
             "main_harness": arm.main_harness,
@@ -541,6 +559,7 @@ class Runner:
             "provenance": provenance(self.cfg, task_root / "spec.md", task_root / "acceptance"),
             "subagent_harness": arm.subagent_harness,
             "autocompact": self.cfg.autocompact,
+            "compact_pct": self.cfg.compact_pct,
             "max_rounds": self.cfg.max_rounds,
             "session_ids": [], "resume_request_indices": [],
             "rounds": [], "passed": False, "rounds_used": 0, "cap_hit": False,
@@ -625,6 +644,10 @@ class Runner:
         cmd = codex.main_command(self.codex_bin, arm.main_model, arm.main_effort,
                                  codex_developer_instructions(self.run_id), last_message.resolve(),
                                  self.repo.resolve(), thread_id)
+        if self.cfg.compact_pct is not None:
+            option = ["-c", f"model_auto_compact_token_limit={compact_token_limit(self.cfg.compact_pct)}"]
+            insert_at = cmd.index(thread_id) if thread_id is not None else len(cmd) - 1
+            cmd[insert_at:insert_at] = option
         bin_dirs = [self.arm_root / arms.CLAUDE_DIR / "bin"] if arm.claude_agents else []
         login_file: Path | None = None
         login_owned = False
@@ -672,7 +695,8 @@ class Runner:
         if self.codex_main:
             return self.invoke_codex(message, session_id, round_no)
         cmd = build_claude_command(self.cfg, self.run_id, message, session_id)
-        done = self.execute(cmd, child_env(self.arm_root, codex_home=self.codex_home), round_no, "claude",
+        done = self.execute(cmd, child_env(self.arm_root, codex_home=self.codex_home,
+                                           compact_pct=self.cfg.compact_pct), round_no, "claude",
                             self.cfg.claude_bin)
         (self.run_dir / f"cli-round{round_no}.stdout.json").write_text(done.stdout, encoding="utf-8")
         (self.run_dir / f"cli-round{round_no}.stderr.txt").write_text(done.stderr, encoding="utf-8")
@@ -894,6 +918,8 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
     else:
         env = (allowlist + " ".join(f"{k}={v}" for k, v in ENV_FIXED.items())
                + f" CLAUDE_CONFIG_DIR={shlex.quote(str(run_dir / 'config'))} {TOKEN_ENV}=<token>")
+    if cfg.compact_pct is not None and not arm.codex_main:
+        env += f" CLAUDE_AUTOCOMPACT_PCT_OVERRIDE={cfg.compact_pct}"
     codex_arm = arm.uses_codex
     if arm.codex and not arm.codex_main:
         env += (f" CODEX_HOME={shlex.quote(str(codex.home_for(run_dir)))}"
@@ -904,6 +930,10 @@ def dry_run(cfg: RunConfig, run_id: str, run_dir: Path, prompt: str) -> None:
             cmd = codex.main_command("<pinned codex>", arm.main_model, arm.main_effort,
                                      codex_developer_instructions(run_id),
                                      run_dir.resolve() / "codex-main-round<N>.last.txt", repo.resolve(), session)
+            if cfg.compact_pct is not None:
+                option = ["-c", f"model_auto_compact_token_limit={compact_token_limit(cfg.compact_pct)}"]
+                insert_at = cmd.index(session) if session is not None else len(cmd) - 1
+                cmd[insert_at:insert_at] = option
         else:
             cmd = build_claude_command(cfg, run_id, message, session)
         if cfg.netns:
@@ -960,6 +990,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     p.add_argument("--task", required=True, help="task1..task4 or the full directory name under tasks/")
     p.add_argument("--rep", required=True, type=int)
     p.add_argument("--autocompact", type=int, default=None, help="auto-compaction window in tokens (min 100000)")
+    p.add_argument("--compact-pct", type=int, default=None,
+                   help="auto-compaction threshold percentage (1..100), with arm variant label")
     p.add_argument("--template", type=Path, default=DEFAULT_TEMPLATE)
     p.add_argument("--runs-dir", type=Path, default=DEFAULT_RUNS_DIR)
     p.add_argument("--arms-dir", type=Path, default=arms.DEFAULT_ARMS_DIR)
@@ -983,6 +1015,8 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
         p.error("--autocompact must be at least 100000")
     if a.autocompact is not None and arms.get_arm(a.arm).codex_main:
         p.error("--autocompact configures Claude Code and does not apply to a Codex main agent")
+    if a.compact_pct is not None and not 1 <= a.compact_pct <= 100:
+        p.error("--compact-pct must be between 1 and 100")
     try:
         short, directory = resolve_task(a.tasks_dir, a.task)
     except RunError as exc:
@@ -994,7 +1028,7 @@ def parse_args(argv: Sequence[str] | None) -> tuple[argparse.Namespace, RunConfi
     assert acceptance_timeout > 0
     cfg = RunConfig(a.arm, short, a.rep, a.autocompact, a.template, a.runs_dir, a.arms_dir, a.tasks_dir,
                     a.gaps, a.max_rounds, acceptance_timeout, a.cli_timeout, a.seed,
-                    a.claude_bin, directory, not a.no_netns)
+                    a.claude_bin, directory, not a.no_netns, a.compact_pct)
     return a, cfg
 
 
