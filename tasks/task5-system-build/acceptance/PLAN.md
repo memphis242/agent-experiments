@@ -5,6 +5,10 @@ S5 GW, S6 SFI, S7 MODE, S8 CTF system tests, N non-functional) and then overall.
 the agent names the failing subsystem and the spec term. Every result on this task
 is labelled preliminary until human review. Check ids are prefixed by subsystem.
 
+All additions remain in this one task. Task 5 runs with an enlarged
+budget (more rounds/time than T1-T4) and is the auto-compaction test bed.
+Round counts and time budgets are TBD by owner.
+
 ## Plumbing every live check depends on
 
 - Every command to a node is a CMDI frame to UDP 1234 (cpu1) or 1235 (cpu2),
@@ -16,6 +20,17 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
 - Live checks run on a scratch copy of the installed tree, in the run's private
   network namespace, with cpu1 and cpu2 started by tools/run_cfs.sh (CFS_CPU=cpu2),
   distinct RAM-disk paths, clocks within the age window.
+- Before live checks, verify effective kernel queue capacity in each node's
+  IPC namespace: the harness sets fs.mqueue.msg_max to 512; require msg_max
+  >= 512 and sufficient RLIMIT_MSGQUEUE for both nodes, counting kernel
+  per-message overhead and other queues charged to the same user. Preflight
+  allocation probes use the final non-root node identity and the actual
+  queue inventory; verify mq_getattr capacities, including TLMO/MODE >=128
+  and SFI >=256. Boot success is insufficient. A kernel/resource-limit
+  shortfall is an environment prerequisite failure, not an implementation
+  failure. Permissive truncation never satisfies a pipe-depth requirement.
+  Nested check namespaces must repeat the setup/preflight, since a newly
+  created IPC namespace has its own limits.
 - The pack carries its own independent frame encoder (HMAC-SHA-256, CRC-16/CCITT-FALSE
   with check value 0x29B1) and compares the agent's tools/udp_harness.py functions
   against it.
@@ -39,11 +54,37 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   one HK period for HK observation. Use raw telemetry/event timestamps to
   bound transitions; MODE recovery is [20,25] s from SFI clear. All request
   telemetry must arrive within 2 s at a sufficient nonzero budget.
+- Timing-sensitive live checks run in a host-coordinated serialized lane
+  with reserved CPU capacity and no concurrent builds, including builds
+  from other reviews. Record independent host scheduling-watchdog evidence: a detected
+  scheduling stall invalidates the attempt and triggers one clean serialized
+  rerun. If that rerun also stalls, report an environment failure. Exact
+  deadlines are graded with synthetic-time tests, not the live tolerance.
+- Live burst envelope: injected verification packets have total SB length
+  <=1024 bytes, at most 8 per burst, with burst starts at least 0.6 s apart.
+  Expanded SFI status, STOR HK and TLMO stream-statistics requests use their
+  exact layout-probed packet lengths (record byte counts, all <=8192), one
+  outstanding large request at a time; await capture and at least 0.6 s
+  before the next, with budget 256 and no held output. Reserved-space
+  SEND_STREAM_STATS snapshots in the S4 held-output checks are the exception:
+  one outstanding snapshot, restore budget through CMDI before awaiting it.
+  No unpaced burst of
+  maximum-size packets is graded live. Maximum-size boundary/burst stress
+  uses hidden component tests. Verify SB allocation-failure counters/logs
+  stay clear within this live envelope, including background traffic.
+  C.6 permits mission SB pool sizing overrides; include descriptors and
+  allocator buckets, not just packet bytes. Pipe depth alone implies no
+  lossless burst guarantee; TLMO's copied queue does not retain SB buffers.
 - Disable MODE automatic responses with SET_ENABLE 0 and wait for HK before
-  isolated S1-S6 setup. This prevents automatic restarts/profile changes from
-  invalidating existing tests. Enable MODE only after peer/route setup in its
+  isolated S1-S6 setup. Before isolated-test overrides, also await completion
+  of initial profile application, or two MODE wakeups after all profile
+  targets register. Complete scheduled profile reapplications before resetting
+  counters and beginning assertions. Enable MODE only after peer/route setup in its
   live checks. Arming tests explicitly arrange first peer contact; no node-loss
   timer is armed by an absent peer at startup.
+- Acceptance never restarts SFI while MODE remains running. SFI recovery
+  restarts the node; peer-loss tests use relay cuts, not an in-run SFI restart.
+  Per-slot report serial history and SFI report numbering share that lifetime.
 - Add raw TLMO collection of SFI_FAULT, SFI_HEALTH and MODE_PEER command packets;
   decode mirrored SFI_FAULT_TLM too, requiring byte-identical report payloads.
   No new live check injects raw SB packets or uses an unauthenticated path.
@@ -60,7 +101,9 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   including code inherited from the lab apps.
 - DESIGN.md per component, at most 80 lines; docs/reports/system.md with its six
   sections, the system-tests section referring to ctf/run_system_tests.sh.
-- Static mission checks: MODE app/table installed on both CPUs, prefix/entry
+- Static mission checks: OSAL_CONFIG_MAX_FILE_NAME = 32 and
+  OSAL_CONFIG_QUEUE_MAX_DEPTH = 512 for both CPUs; allowed mission SB pool
+  overrides support the declared live burst envelope. MODE app/table installed on both CPUs, prefix/entry
   MODE_/MODE_AppMain, startup after SFI at priority 70/stack 131072,
   mode.table include/definition wiring, scheduler MODE SEND_HK 57 and WAKEUP
   10 ticks; 22 - 2 + 12 = 32 slots, MAX_SCHEDULE_ENTRIES 32, 0 spare.
@@ -125,18 +168,29 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   and replay failures, exact reset/table semantics and full 9-row payload.
 - Live `s3-replay-window`: send explicit serials on source 1, use source 2 for
   polling, compare all source-1 counters plus aggregate HK/event/non-execution;
-  include wrap on a clean node. Same accepted bytes on cpu2 are independent.
+  explicitly accept 100, execute unseen 37, reject unseen 36 as REPLAY and
+  duplicate 100 as REPLAY; include wrap on a clean node. Same accepted bytes
+  on cpu2 are independent.
 - Live `s3-key-rotation`: stage NEXT using authenticated cFE TBL load/validate/
   activate with ACTIVE retained, switch in an ACTIVE frame, reject a retired-key
   frame and replay under the new key, accept a fresh NEXT-key frame. Query HK,
   source stats and GW egress under the new key. Test mask-disabled SWITCH_KEY
   with bad HMAC through both CMDI and GW separately, then restore key/mask through accepted frames.
+- Hidden same-wakeup ordering vector: with HMAC enabled, before one CMDI
+  wakeup queue SWITCH_KEY, a retired-key ordinary command and a fresh-key
+  ordinary command. Require
+  immediate changed-key validation (retired rejected, fresh executes). Repeat
+  for mask and age changes without intermediate polling, with vectors whose
+  outcomes distinguish the changed settings. Exercise this queued-datagram
+  order live using a controlled pre-wakeup batch and source-separated counters;
+  hidden tests enforce deterministic same-wakeup dispatch.
 
 ### S4 TLMO
 - Unit tests: eviction, drain order, budget 0, full runtime stream list with
   TLMO_MAX_STREAMS 64.
-- Live hold-and-inject (bursts of <= 8, about 0.6 s apart): exact drop-count
-  arithmetic per class, then datagram order on 2234.
+- Live hold-and-inject (<=8 packets of <=1024 bytes, burst starts at least
+  0.6 s apart): exact drop-count arithmetic per class, then datagram order
+  on 2234.
 - Live: TO_LAB-equivalent default telemetry arrives with no enable step (cFE ES, EVS,
   SB, TBL, TIME housekeeping, SAMPLE_APP, new apps, events); SET_CLASS; SET_BUDGET;
   table load via cFE TBL LOAD/ACTIVATE; class map packet; ADD_STREAM and
@@ -150,9 +204,18 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   SendErrors and Queued attribution covers eviction by another stream,
   oversized packet and failed send, class/profile changes with queued packets,
   remove/table discard, empty/full SEND_STREAM_STATS snapshot, zero tail and slot ordering.
+  Queue MID A with slots A/B, activate slots B/A, require retained A packets
+  owned by A's new slot with their queued class unchanged, cumulative counters
+  and phases reset, and Queued recomputed. Repeat as a live held-output table
+  reorder with the replacement table budget also 0, reserved reply space
+  and the budget-restoration sequence below.
 - Live `s4-stream-profiles`: two reserved streams with differing decimation,
-  inject known counts, hold budget, read Queued with SEND_STREAM_STATS, drain,
-  compare totals/class order, select all three profiles and inspect target
+  use an isolated stream table including STREAM_TLM at Decimation 1 and
+  reserve queue space for the statistics reply. While budget is 0, inject
+  known counts and issue SEND_STREAM_STATS.
+  Restore a sufficient nonzero budget through CMDI without awaiting telemetry,
+  then inspect the captured snapshot and verify drain order/totals/class order.
+  Select all three profiles and inspect target
   budgets/maps. Repeat SET_CLASS/SET_BUDGET override and table activation rules.
   One full snapshot is on default STREAM_TLM; default count 57 within capacity 64,
   pipe >=128 and max packet 8192. Hidden tests cover full 64-slot runtime list.
@@ -185,9 +248,14 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
 - Hidden route/keep-alive tests: definition boolean/peer/local-port constraints,
   route index/MID/duplicate/endpoints, unused-route removal, endpoint removal,
   SET_ENABLED_MASK partial open-failure exception; no-op states preserved.
-  6 s UP timeout, timer exact boundary, Reply=0/1 handling and no reply loop,
+  6 s UP timeout; exact-boundary valid keep-alive pending on the deadline
+  wakeup refreshes before expiry, producing no DOWN/UP edge, SFI link report
+  or transient route switch. Assert inbound -> deadlines -> routes -> outbound
+  ordering. Reply=0/1 handling and no reply loop,
   wrong peer/destination/length/FC/Reply, disabled keep-alive, DOWN probe/recovery,
-  TCP connect versus keep-alive DOWN and explicit disable clears. Capture SFI
+  TCP connect exhaustion emits only CONN_TIMEOUT_ERR (28); keep-alive expiry
+  emits only KEEPALIVE_ERR (29), once per corresponding edge, with no overlap.
+  Explicit disable clears. Capture SFI
   REPORT_LINK exact MID/FC12/payload on edges only. Byte/frame counters include
   rejected frames and exclude stream markers; data packet counters exclude KA.
 - Hidden routing: primary/backup/no-UP selection, immediate failure, 10 s
@@ -230,7 +298,9 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   Old heartbeat-only vectors stay meaningful when no watch fault is injected.
 - Hidden health: global MID/header/FC/payload, Src/Dst/length checks, own echo
   ignored, first-contact arming, 10 s default timeout/clear, disable/re-enable,
-  publication while unarmed and table override. Link reports drive slots 48..55.
+  publication while unarmed and table override. Continuous valid health
+  packets while PeerEnabled 0 must neither arm nor refresh; re-enable remains
+  unarmed until a later valid receipt. Link reports drive slots 48..55.
 - Hidden dump: exact little-endian header + oldest-first records, zero/64/wrapped
   ring, overwrite, all open/write/close errors delete partial output, counter
   semantics; ACK changes current latch array, not historical record bytes.
@@ -244,11 +314,12 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   STALL/LIMIT onsets inside W and separated outside W, check exact history and
   masks and tie selection using synthetic-time hidden tests for boundary cases.
 - Live `s6-peer-health`: configure bidirectional GW health/mode, arm both; cut
-  both paths or disable peer publications by stopping SFI on one node with MODE
-  automation disabled. Assert NODE_LOSS after [10,12] s and clear on contact;
+  both paths using relay cuts. Assert NODE_LOSS in [10,12] s from the last
+  valid onboard receipt, or [9,12] s from a steady relay cut, and clear on
+  contact; synthetic-time tests enforce the exact 10 s deadline;
   unknown/malformed/own-source frames must not arm/refresh. One-node startup
-  with no contact stays unarmed. Use MODE-only stream removal to isolate its
-  separate peer-mode deadline in S7 checks.
+  with no contact stays unarmed. Use relay filtering of MODE_PEER to isolate
+  its separate peer-mode deadline in S7 checks.
 - Live `s6-log-ground`: capture report payloads, dump after onset/clear, STOR
   ADD_FILE, FILE_INFO and TRANSFER KEEP. Independently parse reassembled bytes,
   exact header/count/order/onset/clear payload equality, size and CRC; do not
@@ -267,6 +338,8 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   report validation/per-slot serial wrap, duplicate/stale ignore; active versus
   latched recovery, 20 s continuous health, quiet timer reset, disabled response
   monitoring and re-enable evaluation, all RESET_COUNTERS non-effects.
+  Test isolated overrides only after initial profile completion; a scheduled
+  table/profile reapplication must complete before counter reset/assertions.
 - Hidden responses: ascending slots, one restart resource, no consumption while
   waiting, commands in pinned order and exact payloads, present-app STOP then
   absent-app START, already stopped app no STOP, each 5 s timeout, registration
@@ -274,9 +347,18 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
   Cooldown 30 s across clears/ACK/reset, cap 3, no fourth START, exhaustion only
   at eligible time while still active, persistent SAFE/exhaustion and explicit
   inactive RESET_RESPONSE. Missing restart match does not target another app.
+  Activate a changed MODE table during WAIT_STOP: the subsequent START uses
+  the dispatched attempt's snapshotted target/entry/path/priority/stack, and
+  a later attempt uses the new table. Existing cooldown deadlines are unchanged.
+  Shared route requests release SET_PREFERENCE 0 exactly once on the last
+  requesting slot's clear, including during SET_ENABLE 0; count the cleanup
+  transmission normally, with no deferred duplicate on re-enable.
 - Hidden peer: MODE global publication every wakeup, invalid/own message handling,
   first-contact arming, 10 s mode timer independent of SFI's NODE_LOSS, no forced
   matching of peer mode, recovery/disable semantics and both timer telemetry.
+  Continuous valid messages while PeerEnabled 0 do not arm/refresh; PeerMode
+  and PeerSequence diagnostics still update and publication continues.
+  Re-enable requires a subsequently received valid message before arming.
 - Live `s7-fault-response`: S8.6 stopped-GW sequence; assert SFI report, MODE
   DEGRADED, automatic ES START, restored heartbeat, one attempt, no premature
   retry, 20 s quiet return. Compare budget/purge/mask fields on target apps for
@@ -290,11 +372,16 @@ is labelled preliminary until human review. Check ids are prefixed by subsystem.
 - Live `s7-response-actions`: table-select each action using known fixture
   mode/response.bin, confirm STOR priority 200, transfer KEEP contents/CRC,
   exact GW preference and release, target rejection visible for absent file,
-  profile and action errors/counters as specified. Table changes do not erase
-  attempt state. Per-class tests use fresh nodes/explicit response reset.
+  profile and action errors/counters as specified. Include last-requester
+  route release during SET_ENABLE 0 and live table activation during WAIT_STOP,
+  checking the START snapshot and unchanged cooldown, then new parameters on
+  the next attempt. Table changes do not erase attempt state. Per-class tests
+  use fresh nodes/explicit response reset.
 - Live `s7-peer-mode`: keep health flowing while dropping only MODE_PEER at
   the test relay (valid CMDI controls configure the routing), require DEGRADED
-  after [10,12] s, peer loss/recovery events and no NODE_LOSS; reverse for
+  in [10,12] s from the last valid onboard MODE receipt, or [9,12] s from
+  a steady relay cut, peer loss/recovery events and no NODE_LOSS; synthetic
+  tests enforce the exact 10 s deadline. Reverse the relay filter for
   SFI health. Dual primary cut with backup surviving makes both nodes DEGRADED
   via LINK within 10 s (DOWN within [5,8] s from the cut), then healthy primary/failback/recovery as S8.6. TLMO only observes.
 
@@ -366,13 +453,21 @@ Implementation constraints:
   checks in order in a reconstructed context and writes their results after each check. Groups: checks that
   share nodes (TLMO hold, GW UDP, GW SERIAL, STOR peer transfer, two-node probes) and the CTF scripts (they
   share the one set-up ctf/ tree, and wait until s8-setup-fresh, including its idempotence re-run, is over)
-  are one group each; every other check is its own group. `T5_PACK_JOBS` groups run at once (default 8,
-  1..64; up to 7 reviews may run at once on the 32-thread host). Node start-up failures are shared through a
-  locked file, so after two failed starts of a node the remaining groups report it at once. Without nested
-  namespaces (or when the build failed) the lane runs in-process one check at a time. The contract permits
-  this nesting under `ACCEPT_NO_NAMESPACE` (harness/ACCEPTANCE_CONTRACT.md). The build, a "cpu" lane (unit
-  tests, coverage, then the behaviour tests, whose runners build in one `make -k -j16`) and a "misc" lane
-  (static checks, fresh CTF set-up, plugin listing, CCDD probe) run alongside it.
+  are one group each; every other check is its own group. Timing-sensitive live groups and CTF scripts
+  use a host-coordinated serialized lane with reserved CPU capacity, shared across reviews. Finish all
+  builds (including CTF setup and hidden-test compilation) before entering that lane; coordinate with
+  other reviews so no concurrent builds run. Scheduling-watchdog evidence invalidates a stalled attempt
+  and permits one clean serialized rerun; a second stall is an environment failure. Synthetic-time hidden
+  tests grade exact deadlines. `T5_PACK_JOBS` may parallelize only non-timing groups outside that lane;
+  namespace isolation alone does not establish scheduling isolation. Node start-up failures are shared
+  through a locked file, so after two failed starts of a node the remaining groups report it at once.
+  Without nested namespaces (or when the build failed) checks run in-process one at a time. The contract
+  permits nesting under `ACCEPT_NO_NAMESPACE` (harness/ACCEPTANCE_CONTRACT.md). The build and "cpu" lane
+  (unit tests, coverage, behaviour tests built with `make -k -j16`) retain build parallelism outside the
+  timing lane. The "misc" lane (static checks, fresh CTF setup, plugin listing, CCDD probe) must finish
+  any builds before timing-sensitive live work. In each fresh IPC namespace, namespace-root sets
+  /proc/sys/fs/mqueue/msg_max to 512 before remapping to the non-root node UID; repeat capacity and
+  RLIMIT_MSGQUEUE preflight there before live checks. Do not rely on an ancestor IPC namespace's setting.
 - S1 tables: nodes boot STOR with an entry-less StorageTable and each scenario table is then loaded through
   cFE Table Services, so no default-entry packet files distort the arithmetic Task 4 relied on.
 - Events are read from TLMO's event telemetry; only the start-up INIT events are read from the node's console
@@ -385,8 +480,9 @@ Implementation constraints:
   `s5-restart-serial-probe`, `s5-valtable-share-probe` (GW moved before CMDI in the scratch startup script,
   then ES RESTART_APP of CMDI) and `s8-listener-probe` (a review-owned CTF script while command-type and short
   datagrams arrive on UDP 2234).
-- Time budget: `check.py` starts no new work after 44 minutes; `run.sh` stops at 2700 s. Runs of this task
-  need `harness/run.py --acceptance-timeout 2760` (the default is 2400).
+- Time budget: enlarged Task 5 round/time budgets are TBD by owner. Set the pack's new-work deadline,
+  run.sh limit and harness/run.py --acceptance-timeout consistently once assigned, allowing the serialized
+  lane and one clean rerun; Task 5 is the auto-compaction test bed with more rounds/time than T1-T4.
 - Checks that pass on the unmodified template by design: `n-build-werror`, `n-unit-tests` (the template has
   no CI_LAB/TO_LAB unit tests), `n-change-scope` and `s8-setup-fresh`.
 - Command counters (owner decision on C.4): in every app, every rejected command (unknown function code, wrong

@@ -232,7 +232,11 @@ STOR, CMDI, TLMO, GW and MODE each send one heartbeat per second on
   definitions (`APP_INCLUDE_TABLE_LIST`, `APP_DEFINITION_TABLE_LIST`) that
   `to_lab.table` had, since their default tables name other apps' MIDs
   (`CFS_SBN_ENABLED` is defined on this native build).
-- `sample_defs/default_osconfig.cmake`: `OSAL_CONFIG_MAX_FILE_NAME` 32 (S1).
+- In `sample_defs/default_osconfig.cmake`, set `OSAL_CONFIG_MAX_FILE_NAME`
+  to 32 (S1) and `OSAL_CONFIG_QUEUE_MAX_DEPTH` to 512 for both processors.
+- Mission SB pool configuration overrides are permitted to support the
+  declared live burst envelope (C.7); a pipe depth alone implies no
+  lossless burst guarantee.
 - `sample_defs/tables/sch_lab_table.c` (0.1 s ticks): remove the
   `CI_LAB_SEND_HK_MID` and `TO_LAB_SEND_HK_MID` entries and the
   `ci_lab_msgids.h` and `to_lab_msgids.h` includes; add STOR SEND_HK 49 and
@@ -268,17 +272,45 @@ replies must reach TLMO within 2 seconds at a nonzero sufficient budget.
 Healthy recovery after 20 seconds is checked in [20,23] seconds from the
 first MODE healthy wakeup, or [20,25] from SFI's clear report. Tests use
 telemetry timestamps and event receipt bounds, not sleep-only proofs.
+Timing-sensitive live checks run in a host-coordinated serialized lane
+with reserved CPU capacity and no concurrent builds. A detected scheduling
+stall invalidates the attempt and triggers one clean serialized rerun;
+a stalled rerun is an environment failure, not an implementation failure.
+Exact deadline correctness is graded with synthetic-time tests.
+
+The harness sets fs.mqueue.msg_max to 512 in each run's IPC namespace.
+Before live checks, acceptance verifies effective kernel queue capacity
+in each node's IPC namespace: msg_max >= 512 and sufficient
+RLIMIT_MSGQUEUE for both nodes' queues, including kernel per-message
+bookkeeping and any other queues charged to the same user. Verify queue
+attributes/capacity, not merely successful initialization. Insufficient
+kernel/resource limits are an environment prerequisite failure, not an
+implementation failure. Permissive queue truncation never satisfies a
+pipe-depth requirement; the required depths in S4, S6 and S7 still apply.
+Live checks pin packet sizes, burst counts and pacing in the acceptance
+plan and verify no SB allocation failures within that envelope. SB pool
+sizing must include buffer descriptors, allocator buckets and other live
+traffic; TLMO's copied application queue does not retain SB buffers.
+
 The 57 default TLMO streams fit 64 slots; tests remove streams explicitly
 when they need more than seven additions. Large SFI status, STOR HK and TLMO stream-statistics
 packets use TLMO's 8192-byte maximum; CMDI and GW command frames retain
 their 1024-byte embedded limit.
 
 For S1-S6 live checks that require no autonomous interference, send
-MODE SET_ENABLE 0 and wait for its HK acknowledgement before arranging
-faults or overriding profiles. For SFI/GW tests that configure peer
-paths, explicitly enable/disable both peer monitors as the case needs.
+MODE SET_ENABLE 0 and wait for its HK acknowledgement. Before arranging
+faults or applying isolated-test overrides, also await completion of the
+mandatory initial profile application, or two MODE wakeups after all
+profile targets register. Complete scheduled profile reapplications
+before resetting counters and beginning assertions. For SFI/GW tests
+that configure peer paths, explicitly enable/disable both peer monitors
+as the case needs.
 Counters are reset after setup; protocol serials continue across resets.
 All live commands, including these setup commands, are CMDI frames.
+Acceptance never restarts SFI while MODE remains running: SFI recovery
+restarts the node, and peer-loss tests use relay cuts instead of an
+in-run SFI restart. SFI report serials and MODE's per-slot history share
+that node lifetime; no producer-epoch resynchronization is required.
 
 ## S1. STOR storage manager (base)
 
@@ -1003,8 +1035,9 @@ TO_LAB. Hidden tests also cover the 64-bit window (63/64 boundaries,
 out-of-order gaps, half-range, wrap, slot exhaustion), key staging and
 switch order, mandatory SWITCH_KEY authentication, replay retention on
 switch/reset and source attribution at each validation failure. Live
-checks replay an identical accepted frame and an unseen older frame,
-check non-execution and reason/event/statistics, stage NEXT through TBL,
+checks accept serial 100, execute unseen serial 37, reject unseen serial
+36 as REPLAY and reject duplicate serial 100 as REPLAY, with matching
+execution/non-execution, reason/event/statistics. They stage NEXT through TBL,
 switch under ACTIVE, verify retired-key rejection and NEXT-key acceptance
 without resetting the sequence window, and observe GW using the new key, including GW
 rejection of unauthenticated SWITCH_KEY while ordinary HMAC is disabled.
@@ -1107,9 +1140,10 @@ to 0x18EB on cpu1).
 - Table update: the runtime list is replaced by the table's (streams added
   by command are dropped), subscriptions follow the new list, runtime
   classes and budget reset to the table, queued packets of streams no
-  longer listed are discarded without counting, other queued packets keep
-  their class, and `TLMO_TBL_UPDATE_INF_EID` is sent (not on the initial
-  load).
+  longer listed are discarded without counting. Retained packets follow
+  their MID to its new slot and retain their queued class. Reset cumulative
+  per-stream counters and phases, then recompute Queued from retained
+  packets. `TLMO_TBL_UPDATE_INF_EID` is sent (not on the initial load).
 - Every 10th WAKEUP sends a heartbeat (C.5).
 
 ### S4.3 Commands and telemetry
@@ -1165,7 +1199,9 @@ base class through the selected ClassMap; queued packets keep their class
 when either class or profile changes. SEND_CLASS_MAP reports effective
 classes. ADD_STREAM's existing Spare bytes remain zero and it creates a
 stream with Decimation 1. A table activation selects profile 0, installs
-the table budget and resets decimation phases and per-stream counters.
+the table budget and resets decimation phases and cumulative per-stream
+counters, then recomputes Queued by MID from retained packets, including
+when table slots are reordered (S4.2).
 
 Each used slot has a phase starting at 0. On reception increment
 PacketsReceived and that stream's Received; keep the packet if phase is
@@ -1415,7 +1451,9 @@ The default table has every connection and route unused, spares zero.
   successful write / read; counters always increment.
 - Connection state: DISABLED 0, UP 1, CONNECTING 2, DOWN 3 (TCP connect exhaustion or keep-alive loss, see
   the connect cycle above); reaching UP sends `GW_CONN_UP_INF_EID`,
-  entering DOWN sends `GW_CONN_TIMEOUT_ERR_EID`.
+  TCP connect-cycle exhaustion emits `GW_CONN_TIMEOUT_ERR_EID` (28).
+  Keep-alive expiry emits `GW_KEEPALIVE_ERR_EID` (29), without
+  `GW_CONN_TIMEOUT_ERR_EID`. Each event occurs once per corresponding edge.
 - Every 10th WAKEUP sends a heartbeat (C.5).
 
 ### S5.3 Commands and telemetry
@@ -1475,19 +1513,26 @@ typedef struct
 
 Sequence starts at 1 per open, increments per probe and wraps modulo
 2^32. Reply 0 is a probe; its receiving connection sends Reply 1 with
-the same Sequence, nodes reversed, at once. Valid incoming probes and
-replies (exact payload size and FC 0) from configured PeerNode addressed
-to own node refresh that
-connection's receive time; malformed payloads, wrong nodes and Reply >1
+the same Sequence, nodes reversed, in that wakeup's outbound phase.
+Valid incoming probes and replies (exact payload size and FC 0) from
+configured PeerNode addressed to own node refresh that connection's
+receive time; malformed payloads, wrong nodes and Reply >1
 increment RxErrors and emit FRAME_REJECT_ERR naming KEEPALIVE, without
 refreshing time. GW consumes keep-alives, never publishing them on SB,
 and never replies to a reply. No replay test applies on these links.
 KeepAliveEnabled 0 ignores a well-formed keep-alive after validation.
 
+Each GW wakeup processes pending inbound frames first (within the S5.2
+per-connection bound), evaluates keep-alive deadlines second, updates
+route selections third, and performs outbound work afterward. A valid
+keep-alive processed on the deadline wakeup refreshes the timer without
+a DOWN edge. Probe replies are sent in that same wakeup after route
+selection, along with other outbound work.
+
 Timer starts at UP. Six onboard seconds with no valid keep-alive makes
 the connection DOWN on the first GW wakeup at or after the deadline:
-GW_KEEPALIVE_ERR and SFI REPORT_LINK (S6.8) Down 1 once. Keep Enabled 1,
-retain the transport and read it; send probes once per second while DOWN.
+GW_KEEPALIVE_ERR (29), without CONN_TIMEOUT_ERR (28), and SFI REPORT_LINK
+(S6.6) Down 1 once. Keep Enabled 1, retain the transport and read it; send probes once per second while DOWN.
 Any valid keep-alive makes it UP, emits CONN_UP_INF and REPORT_LINK Down 0.
 TCP transport failure follows the existing connect cycle; if previously
 UP with keep-alives, also reports link fault immediately, clearing it only
@@ -1867,7 +1912,9 @@ a report if active, resets PeerLastSeconds to 0, and applies new
 PeerEnabled/PeerTimeoutSec. LINK states are independent of SfiTable and
 are retained, including latches. No ACK is implied by table activation.
 A no-change enable command succeeds without resetting an enabled source.
-Peer disable clears NODE_LOSS and disarms; re-enable waits for a first
+Peer disable clears NODE_LOSS and disarms. While PeerEnabled is 0,
+valid health messages neither arm nor refresh monitoring; publication
+continues. Re-enable starts unarmed and requires a subsequently received
 valid health message. Runtime enables are overridden by table activation.
 
 Dump format is little-endian: 16-byte header `uint32 Magic` 0x5346494C,
@@ -1940,7 +1987,9 @@ DstNode is 3 - own node ID. Sequence starts at 1 and increases modulo
 2^32 each publication; Seconds is current onboard seconds. Subscribe to
 the same global MID; own SrcNode is ignored. Require correct packet size,
 FC 0, SrcNode equal the other node and DstNode equal own node, otherwise
-CONTROL_ERR and no refresh. A first valid peer packet arms monitoring;
+CONTROL_ERR and no refresh. With PeerEnabled 1, a first valid peer
+packet arms monitoring; while disabled, valid packets neither arm nor
+refresh it. Re-enable requires a subsequently received valid packet;
 no NODE_LOSS is raised before first contact, so a standalone node with
 no GW connection is supported. No application-level sequence freshness
 check is applied (CMDI replay or GW frame validation is the ingress
@@ -1991,7 +2040,9 @@ current capped event-window count, 0 when event monitoring is disabled.
 FaultReports increments per report (including clears); FaultLogDumps per
 successful dump. LinkFaults/NodeLossFaults count onsets. HealthSequence
 is the latest sent sequence, 0 before the first publication; PeerLastSeconds
-is onboard receipt time, not the peer's Seconds field.
+is the onboard receipt time of the last valid health packet received
+while PeerEnabled 1, not the peer's Seconds field; it does not refresh
+while disabled.
 Faults[slot] is its latest edge report, all zero before any edge; ACK
 updates only Latched[], not that historical report. This status exceeds
 1024 bytes: SEND_STATUS sends one full cFE packet and TLMO_MAX_PACKET is
@@ -2112,7 +2163,8 @@ FileName /cf/app.so (lowercase library base name), StackSize
 STOR_AppMain, CMDI_AppMain, TLMO_AppMain, GW_AppMain and /cf/stor.so,
 /cf/cmdi.so, /cf/tlmo.so, /cf/gw.so. Restart ExceptionAction is always 0.
 
-Every response has CooldownSec 30, RetryCap 3, TargetMode DEGRADED,
+Every response has the common defaults below; TargetMode is specified
+separately by the per-fault table. CooldownSec 30, RetryCap 3,
 RecordMid CFE_EVS_HK_TLM_MID, Priority 200, RouteIndex 0, PreferBackup 1,
 Dump = {FILE, ground, KEEP, 0, "mode/response.bin", ""}. Enabled actions:
 
@@ -2194,7 +2246,8 @@ and SAFE precedence still applies. Manual NOMINAL ends a healthy
 DEGRADED interval at once. Disabled automatic response (SET_ENABLE 0)
 retains monitoring and fault state but suspends automatic transitions,
 responses and recovery; explicit SET_MODE/APPLY_PROFILE still work.
-Re-enable evaluates existing state on the next wakeup.
+Re-enable evaluates existing state on the next wakeup. Route-preference
+release is cleanup and remains enabled during SET_ENABLE 0 (S7.3).
 
 ### S7.3 Responses, cooldowns and restart protocol
 
@@ -2224,7 +2277,15 @@ claimed as a successful action result. No response requires CMDI frames.
 A clear for LINK/NODE_LOSS with SwitchRoute sends SET_PREFERENCE 0 once
 to release the override, even when no attempt is due; ordinary 10 s
 failback then applies. If multiple active slots prefer the same route,
-release only when the last such active slot clears.
+release only when the last such active requesting slot clears. This
+release is cleanup, remains enabled during SET_ENABLE 0, and is sent
+once at that last clear, without deferral until re-enable. Count its
+transmission normally in ActionsSent or ActionErrors.
+
+Snapshot the restart target and parameters when an attempt is
+dispatched. An in-progress restart sequence uses that snapshot through
+completion, including START after WAIT_STOP. Table changes affect
+subsequent attempts; existing cooldown deadlines remain unchanged.
 
 For Restart, query CFE_ES_GetAppIDByName. If present, send ES STOP_APP
 FC 5 with CFE_ES_AppNameCmd_Payload_t.Application = target; poll presence
@@ -2285,8 +2346,10 @@ typedef struct
 SrcNode own, DstNode 3 - own, Mode current; Sequence starts 1 at app
 start, +1 per publication modulo 2^32; Seconds current onboard seconds.
 A correctly sized FC 0 message with peer SrcNode, own DstNode and Mode
-0..2 arms the peer-mode timer and updates PeerMode/PeerLastSeconds;
-ignore own SrcNode, reject all other malformed messages with PEER_ERR.
+0..2 updates diagnostic PeerMode and PeerSequence even while PeerEnabled
+is 0. With PeerEnabled 1 it also arms/refreshes the peer-mode timer and
+updates PeerLastSeconds; while disabled it neither arms nor refreshes
+monitoring. Ignore own SrcNode, reject all other malformed messages with PEER_ERR.
 A receive from the peer is not retransmitted (S5.4). No separate mode
 freshness check is applied. PeerMode reports the peer state but does not
 force matching local mode; faults are evaluated locally to avoid a
@@ -2299,8 +2362,10 @@ PeerLost 1 and PEER_LOSS_ERR once, requiring DEGRADED. First valid packet
 clears PeerLost with PEER_RESTORED_INF. SFI NODE_LOSS independently blocks
 recovery while active. Disabling peer monitoring disarms the mode timer
 and clears PeerLost, but does not disable SFI health monitoring; use
-SFI SET_PEER_ENABLE too for an isolated-node test. Mode messages are
-published even when response/peer monitoring is disabled.
+SFI SET_PEER_ENABLE too for an isolated-node test. Re-enable starts
+unarmed and requires a subsequently received valid message. PeerMode
+and PeerSequence diagnostics keep updating while disabled. Mode messages
+are published even when response/peer monitoring is disabled.
 
 ### S7.5 Commands, telemetry and events
 
