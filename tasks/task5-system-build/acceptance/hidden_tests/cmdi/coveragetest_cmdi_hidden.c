@@ -44,8 +44,8 @@ extern void CMDI_AppMain(void);
 #define EID_PARAM_INF    14
 #define EID_PARAM_ERR    15
 
-#define TBL_SIZE         56
-#define HK_PAYLOAD       36
+#define TBL_SIZE         92
+#define HK_PAYLOAD       48
 #define TLM_HDR          16
 #define CMD_HDR          8
 #define HB_SIZE          32
@@ -92,6 +92,13 @@ static void H_TxBuf(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
 /* ------------------------------------------------------------------------- fixture */
 
 static uint32 seqno;
+static int modified_calls;
+
+static void H_Modified(void *ud, UT_EntryKey_t key, const UT_StubContext_t *c)
+{
+    modified_calls++;
+    H_SB_Ok(ud, key, c);
+}
 
 static void Setup(void)
 {
@@ -101,6 +108,8 @@ static void Setup(void)
     memset(tx_orig, 0, sizeof(tx_orig));
     t5_app_entry = CMDI_AppMain;
     seqno = 0;
+    modified_calls = 0;
+    UT_SetHandlerFunction(UT_KEY(CFE_TBL_Modified), H_Modified, NULL);
 }
 
 static void Teardown(void) { t5_teardown(); }
@@ -141,7 +150,8 @@ static bool cmd_mask(uint8 mask)
 typedef struct
 {
     uint8  cc, cec, mask;
-    uint32 rx, acc, fmt, crc, hmac, src, age, max_age;
+    uint32 rx, acc, fmt, crc, hmac, src, age, max_age, replay, switches;
+    uint8 next_valid, slots;
 } hk_t;
 
 static bool get_hk(hk_t *h)
@@ -171,6 +181,8 @@ static bool get_hk(hk_t *h)
     h->src = t5_get32(p + 24);
     h->age = t5_get32(p + 28);
     h->max_age = t5_get32(p + 32);
+    h->replay = t5_get32(p + 36); h->switches = t5_get32(p + 40);
+    h->next_valid = p[44]; h->slots = p[45];
     return true;
 }
 
@@ -755,12 +767,16 @@ static void Test_CommandsAndCounters(void)
     }
 }
 
+
+#include "expanded_cmdi.h"
+
 void UtTest_Setup(void)
 {
     UtAssert_True(sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes",
                   (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
     UtAssert_True(sizeof(CFE_MSG_CommandHeader_t) == CMD_HDR, "command header is %u bytes", (unsigned)sizeof(CFE_MSG_CommandHeader_t));
     UtAssert_True(CFE_MISSION_MAX_API_LEN == 20, "CFE_MISSION_MAX_API_LEN is %d", (int)CFE_MISSION_MAX_API_LEN);
+    Register_Expanded();
     UtTest_Add(Test_StartupAndHousekeeping, Setup, Teardown, "Startup and housekeeping");
     UtTest_Add(Test_PortPerNode, Setup, Teardown, "Port per node");
     UtTest_Add(Test_SocketError, Setup, Teardown, "Socket error");

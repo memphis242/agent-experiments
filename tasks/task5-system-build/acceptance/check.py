@@ -4,13 +4,9 @@
 Usage: check.py <repo-path> <out.json>
 
 The repository is copied to scratch space and built there; the original is never modified. Checks are
-graded per subsystem (S1..S7, N) and overall. Three lanes run in parallel after the build:
-  isolated  every check that binds the fixed node ports (live checks, the harness CLI, CTF scripts), in groups
-            that each run in their own nested user, network, mount, IPC and PID namespaces (isolation.py,
-            live_worker.py), T5_PACK_JOBS groups at a time (default 8); checks of one group share nodes and run
-            in order;
-  cpu       unit tests, coverage, then the black-box component tests;
-  misc      static checks, the fresh CTF set-up, plugin listing and the CCDD layout probe.
+graded per subsystem (S1..S8, N) and overall. Build, unit-test and static work
+finish before live checks. Live groups run in nested namespaces one at a time
+under a host-coordinated lock with explicit CPU reservation and scheduling evidence.
 The result file has exactly the contract's keys; the per-subsystem summary is written next to it as
 <out-stem>.subsystems.json and printed. Exit status: 0 every check passed, 1 at least one failed,
 2 an infrastructure fault before the agent's code was used.
@@ -45,20 +41,23 @@ import live_cmdi as l3  # noqa: E402
 import live_gw as l5  # noqa: E402
 import live_nodes as ln  # noqa: E402
 import live_sfi as l6  # noqa: E402
+import live_mode as l7  # noqa: E402
 import live_stor as l12  # noqa: E402
 import live_tlmo as l4  # noqa: E402
+import preflight  # noqa: E402
+import timing  # noqa: E402
 import static_checks as st  # noqa: E402
-from common import Fail, InfraError, PrereqFail  # noqa: E402
+from common import EnvironmentFail, Fail, InfraError, PrereqFail  # noqa: E402
 from hidden_glue import HIDDEN_CHECKS, HiddenTests, load_case_specs  # noqa: E402
 from node import Node  # noqa: E402
 
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
-TOTAL_BUDGET_S = 44 * 60
+TOTAL_BUDGET_S = 180 * 60
 JOBS = "-j16"
-DEFAULT_GROUP_JOBS = 8
+DEFAULT_GROUP_JOBS = 1
 SUBSYSTEMS = {
     "S1": "S1 STOR base", "S2": "S2 STOR transfer", "S3": "S3 CMDVAL and CMDI", "S4": "S4 TLMO", "S5": "S5 GW",
-    "S6": "S6 SFI", "S7": "S7 CTF system tests", "N": "N Non-functional and common conventions",
+    "S6": "S6 SFI", "S7": "S7 MODE", "S8": "S8 CTF system tests", "N": "N Non-functional and common conventions",
 }
 
 
@@ -82,7 +81,7 @@ class CheckSpec:
 
     @property
     def feedback(self) -> str:
-        return f"{self.label}: {self.text}"
+        return f"{self.label} [{self.check_id}]: {self.text}"
 
 
 class Ctx:
@@ -109,6 +108,7 @@ class Ctx:
         self.pristine_cache: dict[int, dict[str, bytes]] = {}
         self.hidden: HiddenTests | None = None
         self.ctf: cc.CtfEnv | None = None
+        self.queue_preflight: dict[str, object] | None = None
 
     # -- time ----------------------------------------------------------------
     def remaining(self) -> float:
@@ -216,6 +216,8 @@ class Ctx:
                 startup_edit: Callable[[str], str] | None = None) -> dict[int, Node]:
         self.build()
         self.shutdown_session()
+        if self.queue_preflight is None:
+            self.queue_preflight = preflight.namespace_preflight()
         with self.boot_record() as record:
             for nid in nodes:
                 if len(record[nid]) >= 2:
@@ -237,6 +239,22 @@ class Ctx:
                     record[nid] = []
                 started[nid] = n
                 self.nodes[nid] = n
+            inventory = preflight.verify_nodes(tuple((n.cpu, n.pids()[0]) for n in started.values()))
+            if "inventory" not in self.queue_preflight:
+                # Learn the actual OSAL inventory, then stop the entire node
+                # lifetime before probing it as the final non-root identity.
+                for n in started.values():
+                    n.stop()
+                probes = tuple(preflight.Queue(q.name, q.depth, q.message_size) for q in inventory)
+                if len(nodes) == 1:
+                    probes += probes
+                preflight.allocation_probe(probes)
+                self.queue_preflight["inventory"] = tuple((q.name, q.depth, q.message_size) for q in probes)
+                for nid, n in started.items():
+                    n.prepare(startup_edit=startup_edit, seed=(seed or {}).get(nid))
+                    n.start()
+                preflight.verify_nodes(tuple((n.cpu, n.pids()[0]) for n in started.values()))
+            (self.work / "queue-preflight.json").write_text(json.dumps(self.queue_preflight, indent=2) + "\n")
         except BaseException:
             for n in started.values():
                 n.stop()
@@ -272,7 +290,7 @@ def hidden(check_id: str) -> Callable[[Ctx], None]:
 
 
 def script(name: str) -> Callable[[Ctx], None]:
-    return lambda ctx: cc.c_script(ctx, name)
+    return getattr(cc, "c_" + name.removesuffix(".json").removeprefix("st_"))
 
 
 def table(app: str) -> Callable[[Ctx], None]:
@@ -561,30 +579,60 @@ CHECKS: list[CheckSpec] = [
       "RESET_COUNTERS and the C.4 error cases must behave as specified, reflected in SFI housekeeping.", l6.c_sfi_commands,
       "isolated", live=True),
     # ---------------------------------------------------------------- S7
-    C("s7-setup-fresh", "S7", "S7.1 Where CTF code goes (setup_ctf.sh)", "ctf/setup_ctf.sh must create a fresh CTF checkout and "
+    C("s8-setup-fresh", "S8", "S8.1 Where CTF code goes (setup_ctf.sh)", "ctf/setup_ctf.sh must create a fresh CTF checkout and "
       "venv, apply every patch in ctf/shims/patches/, and be idempotent (a second run succeeds and leaves the same patched tree).",
       cc.c_setup_fresh, "misc"),
-    C("s7-plugin-layout", "S7", "S7.1 and S7.2 Plugins and two targets", "ctf/plugins must be a package with cmdi_plugin "
+    C("s8-plugin-layout", "S8", "S8.1 and S8.2 Plugins and two targets", "ctf/plugins must be a package with cmdi_plugin "
       "(CmdiPlugin), tlm_order_plugin (TlmOrderPlugin), link_plugin (LinkPlugin), es_app_plugin (EsAppPlugin) and "
       "node_file_plugin (NodeFilePlugin), loaded through additional_plugins_path ${CTF_PLUGINS_DIR}; mission.ini must have the "
-      "[cpu1] and [cpu2] sections of S7.2; run_ctf.sh must export CTF_PLUGINS_DIR and CFS_RUN_DIR_CPU2 and check UDP 1235; "
+      "[cpu1] and [cpu2] sections of S8.2; run_ctf.sh must export CTF_PLUGINS_DIR and CFS_RUN_DIR_CPU2 and check UDP 1235; "
       "ctf/README.md must list every plugin and patch; no requirement may be added.", cc.c_plugin_layout, "misc"),
-    C("s7-plugin-info", "S7", "S7.3 Required instructions", "ctf --pluginInfo must list every pinned instruction: "
+    C("s8-plugin-info", "S8", "S8.3 Required instructions", "ctf --pluginInfo must list every pinned instruction: "
       + ", ".join(cc.INSTRUCTIONS) + ".", cc.c_plugin_info, "misc"),
-    C("s7-ccdd-layout", "S7", "S7.4 CCDD definitions", "ctf/ccdd/json must define every command and telemetry message of STOR, "
+    C("s8-ccdd-layout", "S8", "S8.4 CCDD definitions", "ctf/ccdd/json must define every command and telemetry message of STOR, "
       "CMDI, TLMO, GW and SFI with all function codes, the SEND_HK, WAKEUP, heartbeat and transfer MIDs, ES START_APP (4) and "
       "STOP_APP (5), and set2 with every MID's cpu2 value; layout_probe.c must probe them all and "
       "probe_layout.sh | check_layout.py must pass.", cc.c_ccdd_layout, "misc"),
-    C("s7-run-system-tests", "S7", "S7.5 Run order", "ctf/run_system_tests.sh must run the two smoke scripts and then the eight "
-      "system test scripts of S7.5 in order with run_ctf.sh.", cc.c_run_system_tests_script, "misc"),
-    C("s7-listener-probe", "S7", "S7.3 tlm_order_plugin (CTF telemetry listener)", "CTF's telemetry listener must keep parsing "
+    C("s8-run-system-tests", "S8", "S8.5 Run order", "ctf/run_system_tests.sh must run the two smoke scripts and then the eight "
+      "system test scripts of S8.5 in order with run_ctf.sh.", cc.c_run_system_tests_script, "misc"),
+    C("s8-listener-probe", "S8", "S8.3 tlm_order_plugin (CTF telemetry listener)", "CTF's telemetry listener must keep parsing "
       "telemetry while command-type and short datagrams arrive on the telemetry port.", cc.c_listener_probe, "isolated"),
 ] + [
-    C(f"s7-{name.removesuffix('.json').replace('_', '-')}", "S7", f"S7.5 {name}",
+    C(f"s8-{name.removesuffix('.json').replace('_', '-')}", "S8", f"S8.5 {name}",
       f"ctf/tests/{name} must exist, send commands only through the CMDI frame plugins (no SendCfsCommand"
       f"{', no TO_LAB enable step' if name in cc.SMOKE else ''}), register and shut down its own nodes, and pass when run with "
-      f"ctf/run_ctf.sh against scratch copies of both installed nodes within 300 seconds.", script(name), "isolated")
+      f"ctf/run_ctf.sh against scratch copies of both installed nodes within 300 seconds.", script(name), "isolated", live=True)
     for name in cc.SMOKE + cc.SYSTEM
+]
+
+
+# Expanded requirements have separate verdicts so feedback identifies the failing behaviour.
+CHECKS += [
+    C("n-queue-capacity", "N", "C.6 IPC queue prerequisites and effective pipe depths", "msg_max must be >=512 and the final non-root node limits must support the actual two-node inventory including kernel overhead; mq_getattr must prove TLMO/MODE >=128 and SFI >=256 without truncation.", ln.c_queue_capacity, "isolated", live=True),
+    C("n-mid-inventory", "N", "C.3 Native classic MID inventory", "Every pinned full MID must match the mission and bundled apps, with command/telemetry types distinct and verification topics reserved.", st.c_mid_inventory, "misc"),
+    C("n-mode-integration", "N", "C.6 MODE integration and queue depths", "MODE must be installed on both CPUs after SFI with its table, heartbeat and all 32 actual scheduler entries; queue depth ceiling is 512.", st.c_mode_integration, "misc"),
+    C("n-sb-pool-sizing", "N", "C.6/C.7 Native software bus pool sizing", "Each CPU's SB pool must cover allocation-rounded descriptors and buckets for the declared verification burst and a full large request; live background sufficiency requires zero allocator errors.", st.c_sb_pool_sizing, "misc"),
+    C("s1-quota-file-info", "S1", "S1.6 Quotas and FILE_INFO", "Authenticated quota activation must preserve accounting; FILE_INFO must report unchanged size and ISO-HDLC CRC on the default stream.", l12.c_quota_file_info, "isolated", live=True),
+    C("s3-replay-window", "S3", "S3.6 Replay window and source statistics", "Serials 100 and unseen 37 execute, 36 and duplicate 100 reject; sources/nodes and wrap are independent, with exact source and aggregate counters.", l3.c_replay_window, "isolated", live=True),
+    C("s3-key-rotation", "S3", "S3.6 Staged key rotation", "Authenticated NEXT staging/switch must retire ACTIVE immediately, retain replay history, update GW and require switch HMAC even with the ordinary HMAC mask disabled.", l3.c_key_rotation, "isolated", live=True),
+    C("s3-same-wakeup-order", "S3", "S3.6 Datagram dispatch ordering", "Queued key/mask/age changes must affect subsequent datagrams in the same wakeup, with source-separated observations.", l3.c_same_wakeup_order, "isolated", live=True),
+    C("s4-stream-profiles", "S4", "S4.4 Stream profiles and statistics", "Held output must preserve decimation/ownership/class/order through a table reorder, capture reserved statistics after budget restoration, and apply all profiles.", l4.c_stream_profiles, "isolated", live=True),
+    C("s4-stream-reorder", "S4", "S4.4 Retained queue ownership on table reorder", "Held packets must follow their MID to the new table slot with unchanged queued class; counters and phases reset while Queued is recomputed.", l4.c_stream_reorder, "isolated", live=True),
+    C("s5-link-health", "S5", "S5.4 Keep-alive health", "Valid probes refresh health, malformed probes do not; a silent cut causes exactly one DOWN/report within [5,8] s and valid probes recover it.", l5.c_link_health, "isolated", live=True),
+    C("s5-route-failover", "S5", "S5.4 Routing and failback", "Dual transparent relays must deliver unique packets only over backup after primary loss, then fail back after [10,12] s of continuous primary health.", l5.c_route_failover, "isolated", live=True),
+    C("s6-limit-latch-enable", "S6", "S6.6 LIMIT, latch and enables", "EF samples 9,9,10,9,9,9,10 must enforce persistence, paired reports, severity, latch/ACK guards and enable baseline resets.", l6.c_limit_latch_enable, "isolated", live=True),
+    C("s6-event-rate", "S6", "S6.7 ERROR event rate", "Six GW ERROR events in 10 s trigger one EVENT_RATE onset and expiry clear; non-ERROR events cannot trigger it.", l6.c_event_rate, "isolated", live=True),
+    C("s6-mixed-cluster", "S6", "S6.3 Mixed fault clustering", "Heartbeat and watch onsets must share clustering history and produce the specified masks, correlation and tie selection.", l6.c_mixed_cluster, "isolated", live=True),
+    C("s6-peer-health", "S6", "S6.8 First-contact peer health", "No absent-startup peer timer arms; authenticated contact arms loss detection and relay cuts cause NODE_LOSS on the specified deadline, clearing on contact.", l6.c_peer_health, "isolated", live=True),
+    C("s6-log-ground", "S6", "S6.9 Binary fault log", "A STOR KEEP transfer must reconstruct the independently parsed oldest-first fault log, matching report bytes and FILE_INFO size/CRC without local dump reads.", l6.c_log_ground, "isolated", live=True),
+    C("s7-default-table", "S7", "S7.1 MODE table", "Both installed ModeTable images must have every pinned profile, restart target and response default.", table("MODE"), "misc"),
+    C("s7-hidden-mode", "S7", "S7 MODE component behaviour", hidden_text("s7-hidden-mode"), hidden("s7-hidden-mode"), "cpu"),
+    C("s7-fault-response", "S7", "S7.2 Fault mode and restart", "Stopped GW must trigger DEGRADED and one automatic restart, restore heartbeat, apply target profiles and return only after [20,25] s continuous health.", l7.c_fault_response, "isolated", live=True),
+    C("s7-cooldown-cap", "S7", "S7.3 Persistent cooldown and cap", "Restart attempts must remain >=30 s apart with cap 3, no fourth START, one exhaustion event and guarded SAFE reset.", l7.c_cooldown_cap, "isolated", live=True),
+    C("s7-response-actions", "S7", "S7.3 Response action payloads and lifetime", "STOR priority/KEEP and GW preference/release must use exact targets; WAIT_STOP table activation must retain the attempt snapshot and cooldown.", l7.c_response_actions, "isolated", live=True),
+    C("s7-peer-mode", "S7", "S7.4 Independent peer-mode timer", "MODE_PEER-only loss must cause DEGRADED at its independent 10 s deadline without NODE_LOSS; primary relay loss and recovery must match both-node profiles.", l7.c_peer_mode, "isolated", live=True),
+    C("s8-script-content", "S8", "S8.6 System script review", "All fifteen system scenarios must contain their required fault, replay, key, route, profile and binary-log assertions, with authenticated commands and bounded execution.", cc.c_script_content, "misc"),
+    C("s8-plugin-negative", "S8", "S8.3 Plugin errors and timeouts", "Pinned instructions must reject invalid arguments and terminate missing-response waits with actionable failures.", cc.c_plugin_negative, "isolated"),
 ]
 
 BY_ID = {c.check_id: c for c in CHECKS}
@@ -598,9 +646,9 @@ assert all(c.lane in ("build", "isolated", "cpu", "misc") for c in CHECKS)
 RUN_ORDER = {
     "build": ["n-build-werror"],
     "misc": ["n-component-layout", "n-targets", "n-install-custom", "n-schedule", "n-readme", "n-change-scope",
-             "n-design-notes", "n-system-report", "s7-plugin-layout", "s7-run-system-tests", "s3-harness-functions",
+             "n-design-notes", "n-system-report", "s8-plugin-layout", "s8-run-system-tests", "s3-harness-functions",
              "n-startup-scripts", "s1-default-table", "s3-default-table", "s4-default-table", "s5-default-table",
-             "s6-default-table", "s3-cmdval-self-contained", "s7-ccdd-layout", "s7-setup-fresh", "s7-plugin-info"],
+             "s6-default-table", "s3-cmdval-self-contained", "s8-ccdd-layout", "s8-setup-fresh", "s8-plugin-info"],
     "cpu": ["n-unit-tests", "n-coverage-tests", "n-coverage", "s3-hidden-cmdval-lib", "s3-hidden-cmdi", "s4-hidden-tlmo",
             "s5-hidden-gw", "s6-hidden-sfi-clusters", "s6-hidden-sfi", "s1-hidden-stor", "s2-hidden-stor-transfer"],
     "isolated": ["s3-harness-cli", "n-run-scripts", "n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks",
@@ -618,8 +666,12 @@ RUN_ORDER = {
               "s5-tcp", "s5-tcp-down", "s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe", "s5-conn-commands",
               "s5-valtable-share-probe",
               "s6-apps-ok-after-startup", "s6-gw-stop-miss", "s6-cluster-and-clear", "s6-stall-rate", "s6-sfi-commands",
-              "s7-listener-probe"] + [f"s7-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
+              "s8-listener-probe"] + [f"s8-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
 }
+_ordered = {cid for ids in RUN_ORDER.values() for cid in ids}
+for _check in CHECKS:
+    if _check.check_id not in _ordered:
+        RUN_ORDER[_check.lane].append(_check.check_id)
 assert sorted(sum(RUN_ORDER.values(), [])) == sorted(BY_ID), "RUN_ORDER must list every check exactly once"
 for _lane, _ids in RUN_ORDER.items():
     assert all(BY_ID[i].lane == _lane for i in _ids), f"lane mismatch in {_lane}"
@@ -628,12 +680,12 @@ for _lane, _ids in RUN_ORDER.items():
 # the one set-up ctf/ tree (its venv and patched checkout), so they run one after another in one group as well.
 # Every other isolated check is a group of its own. Groups are started longest first.
 SHARED_GROUPS = {
-    "ctf": ["s7-listener-probe"] + [f"s7-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
+    "ctf": ["s8-listener-probe"] + [f"s8-{n.removesuffix('.json').replace('_', '-')}" for n in cc.SMOKE + cc.SYSTEM],
     "tlmo-hold": ["s4-hold-drop-arithmetic", "s4-drain-order", "s4-set-class", "s4-set-budget"],
     "gw-udp": ["s5-udp-egress", "s5-udp-ingress", "s5-ingress-rejections", "s5-loop-drop"],
     "gw-serial": ["s5-serial", "s5-pty-idle-probe", "s5-restart-serial-probe"],
     "stor-peer": ["s2-peer-transfer", "s2-peer-exists-nak"],
-    "two-nodes": ["n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks"],
+    "two-nodes": ["n-nodes-operational", "n-ram-disks-distinct", "n-node-clocks", "n-queue-capacity"],
 }
 FIRST_SINGLES = ["s5-tcp-down", "s5-tcp", "s6-stall-rate", "s6-cluster-and-clear", "s6-gw-stop-miss", "s1-idle-file-close",
                  "s1-rollover", "s1-purge-order", "s1-quota-drop", "n-run-scripts"]
@@ -665,9 +717,12 @@ class Results:
     def put(self, cid: str, passed: bool, feedback: str, detail: str, ran: bool = True, echo: bool = True) -> None:
         assert cid in BY_ID
         with self.lock:
-            self.items[cid] = {"id": cid, "passed": passed, "feedback": "" if passed else feedback, "detail": detail}
+            self.items[cid] = {"id": cid, "passed": passed, "feedback": "" if passed else feedback,
+                               "detail": detail if detail.endswith(" [PRELIMINARY]") else detail + " [PRELIMINARY]"}
             if ran:
                 self.ran.add(cid)
+            else:
+                self.ran.discard(cid)
             self.lock.notify_all()
         if echo:
             print(f"[{cid}] {'ok' if passed else 'FAILED'}: {detail[:300]}", flush=True)
@@ -682,28 +737,46 @@ def run_one(ctx: Ctx, spec_: CheckSpec, results: Results) -> None:
     t0 = time.monotonic()
 
     def attempt() -> None:
-        spec_.fn(ctx)
+        if spec_.lane != "isolated":
+            spec_.fn(ctx)
+            return
+        with timing.host_lane(live=spec_.live):
+            for number in (1, 2):
+                failure: BaseException | None = None
+                with timing.Watchdog() as watchdog:
+                    try:
+                        spec_.fn(ctx)
+                        for node in ctx.nodes.values():
+                            if node.alive():
+                                node.verify_observation_integrity()
+                    except BaseException as exc:
+                        failure = exc
+                evidence = watchdog.evidence
+                timing.save_evidence(ctx.work / f"timing-{spec_.check_id}.jsonl", number, evidence)
+                if evidence["stalls_s"]:
+                    ctx.shutdown_session()
+                    if number == 2:
+                        raise EnvironmentFail(f"ENVIRONMENT {spec_.check_id}: scheduler stalled on both serialized "
+                                              f"attempts; observed gaps {evidence['stalls_s']}; implementation ungraded")
+                    print(f"[{spec_.check_id}] scheduling stall invalidated attempt; one clean serialized rerun", flush=True)
+                    continue
+                if failure is not None:
+                    raise failure
+                return
 
     try:
-        try:
-            attempt()
-        except PrereqFail:
-            raise
-        except Fail as first:
-            if not spec_.live:
-                raise
-            print(f"[{spec_.check_id}] first attempt failed ({str(first)[:200]}); retrying once from fresh nodes", flush=True)
-            ctx.shutdown_session()
-            try:
-                attempt()
-            except Fail as second:
-                raise Fail(f"{second} [first attempt: {first}]", second.feedback) from None
+        attempt()
         results.put(spec_.check_id, True, "", f"{time.monotonic() - t0:.0f} s")
     except BudgetExceeded as exc:
         results.put(spec_.check_id, False, spec_.feedback, f"not run: {exc}", ran=False)
         raise
+    except EnvironmentFail as exc:
+        results.put(spec_.check_id, False, f"{spec_.feedback} [{spec_.check_id}] ENVIRONMENT prerequisite failed: {exc}",
+                    f"ENVIRONMENT: {exc}", ran=False)
     except Fail as exc:
-        results.put(spec_.check_id, False, exc.feedback or spec_.feedback, f"{exc} ({time.monotonic() - t0:.0f} s)")
+        observed = ("the named component requirements were not met" if spec_.check_id in HIDDEN_CHECKS else str(exc))
+        results.put(spec_.check_id, False, f"{exc.feedback or spec_.feedback} [{spec_.check_id}] Expected: {spec_.term}. "
+                    f"Observed: {observed}", f"{exc} ({time.monotonic() - t0:.0f} s)")
     except InfraError as exc:
         print(f"INFRASTRUCTURE PROBLEM in {spec_.check_id}: {exc}", file=sys.stderr, flush=True)
         results.put(spec_.check_id, False, spec_.feedback, f"infrastructure problem: {exc}")
@@ -769,9 +842,9 @@ def run_group(ctx: Ctx, name: str, ids: list[str], results: Results) -> None:
     spec_: dict[str, object] = {"repo": str(ctx.repo), "tree": str(ctx.tree), "work": str(gdir / "work"),
                                 "deadline_wall": time.time() + ctx.remaining(), "checks": ids,
                                 "boot_fail_dir": str(ctx.work / "boot-failures")}
-    if any(BY_ID[c].sub == "S7" for c in ids):
-        # The fresh set-up and its idempotence re-run (s7-setup-fresh) must be over before a script runs.
-        if not results.wait_for("s7-setup-fresh", ctx.remaining() - 30):
+    if any(BY_ID[c].sub == "S8" for c in ids):
+        # The fresh set-up and its idempotence re-run (s8-setup-fresh) must be over before a script runs.
+        if not results.wait_for("s8-setup-fresh", ctx.remaining() - 30):
             raise BudgetExceeded("the review's time budget ran out")
         env = cc.ctf_env(ctx)
         try:
@@ -818,10 +891,10 @@ def run_group(ctx: Ctx, name: str, ids: list[str], results: Results) -> None:
         elif timed_out or ctx.remaining() < 20:
             results.put(cid, False, BY_ID[cid].feedback, "not run: the review's time budget ran out", ran=False)
         else:
-            detail = (f"infrastructure problem: the isolated group {name} ended with status {proc.returncode} before "
+            detail = (f"ENVIRONMENT: the isolated group {name} ended with status {proc.returncode} before "
                       f"this check finished; output tail: " + " | ".join(tail[-8:]))
             print(f"INFRASTRUCTURE PROBLEM in {cid}: {detail}", file=sys.stderr, flush=True)
-            results.put(cid, False, BY_ID[cid].feedback, detail)
+            results.put(cid, False, BY_ID[cid].feedback + f" [{cid}] {detail}", detail, ran=False)
 
 
 def group_jobs() -> int:
@@ -841,9 +914,9 @@ def run_isolated(ctx: Ctx, results: Results, only: set[str], jobs: int) -> None:
         return
     ok, why = isolation.available()
     if not ok:
-        print(f"WARNING: nested namespaces are not available ({why}); running the isolated checks one at a time",
-              file=sys.stderr, flush=True)
-        run_lane(ctx, "isolated", results, only)
+        for cid in RUN_ORDER["isolated"]:
+            results.put(cid, False, BY_ID[cid].feedback + f" [{cid}] ENVIRONMENT: namespace prerequisites unavailable: {why}",
+                        f"ENVIRONMENT: nested IPC/network namespace setup failed: {why}", ran=False)
         return
     ctx.boot_fail_dir = ctx.work / "boot-failures"
     groups = []
@@ -872,7 +945,7 @@ def run_isolated(ctx: Ctx, results: Results, only: set[str], jobs: int) -> None:
                     results.put(cid, False, BY_ID[cid].feedback,
                                 f"infrastructure problem: group {name}: {type(exc).__name__}: {exc}")
 
-    with ThreadPoolExecutor(max_workers=jobs, thread_name_prefix="group") as pool:
+    with ThreadPoolExecutor(max_workers=1, thread_name_prefix="group") as pool:
         for fut in [pool.submit(one, name, ids) for name, ids in groups]:
             fut.result()
 
@@ -883,14 +956,20 @@ def summarize(checks: list[dict[str, object]], ran: set[str]) -> dict[str, objec
         mine = [c for c in checks if BY_ID[str(c["id"])].sub == key]
         run = [c for c in mine if c["id"] in ran]
         passed = sum(1 for c in mine if c["passed"])
+        environment = sum(1 for c in mine if str(c["detail"]).startswith("ENVIRONMENT"))
+        graded = len(mine) - environment
         subs[key] = {"label": SUBSYSTEMS[key], "checks": len(mine), "run": len(run), "passed": passed,
-                     "failed": len(mine) - passed, "fraction": round(passed / len(mine), 3) if mine else 0.0,
+                     "environment": environment, "graded": graded,
+                     "failed": graded - passed, "fraction": round(passed / graded, 3) if graded else 0.0,
                      "passed_all": passed == len(mine)}
     total = len(checks)
     passed = sum(1 for c in checks if c["passed"])
+    environment = sum(1 for c in checks if str(c["detail"]).startswith("ENVIRONMENT"))
+    graded = total - environment
     return {"preliminary": True, "subsystems": subs,
-            "overall": {"checks": total, "run": len(ran), "passed": passed, "failed": total - passed,
-                        "fraction": round(passed / total, 3) if total else 0.0, "passed_all": passed == total}}
+            "overall": {"checks": total, "run": len(ran), "passed": passed, "environment": environment,
+                        "graded": graded, "failed": graded - passed,
+                        "fraction": round(passed / graded, 3) if graded else 0.0, "passed_all": passed == total}}
 
 
 def main(argv: list[str]) -> int:
@@ -928,18 +1007,23 @@ def main(argv: list[str]) -> int:
     only = {x for x in os.environ.get("T5_PACK_ONLY", "").split(",") if x}
     t0 = time.monotonic()
     try:
-        misc = threading.Thread(target=run_lane, args=(ctx, "misc", results, only), name="lane-misc")
-        misc.start()
-        run_lane(ctx, "build", results, only)
-        lanes = [threading.Thread(target=run_isolated, args=(ctx, results, only, jobs), name="lane-isolated"),
-                 threading.Thread(target=run_lane, args=(ctx, "cpu", results, only), name="lane-cpu")]
-        for t in lanes:
-            t.start()
-        for t in lanes + [misc]:
-            t.join()
+        with timing.host_lane():
+            run_lane(ctx, "build", results, only)
+            misc = threading.Thread(target=run_lane, args=(ctx, "misc", results, only), name="lane-misc")
+            cpu = threading.Thread(target=run_lane, args=(ctx, "cpu", results, only), name="lane-cpu")
+            misc.start()
+            cpu.start()
+            misc.join()
+            cpu.join()
+        run_isolated(ctx, results, only, jobs)
     finally:
         GROUP_PROCS.kill_all()
         ctx.shutdown_session()
+        evidence = {str(p.relative_to(work)): p.read_text() for p in work.rglob("timing-*.jsonl")}
+        evidence.update({str(p.relative_to(work)): p.read_text() for p in work.rglob("queue-preflight.json")})
+        evidence.update({str(p.relative_to(work)): p.read_text() for p in (work / "native-pool-probe").glob("cpu*.json")})
+        evidence.update({str(p.relative_to(work)): p.read_text() for p in (work / "native-mid-inventory").glob("cpu*.txt")})
+        out.with_name(out.stem + ".evidence.json").write_text(json.dumps(evidence, indent=2) + "\n")
         if os.environ.get("T5_PACK_KEEP") != "1":
             shutil.rmtree(work, ignore_errors=True)
         else:

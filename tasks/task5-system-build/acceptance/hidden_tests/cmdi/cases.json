@@ -4,7 +4,7 @@
     "prefix": "",
     "base": "CMDI must behave as specified when driven through its entry point CMDI_AppMain with software bus messages, a ValTable image and UDP datagrams on its port, using only the names, structures, message IDs, function codes and event IDs in the specification.",
     "cases": {
-      "Startup and housekeeping": "at initialization CMDI registers ValTable (56 bytes, with a validation function), subscribes to CMDI_CMD_MID, CMDI_SEND_HK_MID and CMDI_WAKEUP_MID, binds UDP port 1234 + node ID - 1 and emits CMDI_INIT_INF_EID once; SEND_HK sends CMDI_HkTlm_t in the specified field order with EnableMask and MaxAgeSeconds from the table; NOOP emits CMDI_NOOP_INF_EID and increments CommandCounter",
+      "Startup and housekeeping": "at initialization CMDI registers ValTable (92 bytes, with a validation function), subscribes to CMDI_CMD_MID, CMDI_SEND_HK_MID and CMDI_WAKEUP_MID, binds UDP port 1234 + node ID - 1 and emits CMDI_INIT_INF_EID once; SEND_HK sends CMDI_HkTlm_t in the specified field order with EnableMask and MaxAgeSeconds from the table; NOOP emits CMDI_NOOP_INF_EID and increments CommandCounter",
       "Port per node": "CMDI binds UDP port 1234 + node ID - 1 (1235 on node 2) and executes valid frames received there",
       "Socket error": "a socket that cannot be bound is reported with CMDI_SOCKET_ERR_EID (ERROR type) and CMDI keeps running, answering housekeeping requests and sending its heartbeat",
       "Startup error events": "table registration, table load and software bus read failures are reported with CMDI_TBL_REG_ERR_EID, CMDI_TBL_LOAD_ERR_EID and CMDI_PIPE_ERR_EID",
@@ -18,7 +18,14 @@
       "Framed parameter commands": "SET_ENABLE_MASK and SET_MAX_AGE arriving in valid frames take effect from the next frame, while the same commands sent unframed or in a frame with a bad MAC are rejected and change nothing",
       "Table load overrides": "an update of ValTable replaces the key, the allowed sources, MaxAgeSeconds and EnableMask, overriding values set by SET_MAX_AGE and SET_ENABLE_MASK, and later frames are validated against the new table",
       "Table validation": "ValTable validation rejects an all-zero key, MaxAgeSeconds 0 or above 86400, EnableMask bits above 0x0F, the SOURCE bit with no nonzero source and duplicate nonzero sources, each with CMDI_TBL_VAL_ERR_EID, and accepts the boundary values",
-      "Commands and counters": "an unknown function code (CMDI_CC_ERR_EID), a wrong command length (CMDI_CMD_LEN_ERR_EID) and a message with an unexpected MID (CMDI_MID_ERR_EID) are each counted once in CommandErrorCounter and change nothing else, every accepted command increments CommandCounter, and RESET_COUNTERS (CMDI_RESET_INF_EID) zeroes the command counters, FramesReceived, FramesAccepted and the five reason counters but not MaxAgeSeconds or EnableMask"
+      "Commands and counters": "an unknown function code (CMDI_CC_ERR_EID), a wrong command length (CMDI_CMD_LEN_ERR_EID) and a message with an unexpected MID (CMDI_MID_ERR_EID) are each counted once in CommandErrorCounter and change nothing else, every accepted command increments CommandCounter, and RESET_COUNTERS (CMDI_RESET_INF_EID) zeroes the command counters, FramesReceived, FramesAccepted and the five reason counters but not MaxAgeSeconds or EnableMask",
+      "Replay boundaries and wrap": "S3.6 replay accepts first0, unseen63-behind, jumps>=64 and FFFFFFFF->0, rejects duplicates,64-behind and exactly2^31, independent per source with exact counters/events.",
+      "Replay lifetime and early failures": "S3.6 no earlier FORMAT/CRC/HMAC/SOURCE/AGE failure consumes a serial or slot; RESET retains bitmap, an app-rejected command consumes it, table activation clears it.",
+      "Runtime source slots": "S3.6 SOURCE-disabled ingress still rejects source0 and ninth runtime source without evicting any of eight slots; earlier validation never allocates.",
+      "NEXT key validation": "S3.3 NEXT boolean/all-zero/equal/NextValid0 constraints are checked on native ValTable validation.",
+      "Key switch authentication and shared state": "S3.6 ACTIVE-only validation, mandatory SWITCH_KEY HMAC even mask-disabled before replay, SWITCH_KEY retains window/consumes serial, CFE_TBL_Modified updates shared ACTIVE/NEXT and never leaks key material.",
+      "Nine-row source statistics": "S3.6 exactly one per-datagram source/reason counter in table order or OTHER, short FORMAT and readable listed FORMAT mapping, repeated SOURCE/replay failures, nine full rows and RESET semantics.",
+      "Same-wakeup self-command ordering": "S3.6 before one wakeup queue SWITCH_KEY/retired/fresh then mask/age vectors, require immediate dispatch before reading each next UDP datagram."
     }
   }
 }

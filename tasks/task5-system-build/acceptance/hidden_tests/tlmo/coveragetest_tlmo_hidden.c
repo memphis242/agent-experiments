@@ -63,9 +63,9 @@ extern void TLMO_AppMain(void);
 #define EID_REM_ERR    23
 
 #define TBL_NAME      "PriorityTable"
-#define TBL_SIZE      516
+#define TBL_SIZE      540
 #define MAX_STREAMS   64
-#define HK_PAYLOAD    52
+#define HK_PAYLOAD    60
 #define MAP_PAYLOAD   516
 #define TLM_HDR       16
 #define PKT           40
@@ -80,6 +80,11 @@ static void ptbl_init(ptbl_t *t, uint16 budget, uint16 cap)
     memset(t, 0, sizeof(*t));
     t5_put16(t->b, budget);
     t5_put16(t->b + 2, cap);
+    {
+        static const uint8 maps[3][4] = {{0,1,2,3}, {0,1,2,2}, {0,1,1,1}};
+        int i;
+        for (i = 0; i < 3; i++) { t5_put16(t->b + 516 + i * 8, (uint16)(16 >> i)); memcpy(t->b + 518 + i * 8, maps[i], 4); }
+    }
 }
 
 static void ptbl_set(ptbl_t *t, int slot, uint32 mid, uint8 cls)
@@ -87,7 +92,7 @@ static void ptbl_set(ptbl_t *t, int slot, uint32 mid, uint8 cls)
     uint8 *e = t->b + 4 + slot * 8;
     t5_put32(e, mid);
     e[4] = cls;
-    e[5] = e[6] = e[7] = 0;
+    e[5] = mid ? 1 : 0; e[6] = e[7] = 0;
 }
 
 /* The four verification streams in slots 0..3, classes 0..3. */
@@ -100,8 +105,8 @@ static void ptbl_quad(ptbl_t *t, uint16 budget, uint16 cap)
     ptbl_set(t, 3, V3, 3);
 }
 
-/* The default table of S4.1 on cpu1 (48 streams with SBN). */
-static const uint32 default_streams[48][2] = {
+/* The default table of S4.1 on cpu1 (57 streams with SBN). */
+static const uint32 default_streams[57][2] = {
     {0x0808, 0}, {0x08DC, 0}, {0x18E8, 0},
     {0x0800, 1}, {0x0801, 1}, {0x0803, 1}, {0x0804, 1}, {0x08C4, 1}, {0x08D0, 1}, {0x08D4, 1}, {0x08D8, 1},
     {0x08B0, 1}, {0x0890, 1}, {0x08AD, 1}, {0x089B, 1}, {0x08AA, 1}, {0x088A, 1}, {0x08B8, 1}, {0x08A7, 1},
@@ -110,13 +115,15 @@ static const uint32 default_streams[48][2] = {
     {0x088B, 2}, {0x088C, 2}, {0x088D, 2}, {0x088E, 2}, {0x08C5, 2}, {0x08C6, 2}, {0x08D5, 2}, {0x08D9, 2},
     {0x08DD, 2}, {0x18EA, 2},
     {0x08C2, 3}, {0x08C3, 3}, {0x08C7, 3}, {0x18EB, 3},
-    {0x08FB, 1}, {0x08FC, 1}, {0x08FD, 1}, {0x08FE, 1}, {0x08FF, 1}};
+    {0x08FB, 1}, {0x08FC, 1}, {0x08FD, 1}, {0x08FE, 1}, {0x08FF, 1},
+    {0x08F0, 0}, {0x08DE, 0}, {0x08C8, 2}, {0x08D1, 2}, {0x08D6, 2}, {0x08F1, 2},
+    {0x18F3, 0}, {0x187A, 0}, {0x187B, 0}};
 
 static void ptbl_default(ptbl_t *t)
 {
     int i;
     ptbl_init(t, 16, 64);
-    for (i = 0; i < 48; i++) ptbl_set(t, i, default_streams[i][0], (uint8)default_streams[i][1]);
+    for (i = 0; i < 57; i++) ptbl_set(t, i, default_streams[i][0], (uint8)default_streams[i][1]);
 }
 
 /* ------------------------------------------------------------------------- subscription fault injection */
@@ -457,20 +464,20 @@ static void Test_Startup(void)
     }
     UtAssert_True(t5_subscribed(MID_CMD) && t5_subscribed(MID_SEND_HK) && t5_subscribed(MID_WAKEUP),
                   "subscribed to TLMO_CMD_MID, TLMO_SEND_HK_MID and TLMO_WAKEUP_MID");
-    for (i = 0; i < 48; i++)
+    for (i = 0; i < 57; i++)
     {
         if (!t5_subscribed(default_streams[i][0])) missing++;
         else if (t5_sub_msglim(default_streams[i][0]) != 32) badlim++;
     }
-    UtAssert_True(missing == 0, "subscribed to every used stream of the table (%d of 48 missing)", missing);
+    UtAssert_True(missing == 0, "subscribed to every used stream of the table (%d of 57 missing)", missing);
     UtAssert_True(badlim == 0, "every stream subscription has a message limit of 32 (%d differ)", badlim);
     depth = pipe_depth_of(0x0800);
-    UtAssert_True(depth == 48, "the streams are subscribed on a pipe of depth 48 (depth %d)", depth);
+    UtAssert_True(depth >= 128, "the streams are subscribed on a pipe of depth at least128 (depth %d)", depth);
     UtAssert_True(t5_count_ev(EID_TBL_UPDATE, 0) == 0, "no TLMO_TBL_UPDATE_INF_EID (19) on the initial table load");
     if (get_hk(&h))
     {
-        UtAssert_True(h.budget == 16 && h.cap == 64 && h.active == 48,
-                      "housekeeping BudgetPacketsPerCycle %u, QueueCapacity %u, ActiveStreams %u (expected 16, 64, 48)",
+        UtAssert_True(h.budget == 16 && h.cap == 64 && h.active == 57,
+                      "housekeeping BudgetPacketsPerCycle %u, QueueCapacity %u, ActiveStreams %u (expected 16, 64, 57)",
                       h.budget, h.cap, h.active);
         UtAssert_True(h.cc == 0 && h.cec == 0 && h.queued == 0 && h.rx == 0 && h.sockerr == 0,
                       "counters are zero after start-up (CommandCounter %u, CommandErrorCounter %u, QueuedPackets %u, "
@@ -659,20 +666,20 @@ static void Test_OversizeAndSocketErrors(void)
     bool found = false;
     ptbl_quad(&t, 0, 8);
     if (!boot(&t)) return;
-    inj_size(V0, 77, 1025);
-    inj_size(V1, 78, 1024);
+    inj_size(V0, 77, 8193);
+    inj_size(V1, 78, 8192);
     wakeup();
     if (get_hk(&h))
         UtAssert_True(h.drop[0] == 1 && h.queued == 1 && h.rx == 2,
-                      "a 1025-byte packet is dropped as a class 0 drop and a 1024-byte one is queued "
+                      "a 8193-byte packet is dropped as a class 0 drop and a 8192-byte one is queued "
                       "(DroppedByClass[0] %u, QueuedPackets %u, PacketsReceived %u)", (unsigned)h.drop[0], h.queued,
                       (unsigned)h.rx);
     cmd_budget(4);
     from = t5_nsent;
     wakeup();
     for (i = from; i < t5_nsent; i++)
-        if (t5_be16(t5_sent[i].bytes) == V1 && t5_sent[i].size == 1024) found = true;
-    UtAssert_True(found && t5_nsent - from == 1, "the 1024-byte packet is sent as one 1024-byte datagram");
+        if (t5_be16(t5_sent[i].bytes) == V1 && t5_sent[i].size == 8192) found = true;
+    UtAssert_True(found && t5_nsent - from == 1, "the 8192-byte packet is sent as one 8192-byte datagram");
     expect_intact(from);
 
     /* Socket errors: counted, and the packet leaves the queue either way; output stays on. */
@@ -834,7 +841,7 @@ static void Test_ClassMap(void)
                       "SEND_CLASS_MAP is an accepted command and increments CommandCounter (%u -> %u)", h0.cc, h1.cc);
     if (get_map(&m))
     {
-        UtAssert_True(m.budget == 16 && m.count == 48, "class map BudgetPacketsPerCycle %u, StreamCount %u (expected 16, 48)",
+        UtAssert_True(m.budget == 16 && m.count == 57, "class map BudgetPacketsPerCycle %u, StreamCount %u (expected 16, 57)",
                       m.budget, m.count);
         UtAssert_True(map_equals(&m, &t, why, sizeof(why)), "the class map is the runtime list in slot order: %s",
                       map_equals(&m, &t, why, sizeof(why)) ? "" : why);
@@ -1243,10 +1250,14 @@ static void Test_StartupErrors(void)
     UtAssert_True(t5_count_ev(EID_PIPE_ERR, 0) >= 1, "a pipe read failure emits TLMO_PIPE_ERR_EID (7)");
 }
 
+
+#include "expanded_tlmo.h"
+
 void UtTest_Setup(void)
 {
     UtAssert_True(sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes",
                   (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
+    Register_Expanded();
     UtTest_Add(Test_Startup, Setup, Teardown, "Startup, subscriptions and housekeeping");
     UtTest_Add(Test_Output, Setup, Teardown, "Output without an enable command");
     UtTest_Add(Test_DrainOrder, Setup, Teardown, "Drain order and budget");

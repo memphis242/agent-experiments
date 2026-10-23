@@ -9,14 +9,14 @@ import frames as fr
 import spec
 import tables as tb
 from common import Fail
-from node import Node
+from node import Node, console_events
 
 if TYPE_CHECKING:
     from check import Ctx
 
 
 def boot(ctx: "Ctx", nodes: tuple[int, ...] = (1,), *, seed: dict[int, dict[str, bytes]] | None = None,
-         startup_edit=None, quiet_stor: bool = False) -> dict[int, Node]:  # noqa: ANN001
+         startup_edit=None, quiet_stor: bool = False, isolate_mode: bool = True) -> dict[int, Node]:  # noqa: ANN001
     """Start fresh scratch copies of the given nodes. `quiet_stor` boots STOR with a table that has no entries,
     so that no packet file exists until a scenario table is loaded through cFE Table Services."""
     seeds = {n: dict((seed or {}).get(n, {})) for n in nodes}
@@ -26,7 +26,25 @@ def boot(ctx: "Ctx", nodes: tuple[int, ...] = (1,), *, seed: dict[int, dict[str,
             if img is None:
                 raise Fail(f"the build does not install /cf/stor_tbl.tbl on cpu{n}")
             seeds[n]["stor_tbl.tbl"] = tb.with_body(img, "STOR", tb.StorTable().pack())
-    return ctx.session(nodes, seed=seeds, startup_edit=startup_edit)
+    started = ctx.session(nodes, seed=seeds, startup_edit=startup_edit)
+    for n in started.values():
+        if isolate_mode:
+            n.cmd("MODE", "SET_ENABLE", struct.pack("<B3x", 0))
+            wait_hk_field(n, "MODE", lambda hk: hk["Enabled"] == 0, 3,
+                          "MODE SET_ENABLE 0 must be visible before isolated setup")
+        # Target INIT events occur after registration. Wait without issuing
+        # large STOR requests, which temporarily change the output budget.
+        def targets_registered() -> bool:
+            initialized = {app for app, eid, _text in console_events(n.console_log()) if eid == 1}
+            return {"TLMO", "STOR", "GW"} <= initialized
+        if not n.g.wait(targets_registered, 5):
+            raise Fail(f"{n.cpu} initial MODE profile barrier: expected registered TLMO/STOR/GW INIT events; observed incomplete startup")
+    time.sleep(2.2)
+    for n in started.values():
+        hk = n.hk("MODE")
+        if hk.get("ActionErrors", 0):
+            raise Fail(f"{n.cpu} initial MODE profile: expected no action errors after target registration; observed {hk}")
+    return started
 
 
 def sample_counters(node: Node) -> tuple[int, int]:

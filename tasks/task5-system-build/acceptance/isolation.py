@@ -30,7 +30,11 @@ def wrap(argv: list[str]) -> list[str]:
     assert argv
     uid, gid = os.getuid(), os.getgid()
     inner = shlex.join(["unshare", "-U", f"--map-user={uid}", f"--map-group={gid}", *argv])
-    steps = [shlex.join([sys.executable, "-I", "-c", LO_UP]), "mount -t tmpfs tmpfs /dev/shm", inner]
+    queue_setup = ("from pathlib import Path; "
+                   "Path('/proc/sys/fs/mqueue/msg_max').write_text('512'); "
+                   "print('queue namespace msg_max=512')")
+    steps = [shlex.join([sys.executable, "-I", "-c", LO_UP]), "mount -t tmpfs tmpfs /dev/shm",
+             shlex.join([sys.executable, "-I", "-c", queue_setup]), inner]
     # sh stays PID 1 of the group (the trailing exit stops it exec'ing the last command), so the group's
     # processes are reaped while it runs and all of them die with it.
     script = " && ".join(steps) + "; exit $?"

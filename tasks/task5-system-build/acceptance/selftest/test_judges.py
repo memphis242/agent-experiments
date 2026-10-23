@@ -78,7 +78,7 @@ class Layout(Tmp):
         self.assertTrue(any("gw_eventids.h" in i for i in items) and any("EDS" in i for i in items), items)
 
 
-TARGETS_OK = """list(APPEND MISSION_GLOBAL_APPLIST sample_app sample_lib cmdval_lib stor cmdi tlmo gw sfi)
+TARGETS_OK = """list(APPEND MISSION_GLOBAL_APPLIST sample_app sample_lib cmdval_lib stor cmdi tlmo gw sfi mode)
 SET(cpu1_APPLIST sch_lab)
 SET(cpu2_APPLIST sch_lab)
 """
@@ -90,7 +90,7 @@ CFE_APP, cmdi,        CMDI_AppMain,       CMDI,         40,   32768, 0x0, 0;
 CFE_APP, tlmo,        TLMO_AppMain,       TLMO,         45,   32768, 0x0, 0;
 CFE_APP, sample_app,  SAMPLE_APP_Main,    SAMPLE_APP,   50,   32768, 0x0, 0;
 """ + "".join(f"CFE_APP, {a},  {a.upper()}_AppMain, {a.upper()}, 70,  131072, 0x0, 0;\n"
-              for a in "lc cf ds fm hk hs sc md cs stor gw sfi sbn".split())
+              for a in "lc cf ds fm hk hs sc md cs stor gw sfi mode sbn".split())
 
 
 class Integration(Tmp):
@@ -98,7 +98,7 @@ class Integration(Tmp):
         t = self.tmp
         (t / "sample_defs").mkdir()
         (t / "sample_defs/targets.cmake").write_text(TARGETS_OK)
-        (t / "sample_defs/default_osconfig.cmake").write_text("set(OSAL_CONFIG_MAX_FILE_NAME 32)\n")
+        (t / "sample_defs/default_osconfig.cmake").write_text("set(OSAL_CONFIG_MAX_FILE_NAME 32)\nset(OSAL_CONFIG_QUEUE_MAX_DEPTH 512)\n")
         self.assertEqual(st.judge_targets(t), [])
         (t / "sample_defs/targets.cmake").write_text(TARGETS_OK.replace("SET(cpu2_APPLIST sch_lab)", "SET(cpu2_APPLIST ci_lab to_lab sch_lab)"))
         self.assertTrue(any("cpu2_APPLIST" in i for i in st.judge_targets(t)))
@@ -117,7 +117,7 @@ class Integration(Tmp):
               + "".join(f"    $<TARGET_PROPERTY:{a},INCLUDE_DIRECTORIES>\n" for a in ("sample_app", "hk") + st.APPS) + ")\n"
               + "".join(f"target_include_directories({t} INTERFACE ${{APP_INCLUDE_TABLE_LIST}})\n"
                         f"target_compile_definitions({t} INTERFACE ${{APP_DEFINITION_TABLE_LIST}})\n"
-                        for t in ("tlmo.table", "stor.table", "sfi.table", "sch_lab.table")))
+                        for t in ("tlmo.table", "stor.table", "sfi.table", "mode.table", "sch_lab.table")))
         self.assertEqual(st.judge_install_custom(ok, "cpu1"), [])
         if TEMPLATE.is_dir():
             bad = (TEMPLATE / "sample_defs/cpu1/install_custom.cmake").read_text()
@@ -125,6 +125,7 @@ class Integration(Tmp):
 
     def test_schedule(self) -> None:
         entries = "".join(f"{{CFE_SB_MSGID_WRAP_VALUE({n}), {p}, 0}},\n" for n, p in st.SCHED_NEW)
+        entries += "".join(f"{{CFE_SB_MSGID_WRAP_VALUE(EXISTING_{i}_MID), 50, 0}},\n" for i in range(20))
         self.assertEqual(st.judge_schedule("#include \"stor_msgids.h\"\n" + entries), [])
         items = st.judge_schedule(entries + "{CFE_SB_MSGID_WRAP_VALUE(CI_LAB_SEND_HK_MID), 50, 0},\n")
         self.assertTrue(any("CI_LAB_SEND_HK_MID" in i for i in items))
@@ -182,7 +183,11 @@ none
 """
 
     def test_report(self) -> None:
-        self.assertEqual(st.judge_report(self.REPORT), [])
+        report = self.REPORT.replace("Two nodes;", "32 used, 0 spare; peer/replay/key lifetime decisions. Two nodes;")
+        report = report.replace("## Interfaces\nx", "## Interfaces\n" + " ".join(cc.required_mid_names()))
+        report = report.replace("sfi 22,", "sfi 22, mode 25,")
+        report = report.replace("ctf/run_system_tests.sh: all pass", "ctf/run_system_tests.sh: " + ", ".join(cc.SMOKE + cc.SYSTEM) + " all pass")
+        self.assertEqual(st.judge_report(report), [])
         self.assertTrue(st.judge_report(self.REPORT.replace("## Limitations", "## Notes")))
         self.assertTrue(st.judge_report(self.REPORT.replace("ctf/run_system_tests.sh", "the CTF runner")))
 
@@ -217,19 +222,23 @@ class DefaultTables(unittest.TestCase):
 
     def test_sfi(self) -> None:
         for node in spec.NODES:
-            rows = tuple((spec.verif_mid(m, node) if isinstance(m, int) else spec.named_tlm_mid(m, node), o, w, spec.SFI_RULE[r], lim)
-                         for m, o, w, r, lim in spec.SFI_DEFAULT_WATCH_ROWS)
+            rows = tuple((spec.app_mid(app, "HK_TLM", node), 17, 1, 2, 2, 0, 0, 0, index, 1, 1)
+                         for index, app in enumerate(("STOR", "CMDI", "TLMO", "GW")))
+            rows += ((spec.verif_mid(0xEC, node), 16, 4, 1, 3, 0, 0, 0, 255, 1, 1),
+                     (spec.verif_mid(0xED, node), 16, 2, 2, 5, 0, 0, 0, 255, 1, 1),
+                     (spec.verif_mid(0xEF, node), 16, 4, 3, 0, 10, 20, 3, 255, 2, 1))
             t = tb.SfiTable.unpack(tb.SfiTable(watches=rows).pack())
             self.assertEqual(st.judge_sfi_default(t, node), [])
-            self.assertTrue(st.judge_sfi_default(tb.SfiTable(watches=rows[:-1]), node))
+            wrong = tb.SfiTable.unpack(tb.SfiTable(watches=rows[:-1]).pack())
+            self.assertTrue(st.judge_sfi_default(wrong, node))
 
     def test_image_header(self) -> None:
         hdr = bytearray(116)
-        struct.pack_into(">III", hdr, 64, 0, 0, 56)
+        struct.pack_into(">III", hdr, 64, 0, 0, spec.CMDI_TABLE_SIZE)
         hdr[64 + 12:64 + 12 + 13] = b"CMDI.ValTable"
         img = bytes(hdr) + tb.CmdiTable().pack()
         h, body = tb.split_image(img, "CMDI")
-        self.assertEqual(len(body), 56)
+        self.assertEqual(len(body), spec.CMDI_TABLE_SIZE)
         with self.assertRaises(tb.TableImageError):
             tb.split_image(img + b"\0", "CMDI")
         with self.assertRaises(tb.TableImageError):
@@ -294,7 +303,8 @@ class Parsing(unittest.TestCase):
             self.assertEqual(hk["CommandErrorCounter"], 2)
             with self.assertRaises(nd.Fail):
                 nd.parse_hk(app, tlm(0x0800, payload[:-1]))
-        self.assertEqual(nd.parse_hk("STOR", tlm(0x08C4, struct.pack(spec.HK_LAYOUTS["STOR"].fmt, *range(28))))["RxErrors"], 27)
+        payload = struct.pack(spec.HK_LAYOUTS["STOR"].fmt, *range(len(spec.HK_LAYOUTS["STOR"].fields)))
+        self.assertEqual(nd.parse_hk("STOR", tlm(0x08C4, payload))["RxErrors"], 27)
 
     def test_long_event(self) -> None:
         pkt = bytearray(172)
@@ -429,14 +439,14 @@ class GwJudges(unittest.TestCase):
 
 class SfiParsing(unittest.TestCase):
     def test_status(self) -> None:
-        apps = b"".join(struct.pack(spec.SFI_APP_STATUS_FMT, n.encode(), s, 0, t, ls, 0)
-                        for n, s, t, ls in (("STOR", 1, 0, 0), ("GW", 2, 1, 1000123))) + bytes(32 * 14)
-        hist = struct.pack(spec.SFI_MISS_RECORD_FMT, 1, 1000123, 5) + bytes(12 * 15)
-        watches = struct.pack(spec.SFI_WATCH_STATUS_FMT, 3, 5) + bytes(8 * 15)
-        payload = struct.pack("<BBHHH", 1, 1, 1, 1, 1) + apps + hist + watches
-        s = l6.parse_status(tlm(0x08DD, payload))
-        self.assertEqual((s.apps_missing, s.app("GW").state, s.app("GW").last_secs, s.history[0][:2], s.watches[0]),
-                         (1, 2, 1000123, (1, 1000123), (3, 5)))
+        apps = b"".join(struct.pack(spec.SFI_APP_STATUS_FMT, n.encode(), state, 0, total, seconds, 0, 1, 0, 0)
+                        for n, state, total, seconds in (("STOR", 1, 0, 0), ("GW", 2, 1, 1000123))) + bytes(36 * 14)
+        hist = struct.pack(spec.SFI_MISS_RECORD_FMT, 1, 1000123, 5, 1, 1, 0) + bytes(16 * 15)
+        watches = struct.pack(spec.SFI_WATCH_STATUS_FMT, 3, 5, 1, 0, 0) + bytes(12 * 15)
+        payload = struct.pack("<BBHHH", 1, 1, 1, 1, 1) + apps + hist + watches + bytes(120 + 57 * 48)
+        result = l6.parse_status(tlm(0x08DD, payload))
+        self.assertEqual((result.apps_missing, result.app("GW").state, result.app("GW").last_secs,
+                          result.history[0][:2], result.watches[0]), (1, 2, 1000123, (1, 1000123), (3, 5)))
         with self.assertRaises(nd.Fail):
             l6.parse_status(tlm(0x08DD, payload[:-1]))
         hb = l6.heartbeat("SFI_T1", 3)
@@ -476,11 +486,15 @@ class CtfJudges(Tmp):
     def make_ccdd(self) -> tuple[Path, str]:
         d = self.tmp / "json"
         d.mkdir()
-        names = cc.required_mid_names() + ["CFE_ES_CMD_MID"]
+        names = cc.required_mid_names() + ["CFE_ES_CMD_MID", "CFE_TBL_CMD_MID"]
         set1 = []
         for n in names:
             if n == "CFE_ES_CMD_MID":
                 v = 0x1806
+            elif n == "CFE_TBL_CMD_MID":
+                v = 0x1804
+            elif n in ("SFI_HEALTH_MID", "MODE_PEER_MID", "GW_KEEPALIVE_MID"):
+                v = {"SFI_HEALTH_MID": 0x187A, "MODE_PEER_MID": 0x187B, "GW_KEEPALIVE_MID": 0x187C}[n]
             elif n in ("STOR_XFER_SEG_MID", "STOR_XFER_ACK_MID"):
                 v = spec.XFER_SEG_MID if "SEG" in n else spec.XFER_ACK_MID
             else:
@@ -500,6 +514,11 @@ class CtfJudges(Tmp):
                 doc = {"cmd_mid_name": n, "cmd_codes": [
                     {"cc_name": "CFE_ES_START_APP_CC", "cc_value": "4", "cc_data_type": "CFE_ES_StartAppCmd_t", "cc_parameters": []},
                     {"cc_name": "CFE_ES_STOP_APP_CC", "cc_value": "5", "cc_data_type": "CFE_ES_StopAppCmd_t", "cc_parameters": []}]}
+            elif n == "CFE_TBL_CMD_MID":
+                doc = {"cmd_mid_name": n, "cmd_codes": [
+                    {"cc_name": f"CFE_TBL_{name}_CC", "cc_value": str(value), "cc_data_type": f"CFE_TBL_{name.title()}Cmd_t"}
+                    for name, value in (("LOAD", 2), ("VALIDATE", 4), ("ACTIVATE", 5))]}
+                probe += [f"CC CFE_TBL_{name}_CC {value}" for name, value in (("LOAD", 2), ("VALIDATE", 4), ("ACTIVATE", 5))]
             else:
                 doc = {"tlm_mid_name": n, "tlm_data_type": f"{n}_t", "tlm_parameters": []}
             (d / f"{n.lower()}.json").write_text(json.dumps(doc))

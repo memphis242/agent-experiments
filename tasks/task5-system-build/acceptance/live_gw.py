@@ -8,6 +8,7 @@ import socket
 import struct
 import time
 import tty
+import threading
 from typing import TYPE_CHECKING
 
 import frames as fr
@@ -47,23 +48,27 @@ def add_conn(n: Node, index: int, conn: tb.ConnDef, expect_ok: bool = True) -> l
     return got
 
 
-def conn_status(n: Node) -> list[dict[str, int]]:
+def conn_snapshot(n: Node) -> tuple[list[dict[str, int]], tuple[int, ...], tuple[int, ...]]:
     n.ensure_command_path()
     mid = spec.app_mid("GW", "CONN_TLM", n.id)
-    for _ in range(2):
-        got = n.request(lambda: n.cmd("GW", "SEND_CONN_STATUS", gap=0), mid)
-        if got:
-            raw = got[-1].data
-            need = spec.TLM_HDR + 8 * 20
-            if len(raw) < need:
-                raise Fail(f"GW_CONN_TLM_MID packet is {len(raw)} bytes; the specified payload needs {need}")
-            out = []
-            for i in range(spec.GW_MAX_CONNECTIONS):
-                v = struct.unpack_from(spec.GW_CONN_STATUS_FMT, raw, spec.TLM_HDR + i * 20)
-                out.append(dict(zip(("Interface", "Enabled", "State", "SubCount", "TxPackets", "RxPackets", "TxErrors",
-                                     "RxErrors"), v)))
-            return out
-    raise Fail("no GW_CONN_TLM_MID packet followed SEND_CONN_STATUS")
+    got = n.request(lambda: n.cmd("GW", "SEND_CONN_STATUS", gap=0), mid, timeout=2.0)
+    if not got:
+        raise Fail("no GW_CONN_TLM_MID within 2 s of SEND_CONN_STATUS")
+    raw = got[-1].data
+    n.gw_conn_timestamp = fr.tlm_seconds(raw) + struct.unpack_from(">H", raw, 10)[0] / 65536
+    stride = 44
+    need = spec.TLM_HDR + 8 * stride + 32
+    if len(raw) != need:
+        raise Fail(f"GW_CONN_TLM_MID packet is {len(raw)} bytes; expanded S5.4 layout requires exactly {need}")
+    fields = ("Interface", "Enabled", "State", "SubCount", "TxPackets", "RxPackets", "TxErrors", "RxErrors",
+              "TxFrames", "RxFrames", "TxBytes", "RxBytes", "LastKeepAliveSeconds", "KeepAliveTimeouts")
+    out = [dict(zip(fields, struct.unpack_from("<BBBB10I", raw, spec.TLM_HDR + i * stride))) for i in range(8)]
+    at = spec.TLM_HDR + 8 * stride
+    return out, tuple(raw[at:at + 16]), tuple(raw[at + 16:at + 32])
+
+
+def conn_status(n: Node) -> list[dict[str, int]]:
+    return conn_snapshot(n)[0]
 
 
 def udp_conn(local: int, remote: int, subs: tuple[int, ...] = (), enabled: int = 1) -> tb.ConnDef:
@@ -680,4 +685,251 @@ def c_valtable_share_probe(ctx: "Ctx") -> None:
     time.sleep(0.5)
     p.check(sample_counters(n)[0] == s2[0] + 1, "after CMDI restarted, a frame through GW did not execute")
     p.check(hk.get("ValTableShared") == 1, "ValTableShared is not 1 at the end")
+    p.raise_if()
+
+
+class GwRelay:
+    """Transparent frame-validating relay; cuts consume traffic without closing UDP sockets."""
+    def __init__(self, port_a: int, node_a_port: int, port_b: int, node_b_port: int) -> None:
+        self.sockets = []
+        self.destinations = (node_b_port, node_a_port)
+        self.enabled = True
+        self.drop_mids: set[int] = set()
+        self.records: list[tuple[float, int, bytes, bool]] = []
+        self.errors: list[str] = []
+        self.lock = threading.Lock()
+        self.stop = threading.Event()
+        try:
+            for port in (port_a, port_b):
+                sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                self.sockets.append(sock)
+                sock.bind((spec.HOST, port))
+                sock.setblocking(False)
+        except OSError:
+            self.close()
+            raise
+        self.thread = threading.Thread(target=self._run, name="acceptance-gw-relay", daemon=True)
+        self.thread.start()
+
+    def _run(self) -> None:
+        try:
+            while not self.stop.is_set():
+                ready, _, _ = select.select(self.sockets, [], [], 0.05)
+                for sock in ready:
+                    raw, _address = sock.recvfrom(65535)
+                    lane = self.sockets.index(sock)
+                    packet = fr.parse_frame(raw, fr.DEFAULT_KEY).command
+                    mid = struct.unpack_from(">H", packet)[0]
+                    with self.lock:
+                        forward = self.enabled and mid not in self.drop_mids
+                        self.records.append((time.monotonic(), lane + 1, raw, forward))
+                    if forward:
+                        sock.sendto(raw, (spec.HOST, self.destinations[lane]))
+        except (OSError, fr.FrameError, ValueError) as exc:
+            if not self.stop.is_set():
+                with self.lock:
+                    self.errors.append(str(exc))
+
+    def check(self) -> None:
+        with self.lock:
+            if self.errors:
+                raise Fail("transparent GW relay failed: " + "; ".join(self.errors))
+
+    def set_enabled(self, enabled: bool) -> float:
+        assert isinstance(enabled, bool)
+        self.check()
+        with self.lock:
+            self.enabled = enabled
+            return time.monotonic()
+
+    def set_filter(self, mids: set[int]) -> float:
+        self.check()
+        with self.lock:
+            self.drop_mids = set(mids)
+            return time.monotonic()
+
+    def snapshot(self) -> list[tuple[float, int, bytes, bool]]:
+        self.check()
+        with self.lock:
+            return list(self.records)
+
+    def close(self) -> None:
+        self.stop.set()
+        thread = getattr(self, "thread", None)
+        if thread is not None:
+            thread.join(timeout=1)
+        for sock in self.sockets:
+            sock.close()
+
+
+class DualGwLinks:
+    def __init__(self, primary: GwRelay, backup: GwRelay) -> None:
+        self.primary, self.backup = primary, backup
+
+    def set_enabled(self, enabled: bool) -> float:
+        first = self.primary.set_enabled(enabled)
+        self.backup.set_enabled(enabled)
+        return first
+
+    def set_filter(self, mids: set[int]) -> float:
+        first = self.primary.set_filter(mids)
+        self.backup.set_filter(mids)
+        return first
+
+    def check(self) -> None:
+        self.primary.check()
+        self.backup.check()
+
+
+def set_route(n: Node, index: int, mid: int, primary: int = 0, backup: int = 1) -> None:
+    mark = n.g.mark()
+    n.cmd("GW", "SET_ROUTE", struct.pack("<B3xIBBH", index, mid, primary, backup, 0))
+    if not n.wait_event(mark, "GW", EID["ROUTE_INF"], 2.0):
+        raise Fail(f"GW SET_ROUTE {index} {mid:#06x} was not accepted")
+
+
+def setup_dual_links(ctx: "Ctx", nodes: dict[int, Node], verification: bool = False, health_routes: bool = True) -> DualGwLinks:
+    """Exact S8.6 two-node layout; callers own peer-monitor and MODE enable sequencing."""
+    assert set(nodes) == {1, 2}
+    primary = GwRelay(3201, 3101, 3202, 3102)
+    ctx.on_session_end(primary.close)
+    backup = GwRelay(3211, 3111, 3212, 3112)
+    ctx.on_session_end(backup.close)
+    links = DualGwLinks(primary, backup)
+    for node_id, n in nodes.items():
+        subs = (spec.HEALTH_MID, spec.MODE_PEER_MID) if health_routes else ()
+        if verification:
+            subs += (spec.verif_mid(0xE7, node_id),)
+        for index, offset in ((0, 0), (1, 10)):
+            conn = tb.ConnDef(spec.GW_IF["UDP"], 1, 3100 + node_id + offset, spec.HOST,
+                              3200 + node_id + offset, "", subs, keepalive_enabled=1, peer_node=3 - node_id)
+            add_conn(n, index, conn)
+        for index, mid in enumerate(subs):
+            set_route(n, index, mid)
+        if verification:
+            n.cmd("TLMO", "ADD_STREAM", struct.pack("<IB3x", spec.verif_mid(0xE7, 3 - node_id), 2))
+    for n in nodes.values():
+        end = time.monotonic() + 5
+        while time.monotonic() < end:
+            status = conn_status(n)
+            if all(status[index]["State"] == spec.GW_STATE["UP"] and status[index]["LastKeepAliveSeconds"] > 0 for index in (0, 1)):
+                break
+            time.sleep(0.1)
+        else:
+            raise Fail(f"cpu{n.id}: paired keep-alive connections did not establish valid contact within 5 s")
+    links.check()
+    return links
+
+
+def c_link_health(ctx: "Ctx") -> None:
+    nodes = boot(ctx, (1, 2))
+    links = setup_dual_links(ctx, nodes, health_routes=False)
+    p = Problems()
+    baseline = {node: conn_status(n) for node, n in nodes.items()}
+    marks = {node: n.g.mark() for node, n in nodes.items()}
+    cut = links.primary.set_enabled(False)
+    for node, n in nodes.items():
+        events = n.wait_event(marks[node], "GW", EID["KEEPALIVE_ERR"], 9)
+        relevant = [event for event in events if "0" in event.text]
+        p.check(bool(relevant), f"cpu{node}: no primary KEEPALIVE_ERR after silent relay cut")
+        if relevant:
+            p.check(5 <= relevant[0].t - cut <= 8, f"cpu{node}: primary DOWN after {relevant[0].t - cut:.3f} s, expected [5,8]")
+        status = conn_status(n)
+        p.check(status[0]["State"] == 3 and status[0]["Enabled"] == 1, f"cpu{node}: silent primary did not stay enabled/DOWN")
+        p.check(status[0]["KeepAliveTimeouts"] == baseline[node][0]["KeepAliveTimeouts"] + 1,
+                f"cpu{node}: one silence edge must increment KeepAliveTimeouts once")
+        p.check(not n.events(marks[node], "GW", EID["CONN_TIMEOUT_ERR"]), f"cpu{node}: KA expiry incorrectly emitted TCP connect timeout")
+        p.check(bool(n.events(marks[node], "SFI", spec.EID["SFI"]["LINK_ERR"])), f"cpu{node}: no SFI LINK event for primary edge")
+    time.sleep(2)
+    for node, n in nodes.items():
+        p.check(len(n.events(marks[node], "GW", EID["KEEPALIVE_ERR"])) == 1, f"cpu{node}: repeated silence emitted duplicate timeout edge")
+    # Authenticated malformed probes must not refresh or recover a silent transport.
+    malformed: dict[int, list[bytes]] = {1: [], 2: []}
+    for node, n in nodes.items():
+        before = conn_status(n)[0]
+        mark = n.g.mark()
+        vectors = ((node, node, 0, 0, 8), (3 - node, 3 - node, 0, 0, 8),
+                   (3 - node, node, 2, 0, 8), (3 - node, node, 0, 1, 8), (3 - node, node, 0, 0, 4))
+        for source, destination, reply, cc, length in vectors:
+            payload = struct.pack("<BBBBI", source, destination, reply, 0, 90)[:length]
+            frame = n.frame(fr.build_command(spec.GW_KEEPALIVE_MID, cc, payload))
+            malformed[node].append(frame)
+            links.primary.sockets[2 - node].sendto(frame, (spec.HOST, 3100 + node))
+            time.sleep(0.15)
+        after = conn_status(n)[0]
+        p.check(after["State"] == 3 and after["LastKeepAliveSeconds"] == before["LastKeepAliveSeconds"],
+                f"cpu{node}: malformed keep-alives refreshed/recovered silent primary")
+        p.check(after["RxErrors"] - before["RxErrors"] == len(vectors), f"cpu{node}: malformed KA RxErrors delta is not 5")
+        p.check(len(n.events(mark, "GW", EID["FRAME_REJECT_ERR"])) == len(vectors),
+                f"cpu{node}: malformed keep-alives lack one FRAME_REJECT_ERR each")
+    links.primary.set_enabled(True)
+    for n in nodes.values():
+        wait_hk_field(n, "GW", lambda h: h["ConnectionsUp"] == 2, 4, "primary did not recover on a valid probe")
+        current = conn_status(n)
+        p.check(current[0]["State"] == 1, f"cpu{n.id}: valid keep-alive did not recover primary")
+    # Stop forwarding, drain pending receipts, then freeze writes at administrative disable.
+    links.primary.set_enabled(False)
+    time.sleep(0.6)
+    for n in nodes.values():
+        n.cmd("GW", "DISABLE_CONN", struct.pack("<B3x", 0))
+    time.sleep(0.6)
+    records = links.primary.snapshot()
+    for node, n in nodes.items():
+        current = conn_status(n)[0]
+        outgoing = [raw for _t, source, raw, _forward in records if source == node]
+        incoming = [raw for _t, source, raw, forwarded in records if source != node and forwarded] + malformed[node]
+        p.check(current["TxFrames"] == len(outgoing) and current["TxBytes"] == sum(map(len, outgoing)),
+                f"cpu{node}: frozen TxFrames/Bytes differ from independently captured complete frames")
+        p.check(current["RxFrames"] == len(incoming) and current["RxBytes"] == sum(map(len, incoming)),
+                f"cpu{node}: frozen RxFrames/Bytes omit accepted/rejected frames or include stream markers")
+        p.check(current["RxPackets"] == 0 and current["TxPackets"] == 0,
+                f"cpu{node}: keep-alives incorrectly count as data packets")
+    links.check()
+    p.raise_if()
+
+
+def c_route_failover(ctx: "Ctx") -> None:
+    nodes = boot(ctx, (1, 2))
+    links = setup_dual_links(ctx, nodes, verification=True)
+    p = Problems()
+    links.primary.set_enabled(False)
+    for n in nodes.values():
+        wait_hk_field(n, "GW", lambda h: h["ConnectionsUp"] == 1, 9, "primary did not enter DOWN")
+        p.check(conn_snapshot(n)[1][:3] == (1, 1, 1), f"cpu{n.id}: health/mode/verification routes did not choose backup")
+    def delivery(counter: int, route: int) -> None:
+        for node, n in nodes.items():
+            packet = fr.build_verification(spec.verif_mid(0xE7, node), 40, counter=counter + node)
+            other = nodes[3 - node]
+            mark = other.g.mark()
+            n.inject([packet], burst=1)
+            other.g.wait_mid(mark, spec.verif_mid(0xE7, node), 1.5)
+            time.sleep(0.6)
+            received = other.g.since(mark)
+            matches = [entry for entry in received if entry.data == packet]
+            p.check(len(matches) == 1, f"cpu{node}: expected one opposite-node copy via route {route}, got {len(matches)}")
+    delivery(100, 1)
+    marks = {node: n.g.mark() for node, n in nodes.items()}
+    restored = links.primary.set_enabled(True)
+    first_up = {}
+    for node, n in nodes.items():
+        up = n.wait_event(marks[node], "GW", EID["CONN_UP_INF"], 4)
+        if not up:
+            raise Fail(f"cpu{node}: restored primary produced no UP event")
+        first_up[node] = (up[0].t, up[0].seconds + up[0].subseconds / 65536)
+    while time.monotonic() - restored < 9:
+        for node, n in nodes.items():
+            p.check(conn_snapshot(n)[1][:3] == (1, 1, 1), f"cpu{node}: premature primary failback before 10 seconds continuous UP")
+        time.sleep(0.2)
+    for node, n in nodes.items():
+        deadline = first_up[node][0] + 12
+        selected_at = None
+        while time.monotonic() <= deadline:
+            if conn_snapshot(n)[1][:3] == (0, 0, 0):
+                selected_at = n.gw_conn_timestamp
+                break
+            time.sleep(0.1)
+        p.check(selected_at is not None and 10 <= selected_at - first_up[node][1] <= 12,
+                f"cpu{node}: primary failback missing/outside [10,12] s after UP")
+    delivery(200, 0)
+    links.check()
     p.raise_if()

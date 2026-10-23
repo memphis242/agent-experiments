@@ -71,11 +71,11 @@ extern void GW_AppMain(void);
 #define ST_CONNECTING 2
 #define ST_DOWN       3
 
-#define CONN_SIZE     152
-#define TBL_SIZE      (8 * CONN_SIZE)
-#define VAL_SIZE      56
-#define HK_SIZE       52
-#define CONN_TLM_SIZE 160
+#define CONN_SIZE     156
+#define TBL_SIZE      (8 * CONN_SIZE + 16 * 8)
+#define VAL_SIZE      92
+#define HK_SIZE       60
+#define CONN_TLM_SIZE 384
 #define TLM_HDR       16
 #define CMD_HDR       8
 
@@ -120,7 +120,7 @@ static void conn_set(conn_t *c, uint8 iface, uint8 enabled, uint16 lport, const 
     }
 }
 
-static void conn_sub(conn_t *c, int i, uint32 mid) { t5_put32(c->b + 88 + 4 * i, mid); }
+static void conn_sub(conn_t *c, int i, uint32 mid) { t5_put32(c->b + 92 + 4 * i, mid); }
 
 static void udp_conn(conn_t *c, uint8 en, uint16 lport, uint16 rport, uint32 sub)
 {
@@ -179,7 +179,7 @@ typedef struct
     uint32 egr, ingr, egerr, ingerr, loop;
     uint16 subs;
     uint8  shared;
-    uint32 frames, fmt, crc, hmac, src, age;
+    uint32 frames, fmt, crc, hmac, src, age, ka_timeout, switches;
 } hk_t;
 
 static bool get_hk(hk_t *h)
@@ -215,10 +215,13 @@ static bool get_hk(hk_t *h)
     h->hmac = t5_get32(p + 40);
     h->src = t5_get32(p + 44);
     h->age = t5_get32(p + 48);
+    h->ka_timeout = t5_get32(p + 52);
+    h->switches = t5_get32(p + 56);
     return true;
 }
 
-typedef struct { uint8 iface, en, state, subs; uint32 tx, rx, txerr, rxerr; } cs_t;
+typedef struct { uint8 iface, en, state, subs; uint32 tx, rx, txerr, rxerr, txf, rxf, txb, rxb, lastka, timeouts; } cs_t;
+static uint8 route_selected[16], route_preference[16];
 
 static bool get_cs(cs_t *cs)
 {
@@ -236,7 +239,7 @@ static bool get_cs(cs_t *cs)
                   (unsigned)(TLM_HDR + CONN_TLM_SIZE));
     for (i = 0; i < 8; i++)
     {
-        const uint8 *p = t->bytes + TLM_HDR + i * 20;
+        const uint8 *p = t->bytes + TLM_HDR + i * 44;
         cs[i].iface = p[0];
         cs[i].en = p[1];
         cs[i].state = p[2];
@@ -245,7 +248,12 @@ static bool get_cs(cs_t *cs)
         cs[i].rx = t5_get32(p + 8);
         cs[i].txerr = t5_get32(p + 12);
         cs[i].rxerr = t5_get32(p + 16);
+        cs[i].txf = t5_get32(p + 20); cs[i].rxf = t5_get32(p + 24);
+        cs[i].txb = t5_get32(p + 28); cs[i].rxb = t5_get32(p + 32);
+        cs[i].lastka = t5_get32(p + 36); cs[i].timeouts = t5_get32(p + 40);
     }
+    memcpy(route_selected, t->bytes + TLM_HDR + 8 * 44, 16);
+    memcpy(route_preference, t->bytes + TLM_HDR + 8 * 44 + 16, 16);
     return true;
 }
 
@@ -528,7 +536,7 @@ static void Test_Startup(void)
     UtAssert_True(k >= 0 && t5_tbl[k].owned, "GW registers its table as ConnTable");
     if (k >= 0)
     {
-        UtAssert_True(t5_tbl[k].size == TBL_SIZE, "ConnTable is %u bytes, expected %u (8 GW_ConnDef_t of 152 bytes)",
+        UtAssert_True(t5_tbl[k].size == TBL_SIZE, "ConnTable is %u bytes, expected %u (8 GW_ConnDef_t of 156 bytes and 16 routes)",
                       (unsigned)t5_tbl[k].size, TBL_SIZE);
         UtAssert_True(t5_tbl[k].validate != NULL, "ConnTable has a validation function");
     }
@@ -1875,8 +1883,304 @@ static void Test_Heartbeat(void)
     }
 }
 
+/* S5.4 vectors drive the production entry point and inspect native telemetry and I/O. */
+#define KA_MID 0x187Cu
+#define HEALTH_MID 0x187Au
+#define PEER_MID 0x187Bu
+#define SFI_CMD_MID 0x18DCu
+
+static bool route_cmd(uint8 idx, uint32 mid, uint8 primary, uint8 backup)
+{
+    uint8 p[12] = {0};
+    p[0] = idx; t5_put32(p + 4, mid); p[8] = primary; p[9] = backup;
+    return t5_send_cmd(GW_CMD_MID, 8, p, sizeof(p));
+}
+
+static bool prefer_cmd(uint8 idx, uint8 backup)
+{
+    const uint8 p[4] = {idx, backup, 0, 0};
+    return t5_send_cmd(GW_CMD_MID, 10, p, sizeof(p));
+}
+
+static void ka_conn(conn_t *c, uint16 local, uint16 remote)
+{
+    udp_conn(c, 1, local, remote, V_E7);
+    c->b[88] = 1; c->b[89] = 2;
+}
+
+static size_t ka_frame(uint8 *out, uint8 src, uint8 dst, uint8 reply, uint8 fc, uint32 seq)
+{
+    uint8 pkt[24], p[8] = {0};
+    size_t n;
+    p[0] = src; p[1] = dst; p[2] = reply; t5_put32(p + 4, seq);
+    n = t5_build_cmd(pkt, KA_MID, fc, p, sizeof(p));
+    return mkframe(out, pkt, n, KEY0, 2, 0);
+}
+
+static void ka_in(uint16 local, uint8 src, uint8 dst, uint8 reply, uint8 fc)
+{
+    uint8 f[96];
+    const size_t n = ka_frame(f, src, dst, reply, fc, 77);
+    t5_udp_inject(local, f, n);
+}
+
+static void at_time(uint32 seconds, uint32 subseconds)
+{
+    t5_now_sec = seconds; t5_now_sub = subseconds;
+    t5_send_cmd(GW_WAKEUP_MID, 0, NULL, 0);
+}
+
+static void assert_link_report(int from, uint8 index, uint8 down)
+{
+    int k, found = 0;
+    for (k = from; k < t5_ntx; k++)
+    {
+        const t5_tx_t *const tx = &t5_tx[k];
+        if (tx->mid == SFI_CMD_MID && tx->size == 12 && tx->bytes[6] == 12)
+        {
+            found++;
+            UtAssert_True(tx->bytes[8] == index && tx->bytes[9] == down && tx->bytes[10] == 0 && tx->bytes[11] == 0,
+                          "SFI REPORT_LINK FC12 has exact Index,Down,zero Spare payload");
+        }
+    }
+    UtAssert_True(found == 1, "one exact SFI REPORT_LINK per edge (%d)", found);
+}
+
+static void Test_ExpandedBounds(void)
+{
+    conn_t c;
+    uint8 table[TBL_SIZE] = {0};
+    int k, ev;
+    hk_t h;
+    if (!boot(true)) return;
+    udp_conn(&c, 0, 6000, 7000, V_E7);
+    c.b[88] = 2; add_rejected(0, &c, "KeepAliveEnabled 2");
+    c.b[88] = 0; c.b[89] = 2; add_rejected(0, &c, "disabled keep-alive requires PeerNode 0");
+    c.b[88] = 1; c.b[89] = 0; add_rejected(0, &c, "enabled keep-alive requires PeerNode 1 or 2");
+    c.b[89] = 1; add_rejected(0, &c, "own PeerNode");
+    c.b[89] = 3; add_rejected(0, &c, "unknown PeerNode");
+    c.b[89] = 2; t5_put16(c.b + 2, 0); add_rejected(0, &c, "UDP keep-alive needs an inbound port");
+    udp_conn(&c, 1, 6000, 7000, V_E7); add_conn(0, &c);
+    udp_conn(&c, 1, 6001, 7001, V_E7); add_conn(1, &c);
+    ev = t5_nev;
+    route_cmd(0, V_E7, 0, 1);
+    UtAssert_True(t5_count_ev(30, ev) == 1, "valid route accepted");
+    ev = t5_nev;
+    route_cmd(16, V_E7, 0, 1); route_cmd(1, 0x08E7u, 0, 1);
+    route_cmd(1, V_E7, 0, 1); route_cmd(1, V_E4, 0, 1);
+    route_cmd(1, V_E7, 0, 0); route_cmd(1, V_E7, 0, 8);
+    prefer_cmd(16, 0); prefer_cmd(1, 0); prefer_cmd(0, 2);
+    UtAssert_True(t5_count_ev(31, ev) == 9, "all invalid route/preference bounds reject with ROUTE_ERR");
+    route_cmd(1, 0, 255, 255);
+    k = t5_tbl_find("ConnTable");
+    UtAssert_True(k >= 0, "registered ConnTable exists");
+    tbl_put(table, 0, &c); tbl_put(table, 1, &c);
+    t5_put16(table + CONN_SIZE + 2, 6002);
+    t5_put32(table + 8 * CONN_SIZE, V_E7);
+    table[8 * CONN_SIZE + 4] = 0; table[8 * CONN_SIZE + 5] = 1;
+    UtAssert_True(t5_tbl_validate("ConnTable", table) == CFE_SUCCESS, "valid routes validated in native expanded table");
+    memcpy(table + 8 * CONN_SIZE + 8, table + 8 * CONN_SIZE, 8);
+    UtAssert_True(t5_tbl_validate("ConnTable", table) != CFE_SUCCESS, "duplicate route MID rejected in table");
+    idx_cmd(CC_REMOVE, 1);
+    if (get_cs((cs_t[8]){{0}})) UtAssert_True(route_selected[0] == 255, "removing an endpoint removes its route");
+    if (get_hk(&h)) UtAssert_True(h.cec >= 15, "invalid definitions/routes count command errors");
+}
+
+static void Test_KeepAliveDeadline(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    hk_t h;
+    int ev, tx;
+    uint32 start;
+    if (!boot(true)) return;
+    ka_conn(&c, 6000, 7000); add_conn(0, &c);
+    start = t5_now_sec;
+    ev = t5_nev; tx = t5_ntx;
+    at_time(start + 5, 0xFFFFFFFFu);
+    if (get_cs(cs)) UtAssert_True(cs[0].state == ST_UP, "no keep-alive expiry before exactly 6 seconds");
+    ka_in(6000, 2, 1, 1, 0);
+    at_time(start + 6, 0);
+    if (get_cs(cs)) UtAssert_True(cs[0].state == ST_UP && cs[0].timeouts == 0 && cs[0].lastka == start + 6,
+        "pending valid keep-alive on exact deadline is processed before deadline evaluation");
+    UtAssert_True(t5_count_ev(29, ev) == 0 && t5_count_ev(20, ev) == 0 && t5_tx_count(SFI_CMD_MID, tx) == 0,
+                  "deadline refresh causes no DOWN/UP edge or SFI report");
+    at_time(start + 12, 0);
+    if (get_cs(cs)) UtAssert_True(cs[0].state == ST_DOWN && cs[0].en == 1 && cs[0].timeouts == 1,
+                                  "six exact seconds after last receipt: enabled DOWN and one timeout");
+    UtAssert_True(t5_count_ev(29, ev) == 1 && t5_count_ev(28, ev) == 0, "KA expiry emits only KEEPALIVE_ERR once");
+    assert_link_report(tx, 0, 1);
+    at_time(start + 30, 0);
+    UtAssert_True(t5_count_ev(29, ev) == 1, "repeated silence has no repeated DOWN edge");
+    tx = t5_ntx;
+    ka_in(6000, 2, 1, 0, 0); at_time(start + 31, 0);
+    if (get_cs(cs)) UtAssert_True(cs[0].state == ST_UP && cs[0].lastka == start + 31, "valid probe recovers retained DOWN transport");
+    assert_link_report(tx, 0, 0);
+    simple_cmd(CC_RESET);
+    if (get_cs(cs)) UtAssert_True(cs[0].lastka == start + 31 && cs[0].timeouts == 0, "reset clears cumulative counter but retains timer and last receipt");
+    if (get_hk(&h)) UtAssert_True(h.ka_timeout == 0, "reset clears HK keep-alive timeout total");
+    tx = t5_ntx;
+    idx_cmd(CC_DISABLE, 0);
+    at_time(start + 50, 0);
+    UtAssert_True(t5_tx_count(SFI_CMD_MID, tx) == 0, "explicit disable stops timer without generating a fault");
+}
+
+static void Test_KeepAliveValidation(void)
+{
+    conn_t c;
+    cs_t a[8], b[8];
+    uint8 f[96];
+    int ev, out0, indexes[32], k, nout;
+    size_t n;
+    if (!boot(true)) return;
+    ka_conn(&c, 6000, 7000); add_conn(0, &c);
+    get_cs(a); ev = t5_nev; out0 = t5_nsent;
+    ka_in(6000, 1, 1, 0, 0); ka_in(6000, 2, 2, 0, 0);
+    ka_in(6000, 2, 1, 2, 0); ka_in(6000, 2, 1, 0, 1);
+    /* A valid frame whose embedded keep-alive payload is short. */
+    { uint8 pkt[16] = {0}; n = t5_build_cmd(pkt, KA_MID, 0, NULL, 0); n = mkframe(f, pkt, n, KEY0, 2, 0); }
+    t5_udp_inject(6000, f, n); wakeup();
+    get_cs(b);
+    UtAssert_True(b[0].rxerr == a[0].rxerr + 5 && b[0].lastka == 0,
+                  "wrong peer,destination,Reply,FC,length each rejects without refresh");
+    UtAssert_True(t5_count_ev(25, ev) == 5, "malformed keep-alives each emit FRAME_REJECT_ERR");
+    ka_in(6000, 2, 1, 0, 0); wakeup();
+    nout = udp_out(7000, out0, indexes, 32);
+    k = 0;
+    for (int j = 0; j < nout; j++)
+    {
+        const t5_sent_t *const io = &t5_sent[indexes[j]];
+        const uint8 *const pkt = io->bytes + 16;
+        if (io->size >= 66 && t5_be16(pkt) == KA_MID && pkt[10] == 1)
+        {
+            k++;
+            UtAssert_True(pkt[8] == 1 && pkt[9] == 2 && t5_get32(pkt + 12) == 77, "probe reply reverses nodes and preserves sequence");
+        }
+    }
+    UtAssert_True(k == 1, "probe produces exactly one authenticated reply");
+    out0 = t5_nsent; ka_in(6000, 2, 1, 1, 0); wakeup();
+    UtAssert_True(udp_out(7000, out0, indexes, 32) == 0, "a reply is consumed without a reply loop");
+    get_cs(b);
+    UtAssert_True(b[0].rx == 0 && b[0].rxf == 7 && b[0].rxb > 0, "data RxPackets excludes KA while RxFrames/Bytes include invalid frames");
+    UtAssert_True(t5_tx_count(KA_MID, 0) == 0, "keep-alives never publish onto SB");
+}
+
+static void Test_RouteSelection(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    uint8 pkt[40];
+    size_t n;
+    int io0, ix[8];
+    uint32 start;
+    if (!boot(true)) return;
+    ka_conn(&c, 6000, 7000); add_conn(0, &c);
+    udp_conn(&c, 1, 6001, 7001, V_E7); add_conn(1, &c);
+    route_cmd(0, V_E7, 0, 1); wakeup();
+    get_cs(cs); UtAssert_True(route_selected[0] == 0, "initial primary UP selected");
+    n = t5_build_verif(pkt, V_E7, sizeof(pkt), 1, 4);
+    io0 = t5_nsent; t5_deliver(pkt, n);
+    UtAssert_True(udp_out(7000, io0, ix, 8) == 1 && udp_out(7001, io0, ix, 8) == 0, "routed MID has no duplicate fanout");
+    start = t5_now_sec; at_time(start + 6, t5_now_sub);
+    get_cs(cs); UtAssert_True(route_selected[0] == 1, "failed primary switches to backup in same wakeup");
+    ka_in(6000, 2, 1, 1, 0); at_time(start + 7, 0);
+    for (int sec = 8; sec <= 16; sec++) { ka_in(6000, 2, 1, 1, 0); at_time(start + sec, 0); }
+    get_cs(cs); UtAssert_True(route_selected[0] == 1, "no failback at 9 seconds of continuous primary UP");
+    ka_in(6000, 2, 1, 1, 0); at_time(start + 17, 0);
+    get_cs(cs); UtAssert_True(route_selected[0] == 0, "failback on exact 10-second primary stability boundary");
+    prefer_cmd(0, 1); wakeup(); get_cs(cs);
+    UtAssert_True(route_selected[0] == 1 && route_preference[0] == 1, "preference chooses UP backup and is exposed");
+    at_time(t5_now_sec + 1, 0); prefer_cmd(0, 0); start = t5_now_sec;
+    for (int sec = 1; sec <= 9; sec++) { ka_in(6000, 2, 1, 1, 0); at_time(start + sec, 0); }
+    get_cs(cs); UtAssert_True(route_selected[0] == 1, "preference release starts a fresh stability interval");
+    ka_in(6000, 2, 1, 1, 0); at_time(start + 10, t5_now_sub);
+    get_cs(cs); UtAssert_True(route_selected[0] == 0, "released preference fails back after exact interval");
+    prefer_cmd(0, 1); simple_cmd(CC_RELOAD); get_cs(cs);
+    UtAssert_True(route_preference[0] == 0 && route_selected[0] == 255, "reload resets preference and unused selection");
+}
+
+static void Test_MaskPartialFailure(void)
+{
+    conn_t c;
+    cs_t cs[8];
+    hk_t before, after;
+    const uint8 mask[4] = {3, 0, 0, 0};
+    if (!boot(true)) return;
+    udp_conn(&c, 0, 6000, 7000, V_E7); add_conn(0, &c);
+    udp_conn(&c, 0, 6001, 7001, V_E7); add_conn(1, &c);
+    get_hk(&before); t5_bind_fail_port = 6000;
+    t5_send_cmd(GW_CMD_MID, 9, mask, sizeof(mask)); get_hk(&after); get_cs(cs);
+    UtAssert_True(cs[0].en == 0 && cs[1].en == 1, "mask partial open failure continues increasing-index slots");
+    UtAssert_True(after.cc == before.cc && (uint8)(after.cec - before.cec) == 1 && t5_count_ev(33, 0) == 1,
+                  "partial mask failure increments only one command error and MASK_ERR");
+    t5_bind_fail_port = 0;
+    t5_send_cmd(GW_CMD_MID, 9, mask, sizeof(mask)); get_cs(cs);
+    const uint32 txf = cs[1].txf;
+    t5_send_cmd(GW_CMD_MID, 9, mask, sizeof(mask)); get_cs(cs);
+    UtAssert_True(cs[1].state == ST_UP && cs[1].txf == txf, "unchanged enabled state is not reopened or reset");
+}
+
+static void Test_HealthCache(void)
+{
+    conn_t c;
+    uint8 packets[65][40], frame[128];
+    int out0, ix[128];
+    uint32 start;
+    if (!boot(true)) return;
+    udp_conn(&c, 1, 6000, 7000, HEALTH_MID); conn_sub(&c, 1, PEER_MID); add_conn(0, &c);
+    start = t5_now_sec;
+    out0 = t5_nsent;
+    for (int k = 0; k < 65; k++)
+    {
+        const uint32 mid = k % 2 ? HEALTH_MID : PEER_MID;
+        const size_t plen = t5_build_verif(packets[k], mid, 40, (uint32)k, 4);
+        const size_t n = mkframe(frame, packets[k], plen, KEY0, 2, 0);
+        t5_udp_inject(6000, frame, n);
+        at_time(start, 0);
+    }
+    UtAssert_True(t5_tx_count(HEALTH_MID, 0) == 32 && t5_tx_count(PEER_MID, 0) == 33,
+                  "both health/mode exceptions publish validated inbound commands despite local subscriptions");
+    UtAssert_True(udp_out(7000, out0, ix, 128) == 0, "cached inbound health/mode packets never echo to link");
+    t5_deliver(packets[0], 40);
+    UtAssert_True(udp_out(7000, out0, ix, 128) == 1, "bounded 64-entry cache evicts earliest of 65 complete packet strings");
+    out0 = t5_nsent;
+    at_time(start + 1, 0xFFFFFFFFu); t5_deliver(packets[64], 40);
+    UtAssert_True(udp_out(7000, out0, ix, 128) == 0, "complete packet match remains cached before exactly 2 s");
+    packets[64][2] ^= 1;
+    t5_deliver(packets[64], 40);
+    UtAssert_True(udp_out(7000, out0, ix, 128) == 1, "cache compares header bytes as well as payload");
+    packets[64][2] ^= 1; out0 = t5_nsent;
+    at_time(start + 2, 0); t5_deliver(packets[64], 40);
+    UtAssert_True(udp_out(7000, out0, ix, 128) == 1, "cache retention expires at exact 2 s boundary");
+}
+
+static void Test_SwitchMandatoryHmac(void)
+{
+    conn_t c;
+    uint8 cmd[8], frame[96];
+    hk_t before, after;
+    int from;
+    if (!boot(true)) return;
+    udp_conn(&c, 1, 6000, 7000, 0); add_conn(0, &c);
+    valtbl[52] = 0x0D;
+    t5_tbl_shared_update("CMDI.ValTable", valtbl, VAL_SIZE); wakeup();
+    const size_t plen = t5_build_cmd(cmd, 0x18D0, 4, NULL, 0);
+    const size_t n = mkframe(frame, cmd, plen, KEY0, 1, 0);
+    bad_mac(frame, n); get_hk(&before); from = t5_ntx;
+    t5_udp_inject(6000, frame, n); wakeup(); get_hk(&after);
+    UtAssert_True(after.hmac == before.hmac + 1 && after.ingr == before.ingr && t5_tx_count(0x18D0, from) == 0,
+                  "GW SWITCH_KEY requires ACTIVE HMAC even when shared HMAC enable mask is clear, before publication");
+}
+
 void UtTest_Setup(void)
 {
+    UtTest_Add(Test_HealthCache, Setup, Teardown, "Bounded inbound health and mode cache");
+    UtTest_Add(Test_SwitchMandatoryHmac, Setup, Teardown, "Mandatory switch HMAC with mask disabled");
+    UtTest_Add(Test_ExpandedBounds, Setup, Teardown, "Expanded route and keep-alive bounds");
+    UtTest_Add(Test_KeepAliveDeadline, Setup, Teardown, "Keep-alive exact deadline and recovery");
+    UtTest_Add(Test_KeepAliveValidation, Setup, Teardown, "Keep-alive validation and frame accounting");
+    UtTest_Add(Test_RouteSelection, Setup, Teardown, "Route selection failback and preference");
+    UtTest_Add(Test_MaskPartialFailure, Setup, Teardown, "Enabled mask partial failure and no-op preservation");
     UtTest_Add(Test_Startup, Setup, Teardown, "Startup and housekeeping");
     UtTest_Add(Test_TableShare, Setup, Teardown, "Validation table share and retry");
     UtTest_Add(Test_UnsharedHoldsTraffic, Setup, Teardown, "No traffic without the shared table");

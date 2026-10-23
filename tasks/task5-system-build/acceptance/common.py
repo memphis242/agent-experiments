@@ -22,6 +22,10 @@ class InfraError(Exception):
     """The pack itself cannot run (tooling missing, pack defect). Only raised before the agent's code is used."""
 
 
+class EnvironmentFail(PrereqFail):
+    """A measured host prerequisite prevents an implementation verdict."""
+
+
 @dataclass
 class Problems:
     """Collects deviations so that one check can report all of them."""

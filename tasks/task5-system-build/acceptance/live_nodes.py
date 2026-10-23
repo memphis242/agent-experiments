@@ -11,11 +11,12 @@ from typing import TYPE_CHECKING
 from common import Fail, Problems, short
 from live_common import boot
 from node import Node, console_events, find_node_pids
+import preflight
 
 if TYPE_CHECKING:
     from check import Ctx
 
-NEW_APPS = ("STOR", "CMDI", "TLMO", "GW", "SFI")
+NEW_APPS = ("STOR", "CMDI", "TLMO", "GW", "SFI", "MODE")
 
 
 def two_nodes(ctx: "Ctx") -> dict[int, Node]:
@@ -46,6 +47,11 @@ def c_nodes_operational(ctx: "Ctx") -> None:
             p.check(False, f"cpu{nid}: {item}")
         p.check(n.alive(), f"cpu{nid} stopped running")
     p.raise_if()
+
+
+def c_queue_capacity(ctx: "Ctx") -> None:
+    nodes = two_nodes(ctx)
+    preflight.verify_nodes(tuple((n.cpu, n.pids()[0]) for n in nodes.values()))
 
 
 def ram_disk_identity(pid: int) -> tuple[str, tuple[int, int]] | None:
@@ -97,6 +103,7 @@ def c_node_clocks(ctx: "Ctx") -> None:
 def c_run_scripts(ctx: "Ctx") -> None:
     """CFS_CPU selects the processor; default run directories are run/ (cpu1) and run/cpu2/ (cpu2)."""
     ctx.shutdown_session()
+    preflight.namespace_preflight()
     p = Problems()
     for nid in (1, 2):
         n = Node(ctx.tree, ctx.work / "nodes" / f"runscripts-cpu{nid}", nid, ctx.pristine(nid))
@@ -116,6 +123,8 @@ def c_run_scripts(ctx: "Ctx") -> None:
             if not p.check(proc.returncode == 0, f"cpu{nid}: run_cfs.sh exited {proc.returncode}: {short(proc.stderr, 300)}"):
                 continue
             pids = find_node_pids(n.exe, nid)
+            for pid in pids:
+                preflight.verify_capacities(preflight.process_inventory(pid), f"cpu{nid}")
             p.check(bool(pids), f"cpu{nid}: no core-cpu{nid} runs from build-native_std/exe/cpu{nid}")
             pidfile = run_dir / "cfs.pid"
             logs = list(run_dir.glob("*.log")) if run_dir.is_dir() else []

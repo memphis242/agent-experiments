@@ -1,0 +1,26 @@
+{
+  "s7-hidden-mode": {
+    "runner": "hidden",
+    "prefix": "",
+    "base": "MODE must implement S7 through MODE_AppMain using the native software-bus target command types and deterministic full-time state transitions.",
+    "cases": {
+      "Startup profiles and exact recovery": "initial profiles wait for registered targets, apply once in target order, explicit/same-mode rules and exact full-time quiet recovery",
+      "Mode table bounds and defaults": "all global/profile/restart/action bounds, allow-listed executables, conditional payload validation and pinned defaults",
+      "Fault validation serials and slots": "fault length/FC/type/index/node/severity/flags/name validation, per-slot wrap/duplicate/stale filtering and all slot classes",
+      "Precedence SAFE recovery and disable": "critical/transient demands, guarded SAFE exit, retained latches, last accepted command, enabled/disabled monitoring and reset non-effects",
+      "Native restart snapshot and action order": "native STOP/START target payloads and order, deferred initially-absent START, registration versus clear and table-activation snapshot preservation",
+      "Cooldown recurrences cap and reset": "full-time30s cooldown survives clear/reset/recurrence, three START cap, exhaustion only while active and eligible, explicit inactive reset and SAFE exit",
+      "Independent peer timers and publication": "own/malformed peers,10s first-contact mode deadline independent from SFI loss, diagnostics while disabled, publication and heartbeat every wakeup",
+      "Mode command counter semantics": "each rejected command counts once, request commands count, HK/wakeup/protocol do not, and reset clears only cumulative counters",
+      "Action payloads and shared route cleanup": "pinned native priority/transfer/route fields and order, last-requester release exactly once including while disabled",
+      "Restart resource and exact timeouts": "ascending-slot single restart resource, no attempt consumption while waiting, exact full-time STOP/START deadlines and same-wakeup continuation priority",
+      "Action transmission failures": "each profile/STOP/START transmission failure counts and surfaces once, later actions still execute and failed sequences end without retransmission",
+      "Missing restart target isolation": "no matching allow-list target skips only restart, never substitutes another executable and still consumes an attempt",
+      "Initial absence clear continuation and disable": "absent target sends no STOP and delays START one wakeup, clear retains an in-progress restart, disable cancels it while retaining Pending/attempt/cooldown, re-enable respects eligibility",
+      "Presence wins exact restart deadlines": "STOP absence and START registration checked before full-time5s deadline timeout, with success at the exact deadline",
+      "Accepted bounds and unsafe transfer paths": "accepted endpoints for globals/profiles/restarts/cooldowns/caps and rejected absolute/traversal/unterminated/empty source or nonempty destination paths",
+      "Counter reset non-effects and foreign MID": "all cumulative fields reset without touching mode/peer/fault/serial/attempt/timer state and unexpected MID increments one error",
+      "Simultaneous demands and decision guard": "simultaneous warning/critical and command precedence, transient critical even with DEGRADED response target, second guard without counter duplication, last accepted request and no disabled stale demand"
+    }
+  }
+}

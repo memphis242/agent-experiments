@@ -58,9 +58,9 @@ extern void SFI_AppMain(void);
 #define EID_STATUS     21
 #define EID_HIST_CLEAR 22
 
-#define TBL_SIZE   520
-#define HK_PAYLOAD 36
-#define ST_PAYLOAD 840
+#define TBL_SIZE   780
+#define HK_PAYLOAD 76
+#define ST_PAYLOAD 3888
 #define TLM_HDR    16
 
 #define RULE_STALL 1
@@ -92,33 +92,42 @@ static void stbl_params(stbl_t *t, uint8 n, uint16 w, uint16 h)
 
 static void stbl_app(stbl_t *t, int i, const char *name)
 {
-    memset(t->b + 8 + i * 20, 0, 20);
-    memcpy(t->b + 8 + i * 20, name, strlen(name));
+    memset(t->b + 8 + i * 24, 0, 20);
+    memcpy(t->b + 8 + i * 24, name, strlen(name));
+    memset(t->b + 28 + i * 24, 1, 2);
+    t->b[30 + i * 24] = 5; t->b[31 + i * 24] = 10;
 }
 
 static void stbl_watch(stbl_t *t, int i, uint32 mid, uint16 off, uint8 width, uint8 rule, uint32 limit)
 {
-    uint8 *w = t->b + 328 + i * 12;
+    uint8 *w = t->b + 392 + i * 24;
     t5_put32(w, mid);
     t5_put16(w + 4, off);
     w[6] = width;
     w[7] = rule;
     t5_put32(w + 8, limit);
+    memset(w + 12, 0, 12);
+    if (rule != 0) { w[21] = i < 4 ? (uint8)i : 255; w[22] = 1; w[23] = 1; }
 }
 
 static void stbl_default(stbl_t *t)
 {
-    static const char *const apps[] = {"STOR", "CMDI", "TLMO", "GW", "SFI_T1", "SFI_T2", "SFI_T3"};
+    static const char *const apps[] = {"STOR", "CMDI", "TLMO", "GW", "SFI_T1", "SFI_T2", "SFI_T3", "MODE"};
     int i;
     memset(t, 0, sizeof(*t));
     stbl_params(t, 3, 5, 60);
-    for (i = 0; i < 7; i++) stbl_app(t, i, apps[i]);
+    for (i = 0; i < 8; i++) stbl_app(t, i, apps[i]);
     stbl_watch(t, 0, M_STOR_HK, 17, 1, RULE_RATE, 2);
     stbl_watch(t, 1, M_CMDI_HK, 17, 1, RULE_RATE, 2);
     stbl_watch(t, 2, M_TLMO_HK, 17, 1, RULE_RATE, 2);
     stbl_watch(t, 3, M_GW_HK, 17, 1, RULE_RATE, 2);
     stbl_watch(t, 4, M_STALL, 16, 4, RULE_STALL, 3);
     stbl_watch(t, 5, M_RATE, 16, 2, RULE_RATE, 5);
+    stbl_watch(t, 6, 0x18EF, 16, 4, 3, 0);
+    t5_put32(t->b + 392 + 6*24 + 12, 10);
+    t5_put32(t->b + 392 + 6*24 + 16, 20);
+    t->b[392 + 6*24 + 20] = 3; t->b[392 + 6*24 + 22] = 2;
+    t->b[776] = 1; t->b[777] = 10;
 }
 
 /* ------------------------------------------------------------------------- driving SFI */
@@ -270,7 +279,7 @@ static bool get_status(st_t *s)
     s->ccount = t5_get16(p + 4); s->largest = t5_get16(p + 6);
     for (i = 0; i < 16; i++)
     {
-        const uint8 *a = p + 8 + i * 32;
+        const uint8 *a = p + 8 + i * 36;
         memcpy(s->app[i].name, a, 20);
         s->app[i].name[20] = 0;
         s->app[i].state = a[20]; s->app[i].missed = a[21]; s->app[i].total = t5_get16(a + 22);
@@ -278,12 +287,12 @@ static bool get_status(st_t *s)
     }
     for (i = 0; i < 16; i++)
     {
-        const uint8 *h = p + 520 + i * 12;
+        const uint8 *h = p + 584 + i * 16;
         s->hist[i].idx = h[0]; s->hist[i].sec = t5_get32(h + 4); s->hist[i].sub = t5_get32(h + 8);
     }
     for (i = 0; i < 16; i++)
     {
-        const uint8 *w = p + 712 + i * 8;
+        const uint8 *w = p + 840 + i * 12;
         s->watch[i].state = w[0]; s->watch[i].last = t5_get32(w + 4);
     }
     return true;
@@ -346,8 +355,8 @@ static void Test_StartupAndHousekeeping(void)
     hk_t h;
     st_t s;
     int i, k;
-    static const char *const apps[] = {"STOR", "CMDI", "TLMO", "GW", "SFI_T1", "SFI_T2", "SFI_T3"};
-    static const uint32 wmids[] = {M_STOR_HK, M_CMDI_HK, M_TLMO_HK, M_GW_HK, M_STALL, M_RATE};
+    static const char *const apps[] = {"STOR", "CMDI", "TLMO", "GW", "SFI_T1", "SFI_T2", "SFI_T3", "MODE"};
+    static const uint32 wmids[] = {M_STOR_HK, M_CMDI_HK, M_TLMO_HK, M_GW_HK, M_STALL, M_RATE, 0x18EF};
     UtAssert_True(boot_default(), "SFI_AppMain starts and waits on its pipe");
     UtAssert_True(t5_count_ev(EID_INIT, 0) == 1, "SFI_INIT_INF_EID (1) emitted once (saw %d)", t5_count_ev(EID_INIT, 0));
     UtAssert_True(t5_last_ev_type(EID_INIT) == CFE_EVS_EventType_INFORMATION, "event 1 is INFORMATION");
@@ -362,7 +371,7 @@ static void Test_StartupAndHousekeeping(void)
                   "subscribed to SFI_CMD_MID, SFI_SEND_HK_MID and SFI_WAKEUP_MID");
     UtAssert_True(t5_subscribed(M_HEARTBEAT) && t5_sub_msglim(M_HEARTBEAT) == 32,
                   "subscribed to SFI_HEARTBEAT_MID with message limit 32 (limit %u)", t5_sub_msglim(M_HEARTBEAT));
-    for (i = 0; i < 6; i++)
+    for (i = 0; i < 7; i++)
         UtAssert_True(t5_subscribed(wmids[i]) && t5_sub_msglim(wmids[i]) == 8,
                       "subscribed to watch MID 0x%04X with message limit 8 (limit %u)", (unsigned)wmids[i],
                       t5_sub_msglim(wmids[i]));
@@ -380,7 +389,7 @@ static void Test_StartupAndHousekeeping(void)
     UtAssert_True(t5_last_ev_type(EID_NOOP) == CFE_EVS_EventType_INFORMATION, "event 3 is INFORMATION");
     if (get_hk(&h)) UtAssert_True(h.cc == 1, "NOOP increments CommandCounter (%u)", h.cc);
     if (!get_status(&s)) return;
-    for (i = 0; i < 7; i++)
+    for (i = 0; i < 8; i++)
     {
         const app_st_t *a = st_app(&s, apps[i]);
         UtAssert_True(a != NULL, "the status packet lists %s", apps[i]);
@@ -388,10 +397,10 @@ static void Test_StartupAndHousekeeping(void)
     }
     k = 0;
     for (i = 0; i < 16; i++) if (s.app[i].name[0] == 0) k++;
-    UtAssert_True(k == 9, "unused app slots carry an empty name (%d empty)", k);
-    for (i = 0; i < 6; i++)
+    UtAssert_True(k == 8, "unused app slots carry an empty name (%d empty)", k);
+    for (i = 0; i < 7; i++)
         UtAssert_True(s.watch[i].state == W_PENDING, "watch %d is BASELINE_PENDING after startup (state %u)", i, s.watch[i].state);
-    for (i = 6; i < 16; i++)
+    for (i = 7; i < 16; i++)
         UtAssert_True(s.watch[i].state == W_UNUSED, "unused watch %d reports UNUSED (state %u)", i, s.watch[i].state);
     UtAssert_True(s.hcount == 0 && s.missing == 0 && s.corr == CORR_NONE, "empty history after startup");
 }
@@ -451,7 +460,7 @@ static void Test_TableValidation(void)
     UtAssert_True(!vtbl(&t), "HistorySec 0 is rejected");
     t = good; stbl_params(&t, 3, 5, 3601);
     UtAssert_True(!vtbl(&t), "HistorySec 3601 is rejected");
-    t = good; memset(t.b + 8 + 7 * 20, 'X', 20);
+    t = good; memset(t.b + 8 + 7 * 24, 'X', 20);
     UtAssert_True(!vtbl(&t), "an unterminated app name is rejected");
     t = good; stbl_app(&t, 9, "GW");
     UtAssert_True(!vtbl(&t), "a duplicate app name is rejected");
@@ -483,7 +492,8 @@ static void Test_TableValidation(void)
         stbl_app(&t, i, n);
     }
     UtAssert_True(vtbl(&t), "16 distinct app names of 19 characters are accepted");
-    t = good; memset(t.b + 8, 0, 7 * 20);
+    t = good; memset(t.b + 8, 0, 16 * 24);
+    for (i = 0; i < 4; i++) t.b[392+i*24+21] = 255;
     UtAssert_True(vtbl(&t), "a table with no apps is accepted");
 }
 
@@ -941,7 +951,7 @@ static void Test_ResetCounters(void)
     if (get_status(&s))
     {
         UtAssert_True(st_app(&s, "GW") != NULL && st_app(&s, "GW")->state == APP_MISSING, "GW stays MISSING");
-        UtAssert_True(s.hcount == 1, "the history is kept (%u)", s.hcount);
+        UtAssert_True(s.hcount == 3, "the history is kept (%u)", s.hcount);
         UtAssert_True(s.watch[4].state == W_FAULT && s.watch[5].state == W_FAULT, "watches stay in FAULT");
     }
 }
@@ -996,7 +1006,7 @@ static void Test_TableUpdate(void)
     set_miss_limit(9);
     set_window(77);
     if (!get_status(&s0)) return;
-    UtAssert_True(s0.hcount == 1 && s0.watch[4].state == W_FAULT, "set-up: one miss in the history, STALL watch in FAULT");
+    UtAssert_True(s0.hcount == 2 && s0.watch[4].state == W_FAULT, "set-up: heartbeat and watch onsets in history, STALL watch in FAULT");
     stbl_default(&bad);
     stbl_params(&bad, 0, 5, 60);
     UtAssert_True(t5_tbl_submit("SfiTable", bad.b) != CFE_SUCCESS, "an invalid table update is rejected by validation");
@@ -1043,8 +1053,11 @@ static void Test_TableUpdate(void)
     UtAssert_True(t5_count_ev(EID_MISS, ev0) == 0, "apps unarmed by the table load are not evaluated until heard again");
 }
 
+#include "sfi_expanded_cases.h"
+
 void UtTest_Setup(void)
 {
+    register_expanded_cases();
     UtAssert_True(sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes",
                   (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
     UtAssert_True(sizeof(CFE_MSG_CommandHeader_t) == 8, "command header is 8 bytes");

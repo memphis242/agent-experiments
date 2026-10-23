@@ -28,7 +28,7 @@ BOOT_TIMEOUT_S = 40
 FIRST_TLM_S = 15.0
 CMD_PATH_S = 8.0
 SETTLE_S = 0.35
-HK_WAIT_S = 3.0
+HK_WAIT_S = 2.0
 
 
 # ----------------------------------------------------------------------------- telemetry receiver
@@ -47,6 +47,8 @@ class Event:
     eid: int
     etype: int
     text: str
+    seconds: int = 0
+    subseconds: int = 0
 
 
 EVENT_TYPES = {1: "DEBUG", 2: "INFORMATION", 3: "ERROR", 4: "CRITICAL"}
@@ -59,7 +61,7 @@ def parse_long_event(pkt: bytes, t: float = 0.0) -> Event | None:
     app = pkt[16:36].split(b"\0", 1)[0].decode("latin-1")
     eid, etype = struct.unpack_from("<HH", pkt, 36)
     text = pkt[48:170].split(b"\0", 1)[0].decode("latin-1")
-    return Event(t, app, eid, etype, text)
+    return Event(t, app, eid, etype, text, fr.tlm_seconds(pkt), struct.unpack_from(">H", pkt, 10)[0])
 
 
 class Ground(threading.Thread):
@@ -82,6 +84,7 @@ class Ground(threading.Thread):
         self.log: list[Datagram] = []
         self.last_secs: tuple[int, float] | None = None
         self.listeners: list[Callable[[Datagram], None]] = []
+        self.listener_errors: list[str] = []
         self.running = True
         self.start()
 
@@ -102,7 +105,11 @@ class Ground(threading.Thread):
                     self.last_secs = (fr.tlm_seconds(data), now)
                 listeners = list(self.listeners)
             for fn in listeners:
-                fn(d)
+                try:
+                    fn(d)
+                except Exception as exc:  # noqa: BLE001 - surface collector failures to the check
+                    with self.lock:
+                        self.listener_errors.append(f"{type(exc).__name__}: {exc}")
 
     def close(self) -> None:
         self.running = False
@@ -182,6 +189,13 @@ class Node:
         self.ground: Ground | None = None
         self.tx = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.seq = 0
+        self.serials = fr.SERIALS
+        self.last_burst = float("-inf")
+        self.large_request_lock = threading.Lock()
+        self.last_large_reply = float("-inf")
+        self.large_packet_lengths: dict[int, int] = {}
+        self.tlmo_budget = 16
+        self.tlmo_profiles = tb.TlmoTable().profiles
         self.last_send = 0.0
         self.command_path_ok = False
         self.table_loads = 0
@@ -297,11 +311,11 @@ class Node:
         assert secs is not None
         return secs
 
-    def frame(self, command: bytes, *, key: bytes | None = None, source_id: int = fr.DEFAULT_SOURCE,
+    def frame(self, command: bytes, *, key: bytes | None = None, source_id: int = fr.OBSERVATION_SOURCE,
               time_offset: int = 0, sequence: int | None = None, **header: int) -> bytes:
         if sequence is None:
-            self.seq += 1
-            sequence = self.seq
+            sequence = self.serials.next(self.id, source_id)
+            self.seq = sequence
         secs = max(0, self.onboard_seconds() + time_offset)
         return fr.build_frame(command, time_seconds=secs, key=self.key if key is None else key,
                               source_id=source_id, sequence=sequence, **header)
@@ -309,6 +323,36 @@ class Node:
     def send_raw(self, data: bytes, port: int | None = None) -> None:
         self.tx.sendto(data, (spec.HOST, spec.cmdi_port(self.id) if port is None else port))
         self.last_send = time.monotonic()
+
+    def send_batch(self, frames: tuple[bytes, ...]) -> None:
+        """Queue a bounded authenticated batch before allowing the node to wake.
+
+        Only processes belonging to this scratch node are suspended. The host
+        watchdog remains running, and resume is guaranteed even on send failure.
+        """
+        assert 1 <= len(frames) <= 8
+        assert all(len(frame) <= fr.MAX_FRAME for frame in frames)
+        pids = tuple(self.pids())
+        if not pids:
+            raise Fail(f"{self.cpu} pre-wakeup batch: expected own running node; observed no node process")
+        stopped = []
+        try:
+            for pid in pids:
+                os.kill(pid, signal.SIGSTOP)
+                stopped.append(pid)
+                deadline = time.monotonic() + 0.5
+                while True:
+                    state = Path(f"/proc/{pid}/status").read_text()
+                    if re.search(r"(?m)^State:\s+[Tt]", state):
+                        break
+                    if time.monotonic() >= deadline:
+                        raise Fail(f"{self.cpu} pre-wakeup batch: expected pid {pid} stopped; observed running after 0.5 s")
+                    time.sleep(0.001)
+            for frame in frames:
+                self.send_raw(frame)
+        finally:
+            for pid in stopped:
+                os.kill(pid, signal.SIGCONT)
 
     def send(self, mid: int, cc: int, payload: bytes = b"", *, corrupt: str | None = None, **opts: object) -> bytes:
         f = self.frame(fr.build_command(mid, cc, payload), **opts)  # type: ignore[arg-type]
@@ -319,6 +363,10 @@ class Node:
 
     def cmd(self, app: str, name: str, payload: bytes = b"", *, gap: float = 0.12, **opts: object) -> bytes:
         f = self.send(spec.app_mid(app, "CMD", self.id), spec.CC[app][name], payload, **opts)
+        if app == "TLMO" and name == "SET_BUDGET" and len(payload) == 4:
+            self.tlmo_budget = struct.unpack_from("<H", payload)[0]
+        if app == "TLMO" and name == "SELECT_PROFILE" and len(payload) == 4 and payload[0] < 3:
+            self.tlmo_budget = self.tlmo_profiles[payload[0]][0]
         time.sleep(gap)
         return f
 
@@ -346,16 +394,45 @@ class Node:
 
     # -- telemetry requests ---------------------------------------------------------
     def request(self, send: Callable[[], object], reply_mid: int, timeout: float = HK_WAIT_S,
-                tail: float = 0.25, count: int = 1) -> list[Datagram]:
+                tail: float = 0.25, count: int = 1, *, held_snapshot: bool = False) -> list[Datagram]:
         g = self.g
         self.settle()
-        mark = g.mark()
-        send()
-        got = g.wait_mid(mark, reply_mid, timeout, count)
-        if got:
-            time.sleep(tail)
-            got = g.since(mark, reply_mid)
-        return got
+        large = reply_mid in self.large_mids()
+        with self.large_request_lock:
+            previous_budget = self.tlmo_budget
+            if large:
+                time.sleep(max(0, 0.6 - (time.monotonic() - self.last_large_reply)))
+                if not held_snapshot:
+                    self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", 256, 0))
+            mark = g.mark()
+            try:
+                send()
+                if held_snapshot:
+                    self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", 256, 0), gap=0)
+                got = g.wait_mid(mark, reply_mid, min(timeout, 2.0), count)
+                if not got:
+                    raise Fail(f"{self.cpu} request MID {reply_mid:#06x}: expected {count} reply within 2 s "
+                               "at sufficient nonzero output budget; observed no reply")
+                if large:
+                    length = len(got[0].data)
+                    expected = self.large_mids()[reply_mid]
+                    if length != expected or length > 8192:
+                        raise Fail(f"{self.cpu} large request {reply_mid:#06x}: expected {expected} bytes <=8192; "
+                                   f"observed {length}")
+                    self.large_packet_lengths[reply_mid] = length
+                    self.last_large_reply = time.monotonic()
+                time.sleep(tail)
+                return g.since(mark, reply_mid)
+            finally:
+                if large and not held_snapshot and previous_budget != self.tlmo_budget:
+                    self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", previous_budget, 0))
+
+    def large_mids(self) -> dict[int, int]:
+        return {
+            spec.app_mid("STOR", "HK_TLM", self.id): spec.TLM_HDR + spec.HK_LAYOUTS["STOR"].size,
+            spec.app_mid("SFI", "STATUS_TLM", self.id): spec.TLM_HDR + spec.SFI_STATUS_SIZE,
+            spec.app_mid("TLMO", "STREAM_TLM", self.id): spec.TLM_HDR + spec.TLMO_STREAM_SIZE,
+        }
 
     def hk(self, app: str) -> dict[str, int]:
         self.ensure_command_path()
@@ -363,12 +440,13 @@ class Node:
         send_hk = spec.app_mid(app, "SEND_HK", self.id)
         got = self.request(lambda: self.send(send_hk, 0), mid)
         if not got:
-            got = self.request(lambda: self.send(send_hk, 0), mid)
-        if not got:
             if not self.alive():
                 raise Fail(f"{self.cpu} stopped running")
             raise Fail(f"{self.cpu}: no {app} housekeeping (MID {mid:#06x}) followed a framed SEND_HK")
-        return parse_hk(app, got[-1].data)
+        parsed = parse_hk(app, got[-1].data)
+        if app == "TLMO":
+            self.tlmo_budget = parsed["BudgetPacketsPerCycle"]
+        return parsed
 
     def events(self, mark: int, app: str | None = None, eid: int | None = None) -> list[Event]:
         return self.g.events(mark, app, eid)
@@ -393,6 +471,7 @@ class Node:
         streams TLMO forwards may drop the event itself)."""
         self.ensure_command_path()
         name = spec.TABLES[app][1]
+        activated_table = tb.TlmoTable.unpack(body) if app == "TLMO" else None
         image = tb.with_body(self.table_image(app), app, body)
         self.table_loads += 1
         fname = f"acc{self.table_loads}.tbl"
@@ -428,25 +507,74 @@ class Node:
         end = time.monotonic() + timeout
         while time.monotonic() < end:
             if [e for e in self.events(mark, "CFE_TBL") if e.eid == spec.CFE_TBL_UPDATE_SUCCESS_INF_EID and name in e.text]:
+                if activated_table is not None:
+                    self.tlmo_budget, self.tlmo_profiles = activated_table.budget, activated_table.profiles
                 return
             bad = [e for e in self.events(mark, "CFE_TBL") if e.eid == spec.CFE_TBL_UPDATE_ERR_EID]
             if bad:
                 break
             time.sleep(0.1)
         if not bad and confirm is not None and confirm():
+            if activated_table is not None:
+                self.tlmo_budget, self.tlmo_profiles = activated_table.budget, activated_table.profiles
             return
         raise Fail(f"{self.cpu}: activation of {name} did not complete: " +
                    (bad[0].text if bad else f"no update event within {timeout:.0f} s"))
 
     # -- injection ----------------------------------------------------------------------
-    def inject(self, packets: list[bytes], burst: int = 3, gap: float = 0.25, **opts: object) -> None:
+    def inject(self, packets: list[bytes], burst: int = 8, gap: float = 0.6, **opts: object) -> None:
         """Send each packet in its own frame, `burst` frames at a time, `gap` seconds apart."""
-        assert burst >= 1
+        assert 1 <= burst <= 8
+        assert all(8 <= len(pkt) <= 1024 for pkt in packets), "live SB injection envelope is 8..1024 bytes"
         for i, pkt in enumerate(packets):
+            if i % burst == 0:
+                time.sleep(max(0.0, max(gap, 0.6) - (time.monotonic() - self.last_burst)))
+                self.last_burst = time.monotonic()
             self.send_raw(self.frame(pkt, **opts))  # type: ignore[arg-type]
-            if (i + 1) % burst == 0 and i + 1 < len(packets):
-                time.sleep(gap)
-        time.sleep(gap)
+        time.sleep(max(gap, 0.6))
+
+    def verify_observation_integrity(self) -> None:
+        """Check collector health, fault mirrors, and SB allocator evidence."""
+        if self.g.listener_errors:
+            raise Fail(f"{self.cpu} telemetry collector: expected successful listeners; observed {self.g.listener_errors}")
+        sb_mid = spec.named_tlm_mid("CFE_SB_HK_TLM_MID", self.id)
+        previous_budget = self.tlmo_budget
+        self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", 256, 0))
+        mapping = self.request(lambda: self.cmd("TLMO", "SEND_CLASS_MAP", gap=0),
+                               spec.app_mid("TLMO", "CLASS_TLM", self.id))[-1].data
+        if len(mapping) != spec.TLM_HDR + spec.TLMO_CLASS_SIZE:
+            raise Fail(f"{self.cpu} final SB observation: expected full class map "
+                       f"{spec.TLM_HDR + spec.TLMO_CLASS_SIZE} bytes; observed {len(mapping)}")
+        mids = tuple(struct.unpack_from("<I", mapping, 20 + i * 8)[0] for i in range(64))
+        appended = sb_mid not in mids
+        try:
+            if appended:
+                self.cmd("TLMO", "ADD_STREAM", struct.pack("<IB3x", sb_mid, 1))
+            self.request(lambda: self.send(spec.cmd_mid(spec.CFE_SB_SEND_HK_TOPIC, self.id), 0), sb_mid)
+        finally:
+            if appended:
+                self.cmd("TLMO", "REMOVE_STREAM", struct.pack("<I", sb_mid))
+            self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", previous_budget, 0))
+        packets = self.g.since()
+        raw_mid = spec.app_mid("SFI", "FAULT", self.id)
+        mirror_mid = spec.app_mid("SFI", "FAULT_TLM", self.id)
+        raw = {d.data[8:] for d in packets if d.mid == raw_mid}
+        mirrored = {d.data[16:] for d in packets if d.mid == mirror_mid}
+        if raw != mirrored:
+            raise Fail(f"{self.cpu} SFI fault publication: expected byte-identical raw/mirror report payloads; "
+                       f"observed {len(raw - mirrored)} missing mirrors and {len(mirrored - raw)} missing raw reports")
+        for d in packets:
+            if d.mid == sb_mid and len(d.data) >= 32:
+                errors = d.data[19]
+                overflow, message_limit = struct.unpack_from("<HH", d.data, 28)
+                if errors or overflow or message_limit:
+                    raise Fail(f"{self.cpu} SB live envelope: expected zero send/pipe/message-limit errors; "
+                               f"observed {errors}/{overflow}/{message_limit}")
+        log = self.console_log()
+        failure = re.search(r"(?im)^.*(?:GetPoolBuf.*(?:fail|error)|(?:SB|pool).*allocat.*fail|"
+                            r"(?:SB|pool).*insufficient.*(?:memory|buffer)).*$", log)
+        if failure:
+            raise Fail(f"{self.cpu} SB live envelope: expected no allocation failure log; observed {failure.group(0)[:220]}")
 
 
 # ----------------------------------------------------------------------------- telemetry parsing

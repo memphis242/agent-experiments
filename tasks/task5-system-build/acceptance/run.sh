@@ -2,7 +2,7 @@
 # Usage: run.sh <repo-path> <out.json>
 # Exit 0 every check passed, 1 a check failed, 2 infrastructure error before the agent's code was used.
 # The per-subsystem summary is written next to <out.json> as <out-stem>.subsystems.json.
-# Budget: check.py stops starting work after 44 minutes; the harness's --acceptance-timeout must be at least 2760 s.
+# Budget: check.py stops starting work after 180 minutes; the harness's --acceptance-timeout must be at least 10920 s.
 set -u
 if [ "$#" -ne 2 ]; then
     echo "usage: run.sh <repo-path> <out.json>" >&2
@@ -37,7 +37,7 @@ trap cleanup EXIT
 trap 'exit 2' TERM INT
 
 export T5_PACK_TMP="$scratch"
-timeout --kill-after=30 2700 python3 -I -B "$here/check.py" "$repo" "$out"
+timeout --kill-after=30 10920 python3 -I -B "$here/check.py" "$repo" "$out"
 rc=$?
 case "$rc" in
     0|1) [ -f "$out" ] || exit 2; exit "$rc" ;;

@@ -29,6 +29,8 @@ class AppStatus:
     total_misses: int
     last_secs: int
     last_subsecs: int
+    enabled: int
+    event_count: int
 
 
 @dataclass(frozen=True)
@@ -41,25 +43,76 @@ class Status:
     apps: tuple[AppStatus, ...]
     history: tuple[tuple[int, int, int], ...]
     watches: tuple[tuple[int, int], ...]
+    largest_apps_mask: int
+    largest_watches_mask: int
+    active: tuple[int, ...]
+    latched: tuple[int, ...]
+    faults: tuple[FaultReport, ...]
 
     def app(self, name: str) -> AppStatus | None:
         return next((a for a in self.apps if a.name == name), None)
 
 
+@dataclass(frozen=True)
+class FaultReport:
+    sequence: int
+    fault_type: int
+    source: int
+    severity: int
+    active: int
+    latched: int
+    node: int
+    name: str
+    onset_secs: int
+    onset_subsecs: int
+    change_secs: int
+    change_subsecs: int
+    raw: bytes
+
+    @property
+    def slot(self) -> int:
+        if self.fault_type == 1:
+            return self.source
+        if self.fault_type in (2, 3, 4):
+            return 16 + self.source
+        if self.fault_type == 5:
+            return 32 + self.source
+        if self.fault_type == 6:
+            return 48 + self.source
+        if self.fault_type == 7:
+            return 56
+        raise Fail(f"invalid fault report type {self.fault_type}")
+
+
+def parse_fault(payload: bytes) -> FaultReport:
+    if len(payload) != 48:
+        raise Fail(f"SFI report payload length {len(payload)}, expected 48")
+    values = list(struct.unpack(spec.SFI_FAULT_FMT, payload))
+    if b"\0" not in values[7]:
+        raise Fail("SFI report AppName is not terminated")
+    values[7] = values[7].split(b"\0", 1)[0].decode("ascii")
+    return FaultReport(*values, payload)
+
+
 def parse_status(pkt: bytes) -> Status:
     need = spec.TLM_HDR + spec.SFI_STATUS_SIZE
-    if len(pkt) < need:
-        raise Fail(f"the SFI status packet is {len(pkt)} bytes; the specified payload needs {need}")
+    if len(pkt) != need:
+        raise Fail(f"the SFI status packet is {len(pkt)} bytes; the specified full packet needs {need}")
     o = spec.TLM_HDR
     missing, corr, hcount, ccount, largest = struct.unpack_from("<BBHHH", pkt, o)
+    if hcount > 16:
+        raise Fail(f"SFI HistoryCount {hcount} exceeds 16")
     apps = []
-    for i in range(spec.SFI_MAX_APPS):
-        name, st, mc, tm, ls, lss = struct.unpack_from(spec.SFI_APP_STATUS_FMT, pkt, o + 8 + i * 32)
-        apps.append(AppStatus(name.split(b"\0", 1)[0].decode("latin-1"), st, mc, tm, ls, lss))
-    hist = tuple(struct.unpack_from(spec.SFI_MISS_RECORD_FMT, pkt, o + 8 + 512 + i * 12) for i in range(spec.SFI_HISTORY_LEN))
-    watches = tuple(struct.unpack_from(spec.SFI_WATCH_STATUS_FMT, pkt, o + 8 + 512 + 192 + i * 8)
-                    for i in range(spec.SFI_MAX_WATCHES))
-    return Status(missing, corr, hcount, ccount, largest, tuple(apps), hist, watches)
+    for i in range(16):
+        name, st, mc, tm, ls, lss, enabled, events, spare = struct.unpack_from(spec.SFI_APP_STATUS_FMT, pkt, o + 8 + i * 36)
+        apps.append(AppStatus(name.split(b"\0", 1)[0].decode("ascii"), st, mc, tm, ls, lss, enabled, events))
+    hist = tuple(struct.unpack_from(spec.SFI_MISS_RECORD_FMT, pkt, o + 584 + i * 16) for i in range(16))
+    watches = tuple(struct.unpack_from("<B3xI", pkt, o + 840 + i * 12) for i in range(16))
+    amask, wmask = struct.unpack_from("<HH", pkt, o + 1032)
+    active = tuple(pkt[o + 1036:o + 1093])
+    latched = tuple(pkt[o + 1093:o + 1150])
+    faults = tuple(parse_fault(pkt[o + 1152 + i * 48:o + 1200 + i * 48]) for i in range(57))
+    return Status(missing, corr, hcount, ccount, largest, tuple(apps), hist, watches, amask, wmask, active, latched, faults)
 
 
 def status(n: Node) -> Status:
@@ -114,7 +167,7 @@ def c_apps_ok_after_startup(ctx: "Ctx") -> None:
     p = Problems()
     time.sleep(4.0)
     st = status(n)
-    for name in ("STOR", "CMDI", "TLMO", "GW"):
+    for name in ("STOR", "CMDI", "TLMO", "GW", "MODE"):
         a = st.app(name)
         if p.check(a is not None, f"the status packet does not list {name}"):
             assert a is not None
@@ -135,7 +188,7 @@ def c_gw_stop_miss(ctx: "Ctx") -> None:
     t0 = time.monotonic()
     miss = n.wait_event(mark, "SFI", EID["HB_MISS_ERR"], 7.0, text="GW")
     if p.check(bool(miss), "no SFI_HB_MISS_ERR_EID naming GW within N + 2 seconds of ES STOP_APP"):
-        p.check(miss[0].t - t0 <= 6.5, f"the miss event came {miss[0].t - t0:.1f} s after the stop (N + 2 is 5 s)")
+        p.check(miss[0].t - t0 <= 5.0, f"the miss event came {miss[0].t - t0:.1f} s after the stop (N + 2 is 5 s)")
     hk = n.hk("SFI")
     p.check(hk["AppsMissing"] == 1, f"AppsMissing {hk['AppsMissing']} with GW stopped")
     st = status(n)
@@ -276,3 +329,211 @@ def c_sfi_commands(ctx: "Ctx") -> None:
     p.check(h2["CommandErrorCounter"] == hk["CommandErrorCounter"] + 2 and h2["CommandCounter"] == hk["CommandCounter"],
             "an unknown code and a wrong length did not each count once in CommandErrorCounter (and not in CommandCounter)")
     p.raise_if()
+
+
+def reports(n: Node, mark: int = 0) -> list[FaultReport]:
+    """Read mirrored reports and require matching command-form payloads on the raw tap."""
+    out = [parse_fault(d.data[spec.TLM_HDR:]) for d in n.g.since(mark, spec.app_mid('SFI', 'FAULT_TLM', n.id))]
+    commands = [d.data[8:] for d in n.g.since(mark, spec.app_mid('SFI', 'FAULT', n.id))]
+    for report in out:
+        if report.raw not in commands:
+            raise Fail(f'SFI report {report.sequence} has no byte-identical SFI_FAULT command payload')
+    return out
+
+
+def wait_report(n: Node, mark: int, slot: int, active: int, timeout: float = 4.0) -> FaultReport:
+    found: list[FaultReport] = []
+    def ready() -> bool:
+        found[:] = [r for r in reports(n, mark) if r.slot == slot and r.active == active]
+        return bool(found)
+    if not n.g.wait(ready, timeout):
+        raise Fail(f'no SFI report for slot {slot} Active {active} within {timeout}s')
+    return found[-1]
+
+
+def feed(n: Node, topic: int, values: tuple[int, ...], width: int = 4) -> None:
+    """Paced verification stimuli stay below the live burst envelope."""
+    for index, value in enumerate(values):
+        n.send_raw(n.frame(watch_packet(spec.verif_mid(topic, n.id), value, width, index)))
+        time.sleep(0.65)
+
+
+def parse_fault_log(data: bytes) -> tuple[int, tuple[FaultReport, ...]]:
+    if len(data) < 16:
+        raise Fail('fault log shorter than its 16-byte header')
+    magic, version, size, count, last = struct.unpack_from('<IHHII', data)
+    if magic != 0x5346494C or version != 1 or size != 48 or count > 64 or len(data) != 16 + count * 48:
+        raise Fail(f'invalid fault log header/length {magic:#x}/{version}/{size}/{count}/{len(data)}')
+    result = tuple(parse_fault(data[16+i*48:64+i*48]) for i in range(count))
+    if result and (result[-1].sequence != last or any(((b.sequence-a.sequence)&0xFFFFFFFF) != 1 for a,b in zip(result,result[1:]))):
+        raise Fail('fault log serials are not consecutive oldest-first or LastSequence differs')
+    if not result and last != 0:
+        raise Fail('empty initial fault log has nonzero LastSequence')
+    return last, result
+
+
+def c_limit_latch_enable(ctx: 'Ctx') -> None:
+    n = boot(ctx, (1,))[1]
+    p = Problems()
+    mark = n.g.mark()
+    feed(n, 0xEF, (9, 9, 10, 9, 9))
+    p.check(not [r for r in reports(n, mark) if r.slot == 22], 'LIMIT triggered before three consecutive out-of-range samples')
+    feed(n, 0xEF, (9,))
+    onset = wait_report(n, mark, 22, 1)
+    p.check(onset.fault_type == 4 and onset.severity == 2 and onset.latched == 1 and onset.node == 1,
+            'LIMIT report type/severity/latch/node differs from critical watch6')
+    errors = n.hk('SFI')['CommandErrorCounter']
+    n.cmd('SFI','ACK_FAULT',bytes((22,0,0,0)))
+    p.check(n.hk('SFI')['CommandErrorCounter'] == (errors+1)%256, 'active ACK did not reject once')
+    feed(n, 0xEF, (10,))
+    clear = wait_report(n, mark, 22, 0)
+    p.check((clear.onset_secs,clear.onset_subsecs) == (onset.onset_secs,onset.onset_subsecs) and clear.latched == 1,
+            'clear changed onset identity or dropped retained latch')
+    st = status(n)
+    p.check(st.active[22] == 0 and st.latched[22] == 1, 'inactive fault must retain latch')
+    n.cmd('SFI','ACK_FAULT',bytes((22,0,0,0)))
+    st = status(n)
+    p.check(st.latched[22] == 0 and st.faults[22].raw == clear.raw, 'ACK must only change current latch array')
+    n.cmd('SFI','SET_WATCH_ENABLE',bytes((6,0,0,0)))
+    feed(n,0xEF,(9,9,9))
+    p.check(status(n).active[22] == 0, 'disabled LIMIT consumed samples')
+    n.cmd('SFI','SET_WATCH_ENABLE',bytes((6,1,0,0)))
+    feed(n,0xEF,(9,9))
+    p.check(status(n).active[22] == 0, 're-enable retained consecutive baseline')
+    feed(n,0xEF,(9,))
+    p.check(status(n).active[22] == 1, 're-enabled LIMIT did not trigger third violation')
+    # Disable and re-enable a verification app, with disabled heartbeats ignored.
+    n.cmd('SFI','SET_APP_ENABLE',bytes((4,0,0,0)))
+    n.send_raw(n.frame(heartbeat('SFI_T1',1)))
+    time.sleep(1.2)
+    app = status(n).app('SFI_T1')
+    p.check(app is not None and app.state == 0 and app.enabled == 0, 'disabled app heartbeat armed monitoring')
+    n.cmd('SFI','SET_APP_ENABLE',bytes((4,1,0,0)))
+    p.check(status(n).app('SFI_T1').state == 0, 're-enabled app must start unarmed')
+    p.raise_if()
+
+
+def c_event_rate(ctx: 'Ctx') -> None:
+    n = boot(ctx, (1,))[1]
+    p = Problems()
+    mark=n.g.mark()
+    for _ in range(7):
+        n.cmd('GW','NOOP',gap=0.65)
+    p.check(not [r for r in reports(n,mark) if r.slot==35], 'GW INFORMATION events triggered ERROR rate detector')
+    mark=n.g.mark()
+    for _ in range(6):
+        n.send(spec.app_mid('GW','CMD',n.id),127)
+        time.sleep(0.65)
+    onset=wait_report(n,mark,35,1)
+    p.check(onset.fault_type==5 and onset.name=='GW', 'event-rate source identity differs')
+    clear=wait_report(n,mark,35,0,13)
+    p.check((clear.onset_secs,clear.onset_subsecs)==(onset.onset_secs,onset.onset_subsecs), 'event expiry clear lost onset')
+    p.check(len([r for r in reports(n,mark) if r.slot==35])==2, 'event rate emitted duplicate edges')
+    p.raise_if()
+
+
+def c_mixed_cluster(ctx: 'Ctx') -> None:
+    n=boot(ctx,(1,))[1]
+    p=Problems()
+    n.cmd('SFI','CLEAR_HISTORY')
+    n.send_raw(n.frame(heartbeat('SFI_T1',1)))
+    mark=n.g.mark()
+    wait_report(n,mark,4,1,6)
+    feed(n,0xEC,(5,5,5,5))
+    wait_report(n,mark,20,1)
+    st=status(n)
+    p.check(st.history_count==2 and st.largest==2 and st.correlation==2,
+            f'mixed heartbeat/STALL history metrics {st.history_count}/{st.largest}/{st.correlation}')
+    p.check(st.largest_apps_mask==1<<4 and st.largest_watches_mask==1<<4,
+            f'mixed cluster attribution masks {st.largest_apps_mask:#x}/{st.largest_watches_mask:#x}')
+    n.cmd('SFI','CLEAR_HISTORY')
+    feed(n,0xEC,(6,6,6,6))
+    time.sleep(6.1)
+    feed(n,0xEF,(9,9,9))
+    st=status(n)
+    p.check(st.history_count==2 and st.largest==1 and st.correlation==1,'onsets separated outside W must be uncorrelated')
+    p.raise_if()
+
+
+def c_peer_health(ctx: 'Ctx') -> None:
+    from live_gw import setup_dual_links
+    nodes=boot(ctx,(1,2))
+    p=Problems()
+    for n in nodes.values():
+        p.check(n.hk('SFI')['PeerArmed']==0,'standalone startup armed an absent peer')
+        for src,dst,fc,length in ((n.id,3-n.id,0,12),(3, n.id,0,12),(3-n.id,3-n.id,0,12),
+                                  (3-n.id,n.id,1,12),(3-n.id,n.id,0,11)):
+            payload=struct.pack('<4BII',src,dst,0,0,1,0)
+            n.send(spec.SFI_HEALTH_MID,fc,payload[:length])
+            time.sleep(0.15)
+    time.sleep(11)
+    for n in nodes.values():
+        hk=n.hk('SFI')
+        p.check(hk['PeerArmed']==0 and hk['PeerLost']==0,'own/malformed health armed or refreshed an absent peer')
+    links=setup_dual_links(ctx,nodes)
+    time.sleep(3)
+    for n in nodes.values():
+        p.check(n.hk('SFI')['PeerArmed']==1 and n.hk('SFI')['PeerLost']==0,'valid health did not arm peer')
+    marks={i:n.g.mark() for i,n in nodes.items()}
+    cut=time.monotonic();links.set_enabled(False)
+    for i,n in nodes.items():
+        report=wait_report(n,marks[i],56,1,13)
+        edge = [d for d in n.g.since(marks[i],spec.app_mid('SFI','FAULT_TLM',i)) if d.data[16:] == report.raw]
+        p.check(bool(edge) and 9 <= edge[0].t-cut <= 12, 'NODE_LOSS onset outside[9,12]s from steady relay cut')
+        # Report change time is exact onboard evidence independent of HK observation.
+        health=n.g.since(0,spec.SFI_HEALTH_MID)
+        p.check(report.node==i and report.fault_type==7,'NODE_LOSS reports local node identity')
+    links.set_enabled(True)
+    for i,n in nodes.items():
+        wait_report(n,marks[i],56,0,5)
+    p.raise_if()
+
+
+def ground_capture(n: Node, mark: int, path: str) -> bytes:
+    """Validate all native segment metadata and reconstruct a completed ground transfer."""
+    from live_stor import parse_segment, judge_segments
+    segments=[parse_segment(d.data,spec.TLM_HDR) for d in n.g.since(mark,spec.app_mid('STOR','XFER_TLM',n.id))]
+    if not segments:
+        raise Fail('ground transfer produced no segment telemetry')
+    first=segments[0]
+    indexes=[segment.index for segment in segments]
+    if len(set(indexes))!=len(indexes) or sorted(indexes)!=list(range(first.count)):
+        raise Fail(f'missing/duplicate STOR segments {indexes}')
+    content=b''.join(segment.data for segment in sorted(segments,key=lambda segment:segment.index))
+    errors=judge_segments(segments,content,transfer_id=first.transfer_id,src=n.id,dst=0,area=0,dest_path=path)
+    if errors:
+        raise Fail('invalid STOR ground transfer: '+'; '.join(errors))
+    return content
+
+
+def ground_file(n: Node, path: str) -> bytes:
+    from live_stor import transfer_payload
+    mark=n.g.mark()
+    n.cmd('STOR','TRANSFER',transfer_payload(0,0,0,path))
+    if not n.wait_event(mark,'STOR',spec.EID['STOR']['XFER_DONE_INF'],12):
+        raise Fail(f'STOR ground transfer of {path} did not complete')
+    return ground_capture(n,mark,path)
+
+
+def c_log_ground(ctx: 'Ctx') -> None:
+    import zlib
+    from live_stor import add_payload, file_info
+    n=boot(ctx,(1,),quiet_stor=True)[1]
+    n.cmd('TLMO','SET_BUDGET',struct.pack('<H2x',256))
+    mark=n.g.mark()
+    feed(n,0xEF,(9,9,9,10))
+    observed=reports(n,mark)
+    if len([r for r in observed if r.slot==22])!=2:
+        raise Fail('expected observed LIMIT onset and clear before fault dump')
+    dumpmark=n.g.mark();n.cmd('SFI','DUMP_FAULT_LOG')
+    if not n.wait_event(dumpmark,'SFI',spec.EID['SFI']['DUMP_INF'],2):
+        raise Fail('fault dump did not complete with DUMP_INF')
+    n.cmd('STOR','ADD_FILE',add_payload('/cf/sfi_faults.bin','sfi/log.bin'))
+    info=file_info(n,0,'sfi/log.bin')
+    content=ground_file(n,'sfi/log.bin')
+    last,entries=parse_fault_log(content)
+    if info['Size']!=len(content) or info['Crc']!=(zlib.crc32(content)&0xFFFFFFFF):
+        raise Fail('FILE_INFO size/CRC differ from ground fault log')
+    payloads=[r.raw for r in entries]
+    if not all(r.raw in payloads for r in observed) or last!=entries[-1].sequence:
+        raise Fail('ground dump does not retain exact observed report bytes in chronology')

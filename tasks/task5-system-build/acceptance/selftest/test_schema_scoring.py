@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 import tempfile
 import threading
@@ -64,7 +65,7 @@ class Contract(unittest.TestCase):
         res = harness_acceptance.parse_result({"passed": False, "checks": checks}, 1)
         ids = [c.check_id for c in res.failures()]
         self.assertEqual(ids, sorted(ids))
-        self.assertTrue(ids[0].startswith("n-") and ids[-1].startswith("s7-"))
+        self.assertTrue(ids[0].startswith("n-") and ids[-1].startswith("s8-"))
 
     def test_run_order_and_lanes(self) -> None:
         self.assertEqual(sorted(sum(check.RUN_ORDER.values(), [])), sorted(check.BY_ID))
@@ -72,19 +73,35 @@ class Contract(unittest.TestCase):
             self.assertEqual(c.check_id.split("-", 1)[0].upper(), c.sub)
         self.assertTrue(all(c.lane == "isolated" for c in check.CHECKS if c.live))
 
+    def test_every_named_plan_id_has_an_implementation(self) -> None:
+        ids = set(re.findall(r'`((?:n|s[1-8])-[a-z0-9-]+)`', (PACK / "PLAN.md").read_text()))
+        self.assertTrue(ids)
+        self.assertFalse(ids - set(check.BY_ID), f"missing PLAN ids: {ids - set(check.BY_ID)}")
+        for cid in ids:
+            self.assertTrue(callable(check.BY_ID[cid].fn), cid)
+
+    def test_environment_shortfall_is_not_an_implementation_failure(self) -> None:
+        checks = synthetic(set(check.BY_ID))
+        target = next(c for c in checks if c["id"] == "n-queue-capacity")
+        target.update(passed=False, detail="ENVIRONMENT: insufficient queue limit")
+        result = check.summarize(checks, set(check.BY_ID) - {"n-queue-capacity"})
+        self.assertEqual(result["overall"]["environment"], 1)
+        self.assertEqual(result["overall"]["failed"], 0)
+        self.assertFalse(result["overall"]["passed_all"])
+
 
 class Scoring(unittest.TestCase):
     def test_summary_fractions(self) -> None:
         passing = {c.check_id for c in check.CHECKS if c.sub in ("S1", "N")}
         checks = synthetic(passing)
-        ran = {c["id"] for c in checks} - {"s7-st-stor-transfer"}
+        ran = {c["id"] for c in checks} - {"s8-st-stor-transfer"}
         s = check.summarize(checks, ran)
         self.assertTrue(s["preliminary"])
         self.assertTrue(s["subsystems"]["S1"]["passed_all"])
         self.assertEqual(s["subsystems"]["S1"]["fraction"], 1.0)
         self.assertFalse(s["subsystems"]["S5"]["passed_all"])
         self.assertEqual(s["subsystems"]["S5"]["fraction"], 0.0)
-        self.assertEqual(s["subsystems"]["S7"]["run"], s["subsystems"]["S7"]["checks"] - 1)
+        self.assertEqual(s["subsystems"]["S8"]["run"], s["subsystems"]["S8"]["checks"] - 1)
         total = sum(v["checks"] for v in s["subsystems"].values())
         self.assertEqual(total, len(check.CHECKS))
         self.assertEqual(s["overall"]["passed"], len(passing))
@@ -120,6 +137,14 @@ class HiddenParsing(unittest.TestCase):
         seen, failed = hg.parse_output(self.OUT)
         self.assertEqual(seen, ["S1 Startup and housekeeping", "S2 Transfer rejections"])
         self.assertEqual(list(failed), ["S2 Transfer rejections"])
+
+    def test_every_requirement_case_is_registered_in_its_component(self) -> None:
+        for cid, case_spec in hg.load_case_specs(PACK).items():
+            component, _runner = hg.HIDDEN_CHECKS[cid]
+            root = PACK / "hidden_tests" / component
+            sources = "\n".join(path.read_text() for path in root.iterdir() if path.suffix in (".c", ".h"))
+            for case in case_spec.cases:
+                self.assertIn(json.dumps(case), sources, f"{cid}: unregistered case {case}")
 
     def _ht(self, out: str, rc: int, built: bool = True) -> hg.HiddenTests:
         ht = hg.HiddenTests.__new__(hg.HiddenTests)
@@ -168,7 +193,7 @@ class IsolatedLane(unittest.TestCase):
         self.assertEqual(sorted(ids), sorted(check.RUN_ORDER["isolated"]))
         self.assertEqual(len(ids), len(set(ids)))
         ctf = dict(check._GROUPS)["ctf"]
-        self.assertTrue(all(check.BY_ID[c].sub == "S7" for c in ctf))
+        self.assertTrue(all(check.BY_ID[c].sub == "S8" for c in ctf))
 
     def test_group_jobs(self) -> None:
         import os

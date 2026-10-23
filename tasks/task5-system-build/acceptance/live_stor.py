@@ -1114,3 +1114,89 @@ def c_transfer_abort_and_rejections(ctx: "Ctx") -> None:
             "ABORT_TRANSFER with no transfer active was not rejected with event 30")
     p.check((s.files_dir / "d" / "big.bin").is_file(), "an aborted transfer applied a success action")
     p.raise_if()
+
+
+def parse_file_info(packet: bytes) -> dict[str, int | str]:
+    expected = spec.TLM_HDR + spec.STOR_FILE_INFO_SIZE
+    if len(packet) != expected:
+        raise Fail(f"FILE_INFO reply has {len(packet)} bytes, expected exactly {expected}")
+    area, raw_path, size, crc = struct.unpack_from(spec.STOR_FILE_INFO_FMT, packet, spec.TLM_HDR)
+    if area not in (0, 1) or any(packet[spec.TLM_HDR + 1:spec.TLM_HDR + 4]) or b"\0" not in raw_path:
+        raise Fail("FILE_INFO reply has invalid Area, nonzero spares or unterminated Path")
+    return {"Area": area, "Path": raw_path.split(b"\0", 1)[0].decode("latin-1"), "Size": size, "Crc": crc}
+
+
+def file_info(n: Node, area: int, path: str) -> dict[str, int | str]:
+    got = n.request(lambda: n.cmd("STOR", "FILE_INFO", bytes((area, 0, 0, 0)) + pstr(path), gap=0),
+                    spec.app_mid("STOR", "FILE_INFO_TLM", n.id), timeout=2)
+    if not got:
+        raise Fail(f"{n.cpu}: FILE_INFO {path!r} produced no telemetry within 2 s")
+    return parse_file_info(got[0].data)
+
+
+def check_priority_bytes(p: Problems, hk: dict[str, int], expected: dict[int, int] | None = None) -> None:
+    actual = [hk[f"PriorityBytes{i}"] for i in range(256)]
+    p.check(sum(actual) == hk["TelemetryBytesUsed"], f"PriorityBytes sum {sum(actual)} differs from usage {hk['TelemetryBytesUsed']}")
+    if expected is not None:
+        wanted = [expected.get(i, 0) for i in range(256)]
+        p.check(actual == wanted, f"PriorityBytes nonzero rows {[(i, x) for i, x in enumerate(actual) if x]} != {expected}")
+
+
+def c_quota_file_info(ctx: "Ctx") -> None:
+    contents = {"empty.bin": b"", "digits.bin": b"123456789", "binary.bin": bytes(range(256)) + b"\0\xff"}
+    table = quiet_table(telemetry_quota=8192, file_quota=4096, entries=((INJ_A, 10, 1), (INJ_B, 20, 1)))
+    s = session(ctx, table, seed=contents)
+    p = Problems()
+    for path, content in contents.items():
+        s.cmd("ADD_FILE", add_payload("/cf/" + path, path))
+        target = s.files_dir / path
+        before = target.read_bytes()
+        reply = file_info(s.n, 0, path)
+        p.check(reply == {"Area": 0, "Path": path, "Size": len(content), "Crc": zlib.crc32(content) & 0xFFFFFFFF},
+                f"FILE_INFO size/CRC/identity mismatch for {path}: {reply}")
+        p.check(target.read_bytes() == before, f"FILE_INFO mutated {path}")
+    initial = s.hk()
+    s.cmd("SET_QUOTA", struct.pack("<II", 2048, 0))
+    s.cmd("SET_QUOTA", struct.pack("<II", 1023, 2048))
+    rejected = s.hk()
+    p.check((rejected["TelemetryQuotaBytes"], rejected["FileQuotaBytes"]) == (8192, 4096), "invalid quota changes neither value")
+    p.check(rejected["CommandErrorCounter"] == initial["CommandErrorCounter"] + 2, "two invalid quota commands counted exactly")
+    s.cmd("SET_QUOTA", struct.pack("<II", 1024, 1))
+    lower = s.hk()
+    p.check(lower["FileBytesUsed"] == initial["FileBytesUsed"] and lower["FileQuotaBytes"] == 1,
+            "quota below usage keeps existing files")
+    s.cmd("ADD_FILE", add_payload("/cf/digits.bin", "over.bin"))
+    p.check(not (s.files_dir / "over.bin").exists(), "reduced file quota immediately rejects new addition")
+    s.inject(INJ_A, 2, 700)
+    p.check(s.hk()["PacketsDropped"] == 1, "reduced telemetry quota immediately drops second packet")
+    s.n.load_table("STOR", table.pack())
+    restored = s.hk()
+    p.check((restored["TelemetryQuotaBytes"], restored["FileQuotaBytes"]) == (8192, 4096), "activation restores both quotas")
+    s.inject(INJ_B, 1, 300)
+    s.cmd("CLOSE_FILES")
+    before = s.hk()
+    check_priority_bytes(p, before, {10: 764, 20: 364})
+    name = f"tlm_{INJ_A:04X}_00000000.bin"
+    packet_file = s.tlm_dir / name
+    content = packet_file.read_bytes()
+    reply = file_info(s.n, 1, name)
+    p.check((reply["Size"], reply["Crc"]) == (len(content), zlib.crc32(content) & 0xFFFFFFFF), "FILE_INFO includes packet file header in CRC")
+    s.cmd("SET_PRIORITY", pstr_id(INJ_A, 200))
+    check_priority_bytes(p, s.hk(), {200: 764, 20: 364})
+    mark = s.mark()
+    s.cmd("TRANSFER", transfer_payload(1, 0, spec.XFER_ACTION["MARK_ARCHIVED"], name))
+    done, failed = xfer_wait_done(s, mark, 4)
+    p.check(bool(done) and not failed, "archive transfer completes")
+    check_priority_bytes(p, s.hk(), {200: 764, 20: 364})
+    replaced = quiet_table(telemetry_quota=8192, file_quota=4096, entries=((INJ_B, 30, 1),))
+    s.n.load_table("STOR", replaced.pack())
+    check_priority_bytes(p, s.hk(), {0: 764, 30: 364})
+    s.cmd("SET_QUOTA", struct.pack("<II", 1024, 4096))
+    # Archived unknown-priority data is selected first by the ordinary purge rule.
+    check_priority_bytes(p, s.hk(), {30: 364})
+    mark = s.mark()
+    s.cmd("TRANSFER", transfer_payload(1, 0, spec.XFER_ACTION["DELETE"], f"tlm_{INJ_B:04X}_00000000.bin"))
+    done, failed = xfer_wait_done(s, mark, 4)
+    p.check(bool(done) and not failed, "telemetry DELETE transfer completes")
+    check_priority_bytes(p, s.hk(), {})
+    p.raise_if()

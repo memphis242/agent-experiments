@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import hashlib
 import struct
+import threading
 from dataclasses import dataclass
 
 MAGIC = 0x4356
@@ -22,9 +23,33 @@ MAX_FRAME = OVERHEAD + MAX_CMD  # 1074
 MARKER = bytes.fromhex("1ACFFC1D")
 DEFAULT_KEY = b"cFS-cmdval-test-key-0123456789ab"
 DEFAULT_SOURCE = 1
+OBSERVATION_SOURCE = 2
 
 assert len(DEFAULT_KEY) == 32
 assert HDR_LEN + MAC_LEN + CRC_LEN == OVERHEAD
+
+
+class SerialAllocator:
+    """One serial history per node/source, shared by all command producers in a run.
+
+    Explicit replay vectors do not advance this allocator. A new node lifetime may
+    use a fresh allocator; application counter resets must retain the existing one.
+    """
+
+    def __init__(self) -> None:
+        self._last: dict[tuple[int, int], int] = {}
+        self._lock = threading.Lock()
+
+    def next(self, node: int, source: int) -> int:
+        assert node in (1, 2) and 0 <= source <= 0xFFFF
+        with self._lock:
+            key = (node, source)
+            value = (self._last.get(key, 0) + 1) & 0xFFFFFFFF
+            self._last[key] = value
+            return value
+
+
+SERIALS = SerialAllocator()
 
 
 class FrameError(Exception):

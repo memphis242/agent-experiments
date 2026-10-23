@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from check import Ctx
 
 REASON_FIELDS = {"FORMAT": "FormatErrors", "CRC": "CrcErrors", "HMAC": "HmacErrors", "SOURCE": "SourceErrors",
-                 "AGE": "AgeErrors"}
+                 "AGE": "AgeErrors", "REPLAY": "ReplayErrors"}
 REJECT_EID = spec.EID["CMDI"]["REJECT_ERR"]
 
 
@@ -256,3 +256,171 @@ def c_cpu2_frame(ctx: "Ctx") -> None:
     if s2[0] != s1[0] + 1:
         raise Fail(f"cpu2: a valid frame carrying SAMPLE_APP NOOP ({spec.sample_cmd_mid(2):#06x}) sent to UDP 1235 did not "
                    f"execute ({s1[0]} -> {s2[0]})")
+
+
+SOURCE_COUNTERS = ("Accepted", "FormatErrors", "CrcErrors", "HmacErrors", "SourceErrors", "AgeErrors", "ReplayErrors")
+
+
+def parse_source_stats(packet: bytes) -> tuple[dict[str, int], ...]:
+    need = spec.TLM_HDR + spec.CMDI_SOURCE_SIZE
+    if len(packet) != need:
+        raise Fail(f"CMDI source statistics packet has {len(packet)} bytes, expected exactly {need}")
+    rows = []
+    for i in range(9):
+        source, spare, *values = struct.unpack_from(spec.CMDI_SOURCE_FMT, packet, spec.TLM_HDR + i * 32)
+        if spare:
+            raise Fail(f"CMDI source row {i} has nonzero Spare")
+        rows.append({"SourceId": source, **dict(zip(SOURCE_COUNTERS, values))})
+    return tuple(rows)
+
+
+def source_stats(n: Node) -> tuple[dict[str, int], ...]:
+    got = n.request(lambda: n.cmd("CMDI", "SEND_SOURCE_STATS", gap=0),
+                    spec.app_mid("CMDI", "SOURCE_TLM", n.id), timeout=2)
+    if not got:
+        raise Fail(f"{n.cpu}: SEND_SOURCE_STATS produced no reply within 2 s")
+    rows = parse_source_stats(got[0].data)
+    if tuple(row["SourceId"] for row in rows) != (1, 2, 0, 0, 0, 0, 0, 0, 0):
+        raise Fail(f"{n.cpu}: source statistics do not follow the active AllowedSources order")
+    return rows
+
+
+def check_source_row(p: Problems, row: dict[str, int], **expected: int) -> None:
+    for field in SOURCE_COUNTERS:
+        p.check(row[field] == expected.get(field, 0), f"source {row['SourceId']} {field}={row[field]}, expected {expected.get(field, 0)}")
+
+
+def c_replay_window(ctx: "Ctx") -> None:
+    """Serial-window boundaries use source 1; all observations consume only source 2."""
+    import tables as tb
+    nodes = boot(ctx, (1, 2))
+    n, peer = nodes[1], nodes[2]
+    for node in nodes.values():
+        node.load_table("CMDI", tb.CmdiTable().pack())
+        node.cmd("CMDI", "RESET_COUNTERS")
+    p = Problems()
+    before = sample_counters(n)[0]
+    mark = n.g.mark()
+    frame100 = n.frame(noop_cmd(n), source_id=1, sequence=100)
+    for frame in (frame100, n.frame(noop_cmd(n), source_id=1, sequence=37),
+                  n.frame(noop_cmd(n), source_id=1, sequence=36), frame100):
+        n.send_raw(frame)
+        time.sleep(0.15)
+    p.check(sample_counters(n)[0] == before + 2, "only serial100 and unseen37 execute;36 and duplicate100 do not")
+    rows = source_stats(n)
+    check_source_row(p, rows[0], Accepted=2, ReplayErrors=2)
+    for row in rows[2:]:
+        check_source_row(p, row)
+    hk = n.hk("CMDI")
+    p.check(hk["ReplayErrors"] == 2 and hk["FramesReceived"] - hk["FramesAccepted"] == 2,
+            "aggregate CMDI counters count exactly two REPLAY rejections")
+    for item in judge_reject_events(n.events(mark, "CMDI", REJECT_EID), [("REPLAY", 1)] * 2):
+        p.check(False, item)
+    peer.send_raw(frame100)
+    peer.settle()
+    check_source_row(p, source_stats(peer)[0], Accepted=1)
+    # A successful table activation provides the clean window required for wrap.
+    n.load_table("CMDI", tb.CmdiTable().pack())
+    before = sample_counters(n)[0]
+    for serial in (0xFFFFFFFF, 0, 0xFFFFFFFF):
+        n.send_raw(n.frame(noop_cmd(n), source_id=1, sequence=serial))
+        time.sleep(0.15)
+    check_source_row(p, source_stats(n)[0], Accepted=2, ReplayErrors=1)
+    p.check(sample_counters(n)[0] == before + 2, "FFFFFFFF->0 wraps forward; duplicateFFFFFFFF does not execute")
+    p.raise_if()
+
+
+def c_key_rotation(ctx: "Ctx") -> None:
+    """Authenticated native table staging, ACTIVE switch, retired-key and replay rejection."""
+    import socket
+    import tables as tb
+    n = boot(ctx, (1,))[1]
+    p = Problems()
+    original = n.key
+    next_key = bytes(range(1, 33))
+    n.load_table("CMDI", tb.CmdiTable(key=original, next_key=next_key, next_valid=1).pack())
+    p.check(n.hk("CMDI")["NextValid"] == 1, "native LOAD/VALIDATE/ACTIVATE stages NEXT")
+    n.cmd("CMDI", "RESET_COUNTERS")
+    baseline = sample_counters(n)[0]
+    n.send_raw(n.frame(noop_cmd(n), source_id=1, sequence=500))
+    n.cmd("CMDI", "SWITCH_KEY", source_id=1, sequence=501)
+    n.key = next_key
+    hk = n.hk("CMDI")
+    p.check(hk["KeySwitches"] == 1 and hk["NextValid"] == 0, "SWITCH_KEY consumes NEXT and increments KeySwitches")
+    mark = n.g.mark()
+    n.send_raw(n.frame(noop_cmd(n), source_id=1, sequence=502, key=original))
+    n.send_raw(n.frame(noop_cmd(n), source_id=1, sequence=500))
+    n.send_raw(n.frame(noop_cmd(n), source_id=1, sequence=502))
+    n.settle()
+    p.check(sample_counters(n)[0] == baseline + 2, "retired key and replay do not execute; fresh NEXT-key command executes")
+    check_source_row(p, source_stats(n)[0], Accepted=3, HmacErrors=1, ReplayErrors=1)
+    for item in judge_reject_events(n.events(mark, "CMDI", REJECT_EID), [("HMAC", 1), ("REPLAY", 1)]):
+        p.check(False, item)
+    # GW must share the active working copy for both ingress and egress.
+    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as endpoint:
+        endpoint.bind((spec.HOST, 51022))
+        endpoint.settimeout(2)
+        conn = tb.ConnDef(interface=spec.GW_IF["UDP"], enabled=1, local_port=51021,
+                          remote_addr=spec.HOST, remote_port=51022, subs=(spec.verif_mid(0xEA),))
+        n.cmd("GW", "ADD_CONN", bytes((0, 0, 0, 0)) + conn.pack())
+        n.inject([fr.build_verification(spec.verif_mid(0xEA), 40, counter=701)])
+        raw, _address = endpoint.recvfrom(16384)
+        decoded = fr.parse_frame(raw, key=next_key)
+        p.check(decoded.command == fr.build_verification(spec.verif_mid(0xEA), 40, counter=701),
+                "GW egress authenticates under the switched shared ACTIVE key")
+        endpoint.sendto(n.frame(noop_cmd(n), key=next_key, source_id=1, sequence=700), (spec.HOST, 51021))
+        n.settle()
+        p.check(sample_counters(n)[0] == baseline + 3, "GW ingress follows the shared switched key")
+        # Table mask applies to GW as well as CMDI. Staging retains ACTIVE.
+        n.load_table("CMDI", tb.CmdiTable(key=next_key, mask=0x0D, next_key=original, next_valid=1).pack())
+        switch = fr.build_command(spec.app_mid("CMDI", "CMD"), spec.CC["CMDI"]["SWITCH_KEY"])
+        bad = fr.corrupt(n.frame(switch, key=next_key, source_id=1, sequence=800), "mac")
+        before_cmdi, before_gw = n.hk("CMDI"), n.hk("GW")
+        n.send_raw(bad)
+        endpoint.sendto(bad, (spec.HOST, 51021))
+        n.settle()
+        after_cmdi, after_gw = n.hk("CMDI"), n.hk("GW")
+        p.check(after_cmdi["HmacErrors"] == before_cmdi["HmacErrors"] + 1 and after_cmdi["NextValid"] == 1,
+                "CMDI enforces mandatory SWITCH_KEY HMAC with ordinary HMAC disabled")
+        p.check(after_gw["HmacErrors"] == before_gw["HmacErrors"] + 1 and after_gw["PacketsIngressed"] == before_gw["PacketsIngressed"],
+                "GW enforces mandatory SWITCH_KEY HMAC before publishing")
+        n.cmd("CMDI", "SWITCH_KEY", source_id=1, sequence=800)
+        n.key = original
+        n.cmd("CMDI", "SET_ENABLE_MASK", mask_payload(0x0F))
+        n.load_table("CMDI", tb.CmdiTable(key=original).pack())
+        n.cmd("GW", "REMOVE_CONN", bytes((0, 0, 0, 0)))
+    p.raise_if()
+
+
+def c_same_wakeup_order(ctx: "Ctx") -> None:
+    """A tightly queued socket batch supplements the deterministic hidden single-wakeup vectors."""
+    import tables as tb
+    n = boot(ctx, (1,))[1]
+    original = n.key
+    next_key = bytes(range(32, 64))
+    n.load_table("CMDI", tb.CmdiTable(key=original, next_key=next_key, next_valid=1).pack())
+    p = Problems()
+    before = sample_counters(n)[0]
+    switch = fr.build_command(spec.app_mid("CMDI", "CMD"), spec.CC["CMDI"]["SWITCH_KEY"])
+    batch = (n.frame(switch, source_id=1, sequence=100),
+             n.frame(noop_cmd(n), source_id=1, sequence=101),
+             n.frame(noop_cmd(n), key=next_key, source_id=1, sequence=102))
+    n.send_batch(batch)
+    n.key = next_key
+    n.settle()
+    p.check(sample_counters(n)[0] == before + 1, "queued key switch rejects retired-key command and accepts fresh-key command")
+    check_source_row(p, source_stats(n)[0], Accepted=2, HmacErrors=1)
+    for serial, name, payload, offset, corrupt in ((103, "SET_ENABLE_MASK", mask_payload(0x0D), 0, True),
+                                                    (105, "SET_MAX_AGE", struct.pack("<I", 120), -90, False)):
+        before = sample_counters(n)[0]
+        command = n.frame(fr.build_command(spec.app_mid("CMDI", "CMD"), spec.CC["CMDI"][name], payload),
+                          source_id=1, sequence=serial)
+        packet = n.frame(noop_cmd(n), source_id=1, sequence=serial + 1, time_offset=offset)
+        n.send_batch((command, fr.corrupt(packet, "mac") if corrupt else packet))
+        n.settle()
+        p.check(sample_counters(n)[0] == before + 1, f"queued {name} applies before following datagram")
+    n.load_table("CMDI", tb.CmdiTable(key=next_key, next_key=original, next_valid=1).pack())
+    n.cmd("CMDI", "SWITCH_KEY")
+    n.key = original
+    n.load_table("CMDI", tb.CmdiTable().pack())
+    p.raise_if()

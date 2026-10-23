@@ -4,7 +4,7 @@
     "prefix": "S1 ",
     "base": "STOR must behave as specified when driven through its entry point STOR_AppMain with software bus messages, using only the names, structures, message IDs, function codes and event IDs in the specification.",
     "cases": {
-      "S1 Startup and housekeeping": "at startup STOR must register events and the StorageTable (400 bytes) with a validation function, subscribe to its command, SEND_HK and WAKEUP message IDs, every used table entry and the global STOR_XFER_SEG_MID and STOR_XFER_ACK_MID, create both roots one directory level at a time, emit event 1, and answer SEND_HK with the 72-byte STOR_HkTlm_Payload_t including the idle transfer fields",
+      "S1 Startup and housekeeping": "at startup STOR must register events and the StorageTable (400 bytes) with a validation function, subscribe to its command, SEND_HK and WAKEUP message IDs, every used table entry and the global STOR_XFER_SEG_MID and STOR_XFER_ACK_MID, create both roots one directory level at a time, emit event 1, and answer SEND_HK with the 1096-byte STOR_HkTlm_Payload_t including PriorityBytes[256] including the idle transfer fields",
       "S1 Heartbeat": "STOR must send one SFI_HeartbeatCmd_t on SFI_HEARTBEAT_MID on every 1 Hz WAKEUP, with AppName STOR and Sequence 1 for the first heartbeat and one more for each next one",
       "S1 Startup error events": "initialization and pipe failures must be reported with events 7 (pipe), 8 (table registration), 9 (table load), 11 (subscription) and 12 (directory creation)",
       "S1 Table validation": "the table validation function must reject empty or unterminated roots, zero quotas, MaxPacketFileBytes below 1024 or above TelemetryQuotaBytes, a threshold outside 1..100, a used entry with Priority or Decimation 0 and duplicate used MsgIds (event 10), and accept the boundary values",
@@ -24,7 +24,12 @@
       "S1 Listing packets": "LIST_DIR and LIST_ALL send STOR_ListTlm_t packets of at most four entries with TotalEntries, PacketIndex and EntriesInPacket, directories as name/ with size 0, LIST_ALL depth-first with relative paths, an empty listing as one packet, and event 25 for a missing directory",
       "S1 Table update": "after a table update STOR subscribes to new entries, unsubscribes from removed ones, keeps its transfer subscriptions, and resets the run-time priority, decimation and threshold to the table values",
       "S1 Idle close": "on WAKEUP a packet file not written for 10 seconds or more is closed, and not earlier",
-      "S1 File write failures": "a packet file that cannot be created or written is reported with event 15 and STOR keeps running"
+      "S1 File write failures": "a packet file that cannot be created or written is reported with event 15 and STOR keeps running",
+      "S1 Quota atomicity and activation": "S1.6 reject zero file quota or telemetry below MaxPacketFileBytes atomically, accept below-used quotas, keep existing files, immediate drops/purge and table restoration.",
+      "S1 FILE_INFO CRC and no mutation": "S1.6 full FILE_INFO identity/size/ISO-HDLC CRC for empty/123456789/binary and packet header bytes, zero spares and no file/transfer mutation.",
+      "S1 FILE_INFO errors": "S1.6 path, unterminated, invalid area, missing, directory, open packet file and OSAL read failure produce named errors and no reply.",
+      "S1 Priority byte reclassification": "S1.6 PriorityBytes exact256-row accounting across open files, SET_PRIORITY, archived files, table reclassification to unknown0, transfer DELETE and purge.",
+      "S1 FILE_INFO close failure": "S1.6 an OSAL close failure on a regular FILE_INFO source emits one FILE_INFO_ERR and no reply or success event, increments only CommandErrorCounter, preserves file/transfer/accounting state, and permits a later successful request."
     }
   },
   "s2-hidden-stor-transfer": {

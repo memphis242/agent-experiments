@@ -97,11 +97,15 @@ class CmdiTable:
     sources: tuple[int, ...] = (1, 2)
     max_age: int = 30
     mask: int = 0x0F
+    next_key: bytes = bytes(32)
+    next_valid: int = 0
 
     def pack(self) -> bytes:
         assert len(self.key) == 32 and len(self.sources) <= spec.CMDVAL_MAX_SOURCES
         src = list(self.sources) + [0] * (spec.CMDVAL_MAX_SOURCES - len(self.sources))
         body = self.key + struct.pack("<8HIB3x", *src, self.max_age, self.mask)
+        assert len(self.next_key) == 32
+        body += self.next_key + struct.pack("<B3x", self.next_valid)
         assert len(body) == spec.CMDI_TABLE_SIZE
         return body
 
@@ -109,7 +113,7 @@ class CmdiTable:
     def unpack(body: bytes) -> "CmdiTable":
         assert len(body) == spec.CMDI_TABLE_SIZE
         vals = struct.unpack_from("<8HIB", body, 32)
-        return CmdiTable(bytes(body[:32]), tuple(vals[:8]), vals[8], vals[9])
+        return CmdiTable(bytes(body[:32]), tuple(vals[:8]), vals[8], vals[9], bytes(body[56:88]), body[88])
 
 
 # ----------------------------------------------------------------------------- TLMO (S4.1)
@@ -118,14 +122,20 @@ class CmdiTable:
 class TlmoTable:
     budget: int = 16
     capacity: int = 64
-    streams: tuple[tuple[int, int], ...] = ()  # (mid, class) in slot order; mid 0 = unused slot
+    streams: tuple[tuple[int, int] | tuple[int, int, int], ...] = ()  # optional third field is decimation
+    profiles: tuple[tuple[int, tuple[int, int, int, int]], ...] = ((16, (0, 1, 2, 3)), (8, (0, 1, 2, 2)), (4, (0, 1, 1, 1)))
 
     def pack(self) -> bytes:
         assert len(self.streams) <= spec.TLMO_MAX_STREAMS
         body = struct.pack("<HH", self.budget, self.capacity)
         for i in range(spec.TLMO_MAX_STREAMS):
-            mid, cls = self.streams[i] if i < len(self.streams) else (INVALID_MID, 0)
-            body += struct.pack("<IB3x", mid, cls)
+            row = self.streams[i] if i < len(self.streams) else (INVALID_MID, 0, 0)
+            mid, cls = row[:2]
+            dec = row[2] if len(row) == 3 else (1 if mid else 0)
+            body += struct.pack("<IBBH", mid, cls, dec, 0)
+        assert len(self.profiles) == 3
+        for budget, mapping in self.profiles:
+            body += struct.pack("<H4BH", budget, *mapping, 0)
         assert len(body) == spec.TLMO_TABLE_SIZE
         return body
 
@@ -133,11 +143,12 @@ class TlmoTable:
     def unpack(body: bytes) -> "TlmoTable":
         assert len(body) == spec.TLMO_TABLE_SIZE
         budget, cap = struct.unpack_from("<HH", body, 0)
-        streams = tuple(struct.unpack_from("<IB", body, 4 + i * 8) for i in range(spec.TLMO_MAX_STREAMS))
-        return TlmoTable(budget, cap, streams)
+        streams = tuple(struct.unpack_from("<IBB", body, 4 + i * 8) for i in range(spec.TLMO_MAX_STREAMS))
+        profiles = tuple((struct.unpack_from("<H", body, 516 + i * 8)[0], tuple(body[518 + i * 8:522 + i * 8])) for i in range(3))
+        return TlmoTable(budget, cap, streams, profiles)
 
     def used(self) -> dict[int, int]:
-        return {mid: cls for mid, cls in self.streams if mid != INVALID_MID}
+        return {row[0]: row[1] for row in self.streams if row[0] != INVALID_MID}
 
 
 # ----------------------------------------------------------------------------- GW (S5.1)
@@ -151,6 +162,8 @@ class ConnDef:
     remote_port: int = 0
     device_path: str = ""
     subs: tuple[int, ...] = ()
+    keepalive_enabled: int = 0
+    peer_node: int = 0
 
     def pack(self) -> bytes:
         assert len(self.subs) <= spec.GW_MAX_SUBS
@@ -158,14 +171,18 @@ class ConnDef:
         addr = self.remote_addr.encode()[:16].ljust(16, b"\0")
         dev = self.device_path.encode()[:64].ljust(64, b"\0")
         body = struct.pack(spec.GW_CONN_DEF_FMT, self.interface, self.enabled, self.local_port, addr,
-                           self.remote_port, 0, dev, *subs)
+                           self.remote_port, 0, dev, self.keepalive_enabled, self.peer_node, 0, *subs)
         assert len(body) == spec.GW_CONN_DEF_SIZE
         return body
 
 
-def gw_table(conns: dict[int, ConnDef] | None = None) -> bytes:
+def gw_table(conns: dict[int, ConnDef] | None = None, routes: tuple[tuple[int, int, int], ...] = ()) -> bytes:
     conns = conns or {}
     body = b"".join((conns.get(i) or ConnDef()).pack() for i in range(spec.GW_MAX_CONNECTIONS))
+    assert len(routes) <= spec.GW_MAX_ROUTES
+    for i in range(spec.GW_MAX_ROUTES):
+        mid, primary, backup = routes[i] if i < len(routes) else (0, 0, 0)
+        body += struct.pack(spec.GW_ROUTE_FMT, mid, primary, backup, 0)
     assert len(body) == spec.GW_TABLE_SIZE
     return body
 
@@ -207,3 +224,8 @@ class SfiTable:
                 watches.append(row)
         return SfiTable(n, w, h, tuple(a for a in apps if a), tuple(watches))
 
+
+# SFI and MODE use the same native image helpers and registry.
+import sys as _sys
+import tables_sfi_mode as _tables_sfi_mode
+_tables_sfi_mode.install(_sys.modules[__name__])

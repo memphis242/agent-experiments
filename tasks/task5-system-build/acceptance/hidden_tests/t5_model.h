@@ -164,7 +164,8 @@ T5_FN void H_TIME_Micro2SubSecs(void *ud, UT_EntryKey_t key, const UT_StubContex
 
 /* ------------------------------------------------------------------------- CCSDS messages (byte level) */
 
-#define T5_MSG_MAX 2048
+#define T5_MSG_MAX 16384
+typedef char t5_packet_storage_invariant[(T5_MSG_MAX >= 8193) ? 1 : -1];
 
 T5_FN uint32 t5_msg_mid(const uint8 *m) { return t5_be16(m); }
 T5_FN size_t t5_msg_size(const uint8 *m) { return (size_t)t5_be16(m + 4) + 7; }
@@ -408,10 +409,11 @@ T5_FN bool t5_ev_has(uint16 id, int from, const char *s1, const char *s2, const 
 /* ------------------------------------------------------------------------- software bus */
 
 #define T5_MAX_PIPES 8
-#define T5_PIPE_Q    256
-#define T5_POOL      512
+#define T5_PIPE_Q    512
+#define T5_POOL      1024
 #define T5_SUBS_MAX  512
 #define T5_TX_MAX    2048
+typedef char t5_pipe_capacity_invariant[(T5_PIPE_Q >= 512 && T5_POOL >= T5_PIPE_Q) ? 1 : -1];
 
 typedef struct
 {
@@ -576,6 +578,11 @@ T5_FN int t5_route(const uint8 *msg, size_t size)
 T5_FN void t5_capture(const uint8 *m)
 {
     size_t sz = t5_msg_size(m);
+    if (sz > T5_MSG_MAX)
+    {
+        UtAssert_True(false, "SB output size %lu exceeds model capacity %u", (unsigned long)sz, T5_MSG_MAX);
+        return;
+    }
     if (t5_ntx < T5_TX_MAX)
     {
         t5_tx[t5_ntx].mid = t5_msg_mid(m);

@@ -49,7 +49,7 @@ extern void STOR_AppMain(void);
 #define TLM_HDR      16
 #define CMD_HDR      8
 #define FS_HDR       64
-#define HK_PAYLOAD   72
+#define HK_PAYLOAD   1096
 #define SEG_PAYLOAD  604
 #define SEG_CMD_SIZE (CMD_HDR + SEG_PAYLOAD)
 #define SEG_TLM_SIZE (TLM_HDR + SEG_PAYLOAD)
@@ -269,6 +269,7 @@ typedef struct
     uint16 xdone, xfail;
     uint32 xsent, xrecv;
     uint16 frecv, rxerr;
+    uint32 priority[256];
 } hk_t;
 
 T5_FN bool get_hk(hk_t *h)
@@ -296,6 +297,12 @@ T5_FN bool get_hk(hk_t *h)
     h->xstate = p[48]; h->xlast = p[49]; h->rxstate = p[50];
     h->xid = t5_get32(p + 52); h->xdone = t5_get16(p + 56); h->xfail = t5_get16(p + 58);
     h->xsent = t5_get32(p + 60); h->xrecv = t5_get32(p + 64); h->frecv = t5_get16(p + 68); h->rxerr = t5_get16(p + 70);
+    {
+        uint64 sum = 0;
+        int i;
+        for (i = 0; i < 256; i++) { h->priority[i] = t5_get32(p + 72 + i * 4); sum += h->priority[i]; }
+        UtAssert_True(sum == h->used, "PriorityBytes[0..255] sum equals TelemetryBytesUsed");
+    }
     return true;
 }
 
@@ -2062,11 +2069,15 @@ static void Test_XferReset(void)
                   "but not XferActiveId (%u), XferLastStatus, transfer state or file accounting", b.xid);
 }
 
+
+#include "expanded_stor.h"
+
 void UtTest_Setup(void)
 {
     UtAssert_True(sizeof(CFE_MSG_TelemetryHeader_t) == TLM_HDR, "telemetry header is %u bytes", (unsigned)sizeof(CFE_MSG_TelemetryHeader_t));
     UtAssert_True(sizeof(CFE_MSG_CommandHeader_t) == CMD_HDR, "command header is %u bytes", (unsigned)sizeof(CFE_MSG_CommandHeader_t));
     UtAssert_True(sizeof(CFE_FS_Header_t) == FS_HDR, "file header is %u bytes", (unsigned)sizeof(CFE_FS_Header_t));
+    Register_Expanded();
     UtTest_Add(Test_StartupAndHousekeeping, Setup, Teardown, "S1 Startup and housekeeping");
     UtTest_Add(Test_Heartbeat, Setup, Teardown, "S1 Heartbeat");
     UtTest_Add(Test_StartupErrors, Setup, Teardown, "S1 Startup error events");

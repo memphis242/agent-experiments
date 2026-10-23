@@ -52,10 +52,10 @@ def localize(mid_cpu1: int, node: int) -> int:
 APP_TOPICS: dict[str, dict[str, tuple[str, int]]] = {
     # name -> (cmd|tlm, topic)
     "STOR": {"CMD": ("cmd", 0xC4), "SEND_HK": ("cmd", 0xC5), "WAKEUP": ("cmd", 0xC6), "HK_TLM": ("tlm", 0xC4),
-             "LIST_TLM": ("tlm", 0xC5), "STATS_TLM": ("tlm", 0xC6), "XFER_TLM": ("tlm", 0xC7)},
-    "CMDI": {"CMD": ("cmd", 0xD0), "SEND_HK": ("cmd", 0xD1), "WAKEUP": ("cmd", 0xD2), "HK_TLM": ("tlm", 0xD0)},
+             "LIST_TLM": ("tlm", 0xC5), "STATS_TLM": ("tlm", 0xC6), "XFER_TLM": ("tlm", 0xC7), "FILE_INFO_TLM": ("tlm", 0xC8)},
+    "CMDI": {"CMD": ("cmd", 0xD0), "SEND_HK": ("cmd", 0xD1), "WAKEUP": ("cmd", 0xD2), "HK_TLM": ("tlm", 0xD0), "SOURCE_TLM": ("tlm", 0xD1)},
     "TLMO": {"CMD": ("cmd", 0xD4), "SEND_HK": ("cmd", 0xD5), "WAKEUP": ("cmd", 0xD6), "HK_TLM": ("tlm", 0xD4),
-             "CLASS_TLM": ("tlm", 0xD5)},
+             "CLASS_TLM": ("tlm", 0xD5), "STREAM_TLM": ("tlm", 0xD6)},
     "GW": {"CMD": ("cmd", 0xD8), "SEND_HK": ("cmd", 0xD9), "WAKEUP": ("cmd", 0xDA), "HK_TLM": ("tlm", 0xD8),
            "CONN_TLM": ("tlm", 0xD9)},
     "SFI": {"CMD": ("cmd", 0xDC), "SEND_HK": ("cmd", 0xDD), "WAKEUP": ("cmd", 0xDE), "HK_TLM": ("tlm", 0xDC),
@@ -64,7 +64,10 @@ APP_TOPICS: dict[str, dict[str, tuple[str, int]]] = {
 NEW_APPS = ("STOR", "CMDI", "TLMO", "GW", "SFI")
 XFER_SEG_MID = 0x1878
 XFER_ACK_MID = 0x1879
-GLOBAL_MIDS = (XFER_SEG_MID, XFER_ACK_MID)
+HEALTH_MID = SFI_HEALTH_MID = 0x187A
+MODE_PEER_MID = 0x187B
+GW_KEEPALIVE_MID = 0x187C
+GLOBAL_MIDS = (XFER_SEG_MID, XFER_ACK_MID, HEALTH_MID, MODE_PEER_MID, GW_KEEPALIVE_MID)
 
 
 def app_mid(app: str, name: str, node: int = 1) -> int:
@@ -193,12 +196,12 @@ def tbl_activate_payload(name: str) -> bytes:
 CC = {
     "STOR": {"NOOP": 0, "RESET_COUNTERS": 1, "SET_PRIORITY": 2, "SET_DECIMATION": 3, "SET_PURGE_THRESHOLD": 4,
              "ADD_FILE": 5, "DELETE_FILE": 6, "LIST_DIR": 7, "LIST_ALL": 8, "SEND_STATS": 9, "CLOSE_FILES": 10,
-             "TRANSFER": 11, "ABORT_TRANSFER": 12},
-    "CMDI": {"NOOP": 0, "RESET_COUNTERS": 1, "SET_MAX_AGE": 2, "SET_ENABLE_MASK": 3},
+             "TRANSFER": 11, "ABORT_TRANSFER": 12, "SET_QUOTA": 13, "FILE_INFO": 14},
+    "CMDI": {"NOOP": 0, "RESET_COUNTERS": 1, "SET_MAX_AGE": 2, "SET_ENABLE_MASK": 3, "SWITCH_KEY": 4, "SEND_SOURCE_STATS": 5},
     "TLMO": {"NOOP": 0, "RESET_COUNTERS": 1, "SET_CLASS": 2, "SET_BUDGET": 3, "SEND_CLASS_MAP": 4,
-             "ADD_STREAM": 5, "REMOVE_STREAM": 6},
+             "ADD_STREAM": 5, "REMOVE_STREAM": 6, "SET_DECIMATION": 7, "SELECT_PROFILE": 8, "SEND_STREAM_STATS": 9},
     "GW": {"NOOP": 0, "RESET_COUNTERS": 1, "ADD_CONN": 2, "REMOVE_CONN": 3, "ENABLE_CONN": 4, "DISABLE_CONN": 5,
-           "RELOAD": 6, "SEND_CONN_STATUS": 7},
+           "RELOAD": 6, "SEND_CONN_STATUS": 7, "SET_ROUTE": 8, "SET_ENABLED_MASK": 9, "SET_PREFERENCE": 10},
     "SFI": {"NOOP": 0, "RESET_COUNTERS": 1, "SET_MISS_LIMIT": 2, "SET_CLUSTER_WINDOW": 3, "SEND_STATUS": 4,
             "CLEAR_HISTORY": 5},
 }
@@ -213,16 +216,17 @@ EID = {
              "FILE_EXISTS_ERR": 20, "FILE_QUOTA_ERR": 21, "FILE_ADD_INF": 22, "FILE_DEL_ERR": 23, "FILE_DEL_INF": 24,
              "LIST_ERR": 25, "LIST_INF": 26, "CLOSE_INF": 27, "STATS_INF": 28, "XFER_START_INF": 29, "XFER_ERR": 30,
              "XFER_DONE_INF": 31, "XFER_FAIL_ERR": 32, "XFER_ABORT_INF": 33, "XFER_RX_INF": 34, "XFER_RX_ERR": 35,
-             "XFER_ACTION_ERR": 36},
+             "XFER_ACTION_ERR": 36, "FILE_INFO_INF": 37, "FILE_INFO_ERR": 38},
     "CMDI": {**COMMON_EIDS, "SOCKET_ERR": 11, "REJECT_ERR": 12, "ACCEPT_DBG": 13, "SET_PARAM_INF": 14,
-             "SET_PARAM_ERR": 15},
+             "SET_PARAM_ERR": 15, "KEY_SWITCH_INF": 16, "KEY_ERR": 17, "SOURCE_STATS_INF": 18},
     "TLMO": {**COMMON_EIDS, "SUB_ERR": 11, "SOCKET_ERR": 12, "SET_CLASS_INF": 13, "SET_CLASS_ERR": 14,
              "SET_BUDGET_INF": 15, "SET_BUDGET_ERR": 16, "DROP_INF": 17, "CLASS_MAP_INF": 18, "TBL_UPDATE_INF": 19,
-             "ADD_STREAM_INF": 20, "ADD_STREAM_ERR": 21, "REMOVE_STREAM_INF": 22, "REMOVE_STREAM_ERR": 23},
+             "ADD_STREAM_INF": 20, "ADD_STREAM_ERR": 21, "REMOVE_STREAM_INF": 22, "REMOVE_STREAM_ERR": 23, "SET_DECIMATION_INF": 24,
+             "SET_DECIMATION_ERR": 25, "PROFILE_INF": 26, "PROFILE_ERR": 27, "STREAM_STATS_INF": 28},
     "GW": {**COMMON_EIDS, "CONN_ADD_INF": 11, "CONN_ADD_ERR": 12, "CONN_REMOVE_INF": 13, "CONN_REMOVE_ERR": 14,
            "CONN_ENABLE_INF": 15, "CONN_ENABLE_ERR": 16, "CONN_DISABLE_INF": 17, "CONN_DISABLE_ERR": 18,
            "RELOAD_INF": 19, "CONN_UP_INF": 20, "CONN_DOWN_ERR": 21, "EGRESS_ERR": 22, "INGRESS_ERR": 23,
-           "CONN_STATUS_INF": 24, "FRAME_REJECT_ERR": 25, "VALTBL_ERR": 26, "VALTBL_INF": 27, "CONN_TIMEOUT_ERR": 28},
+           "CONN_STATUS_INF": 24, "FRAME_REJECT_ERR": 25, "VALTBL_ERR": 26, "VALTBL_INF": 27, "CONN_TIMEOUT_ERR": 28, "KEEPALIVE_ERR": 29, "ROUTE_INF": 30, "ROUTE_ERR": 31, "MASK_INF": 32, "MASK_ERR": 33},
     "SFI": {**COMMON_EIDS, "SUB_ERR": 11, "HB_MISS_ERR": 12, "HB_RESTORED_INF": 13, "HB_UNKNOWN_DBG": 14,
             "STALL_ERR": 15, "RATE_ERR": 16, "WATCH_CLEAR_INF": 17, "CLUSTER_ERR": 18, "SET_PARAM_INF": 19,
             "SET_PARAM_ERR": 20, "STATUS_INF": 21, "HISTORY_CLEAR_INF": 22},
@@ -282,35 +286,35 @@ class Layout:
 
 
 HK_LAYOUTS: dict[str, Layout] = {
-    "STOR": Layout("<BBBBIIIIIIIIIHHHHBBBBIHHIIHH", (
+    "STOR": Layout("<BBBBIIIIIIIIIHHHHBBBBIHHIIHH256I", (
         "CommandCounter", "CommandErrorCounter", "PurgeThresholdPercent", None,
         "TelemetryBytesUsed", "TelemetryQuotaBytes", "FileBytesUsed", "FileQuotaBytes",
         "PacketsStored", "PacketsDecimated", "PacketsDropped", "FilesPurged", "PurgeCycles",
         "FileAddsRejected", "FileCount", "ActiveEntries", "OpenPacketFiles",
         "XferState", "XferLastStatus", "RxState", None, "XferActiveId", "XfersCompleted", "XfersFailed",
-        "XferSegmentsSent", "XferSegmentsReceived", "FilesReceived", "RxErrors")),
-    "CMDI": Layout("<BBBBIIIIIIII", (
+        "XferSegmentsSent", "XferSegmentsReceived", "FilesReceived", "RxErrors", *(f"PriorityBytes{i}" for i in range(256)))),
+    "CMDI": Layout("<BBBB10IBBH", (
         "CommandCounter", "CommandErrorCounter", "EnableMask", None, "FramesReceived", "FramesAccepted",
-        "FormatErrors", "CrcErrors", "HmacErrors", "SourceErrors", "AgeErrors", "MaxAgeSeconds")),
-    "TLMO": Layout("<BBHHHHHI4I4II", (
+        "FormatErrors", "CrcErrors", "HmacErrors", "SourceErrors", "AgeErrors", "MaxAgeSeconds", "ReplayErrors", "KeySwitches", "NextValid", "SourceSlotsUsed", None)),
+    "TLMO": Layout("<BBHHHHHI4I4IIB3xI", (
         "CommandCounter", "CommandErrorCounter", "BudgetPacketsPerCycle", "QueuedPackets", "QueueCapacity",
         "ActiveStreams", None, "PacketsReceived", "Sent0", "Sent1", "Sent2", "Sent3",
-        "Dropped0", "Dropped1", "Dropped2", "Dropped3", "SocketErrors")),
-    "GW": Layout("<BBBBIIIIIHBBIIIIII", (
+        "Dropped0", "Dropped1", "Dropped2", "Dropped3", "SocketErrors", "SelectedProfile", "PacketsDecimated")),
+    "GW": Layout("<BBBBIIIIIHBB8I", (
         "CommandCounter", "CommandErrorCounter", "ConnectionsConfigured", "ConnectionsUp",
         "PacketsEgressed", "PacketsIngressed", "EgressErrors", "IngressErrors", "LoopDrops",
         "Subscriptions", "ValTableShared", None, "FramesReceived",
-        "FormatErrors", "CrcErrors", "HmacErrors", "SourceErrors", "AgeErrors")),
+        "FormatErrors", "CrcErrors", "HmacErrors", "SourceErrors", "AgeErrors", "KeepAliveTimeouts", "RouteSwitches")),
     "SFI": Layout("<BBBBBBBBHHHHIIIII", (
         "CommandCounter", "CommandErrorCounter", "AppsMonitored", "AppsMissing",
         "WatchesInFault", "Correlation", "HbMissLimit", None,
         "RecentMisses", "ClusterCount", "LargestClusterSize", "ClusterWindowSec",
         "TotalHeartbeats", "UnknownHeartbeats", "HbMissEvents", "StallFaults", "RateFaults")),
 }
-assert HK_LAYOUTS["STOR"].size == 72
-assert HK_LAYOUTS["CMDI"].size == 36
-assert HK_LAYOUTS["TLMO"].size == 52
-assert HK_LAYOUTS["GW"].size == 52
+assert HK_LAYOUTS["STOR"].size == 1096
+assert HK_LAYOUTS["CMDI"].size == 48
+assert HK_LAYOUTS["TLMO"].size == 60
+assert HK_LAYOUTS["GW"].size == 60
 assert HK_LAYOUTS["SFI"].size == 36
 
 XFER_SEG_FMT = "<IBBBBHHIIIHH64s512s"
@@ -318,11 +322,11 @@ XFER_SEG_SIZE = struct.calcsize(XFER_SEG_FMT)
 assert XFER_SEG_SIZE == 604
 XFER_ACK_FMT = "<IBBBBI"
 assert struct.calcsize(XFER_ACK_FMT) == 12
-GW_CONN_DEF_FMT = "<BBH16sHH64s16I"
+GW_CONN_DEF_FMT = "<BBH16sHH64sBBH16I"
 GW_CONN_DEF_SIZE = struct.calcsize(GW_CONN_DEF_FMT)
-assert GW_CONN_DEF_SIZE == 152
-GW_CONN_STATUS_FMT = "<BBBBIIII"
-assert struct.calcsize(GW_CONN_STATUS_FMT) == 20
+assert GW_CONN_DEF_SIZE == 156
+GW_CONN_STATUS_FMT = "<BBBB10I"
+assert struct.calcsize(GW_CONN_STATUS_FMT) == 44
 SFI_APP_STATUS_FMT = "<20sBBHII"
 assert struct.calcsize(SFI_APP_STATUS_FMT) == 32
 SFI_MISS_RECORD_FMT = "<B3xII"
@@ -341,10 +345,12 @@ assert struct.calcsize(STOR_STATS_ENTRY_FMT) == 24
 
 # Table images (bodies after the 116-byte file headers).
 STOR_TABLE_SIZE = 400
-CMDI_TABLE_SIZE = 56
-TLMO_TABLE_SIZE = 516
-GW_TABLE_SIZE = GW_MAX_CONNECTIONS * GW_CONN_DEF_SIZE
-assert GW_TABLE_SIZE == 1216
+CMDI_TABLE_SIZE = 92
+TLMO_TABLE_SIZE = 540
+GW_MAX_ROUTES = 16
+GW_ROUTE_FMT = "<IBBH"
+GW_TABLE_SIZE = GW_MAX_CONNECTIONS * GW_CONN_DEF_SIZE + GW_MAX_ROUTES * 8
+assert GW_TABLE_SIZE == 1376
 SFI_TABLE_SIZE = 8 + SFI_MAX_APPS * API_LEN + SFI_MAX_WATCHES * 12
 assert SFI_TABLE_SIZE == 520
 
@@ -374,14 +380,24 @@ TLMO_DEFAULT_CLASSES: dict[int, tuple[str | tuple[str, int], ...]] = {
 
 
 def tlmo_default_streams(node: int) -> dict[int, int]:
-    """MID -> class of the default PriorityTable on `node` (48 streams with SBN)."""
+    """Default PriorityTable in the normative slot order (57 used streams with SBN)."""
     out: dict[int, int] = {}
+    sbn = []
     for cls, names in TLMO_DEFAULT_CLASSES.items():
-        for n in names:
-            mid = verif_mid(n[1], node) if isinstance(n, tuple) else named_tlm_mid(n, node)
-            assert mid not in out
-            out[mid] = cls
-    assert len(out) == 48
+        for name in names:
+            mid = verif_mid(name[1], node) if isinstance(name, tuple) else named_tlm_mid(name, node)
+            if isinstance(name, str) and name.startswith("SBN_"):
+                sbn.append((mid, cls))
+            else:
+                assert mid not in out
+                out[mid] = cls
+    out.update(sbn)
+    additions = ((tlm_mid(0xF0, node), 0), (tlm_mid(0xDE, node), 0),
+                 (app_mid("STOR", "FILE_INFO_TLM", node), 2), (app_mid("CMDI", "SOURCE_TLM", node), 2),
+                 (app_mid("TLMO", "STREAM_TLM", node), 2), (tlm_mid(0xF1, node), 2),
+                 (cmd_mid(0xF3, node), 0), (HEALTH_MID, 0), (MODE_PEER_MID, 0))
+    out.update(additions)
+    assert len(out) == 57
     return out
 
 
@@ -406,3 +422,17 @@ COMPONENTS = {  # component -> (directory, source prefix)
     "stor": ("apps/stor", "STOR_"), "cmdi": ("apps/cmdi", "CMDI_"), "tlmo": ("apps/tlmo", "TLMO_"),
     "gw": ("apps/gw", "GW_"), "sfi": ("apps/sfi", "SFI_"), "cmdval_lib": ("libs/cmdval_lib", "CMDVAL_"),
 }
+
+# Full-sized request telemetry layouts, including every zero-filled unused row.
+STOR_FILE_INFO_FMT = "<B3x64sII"
+STOR_FILE_INFO_SIZE = struct.calcsize(STOR_FILE_INFO_FMT)
+CMDI_SOURCE_FMT = "<HH7I"
+CMDI_SOURCE_SIZE = 9 * struct.calcsize(CMDI_SOURCE_FMT)
+TLMO_STREAM_FMT = "<HHIBBH5I"
+TLMO_STREAM_SIZE = 4 + TLMO_MAX_STREAMS * struct.calcsize(TLMO_STREAM_FMT)
+assert (STOR_FILE_INFO_SIZE, CMDI_SOURCE_SIZE, TLMO_STREAM_SIZE) == (76, 288, 2052)
+
+# Subsystem additions share the common identifier/layout registry.
+import sys as _sys
+import spec_sfi_mode as _spec_sfi_mode
+_spec_sfi_mode.install(_sys.modules[__name__])

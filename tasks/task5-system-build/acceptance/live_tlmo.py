@@ -365,7 +365,7 @@ def c_tlmo_commands(ctx: "Ctx") -> None:
 
 DEFAULT_TLM_NAMES = ("CFE_ES_HK_TLM_MID", "CFE_EVS_HK_TLM_MID", "CFE_SB_HK_TLM_MID", "CFE_TBL_HK_TLM_MID",
                      "CFE_TIME_HK_TLM_MID", "SAMPLE_APP_HK_TLM_MID", "STOR_HK_TLM_MID", "CMDI_HK_TLM_MID",
-                     "TLMO_HK_TLM_MID", "GW_HK_TLM_MID", "SFI_HK_TLM_MID", "CFE_EVS_LONG_EVENT_MSG_MID")
+                     "TLMO_HK_TLM_MID", "GW_HK_TLM_MID", "SFI_HK_TLM_MID", "MODE_HK_TLM_MID", "CFE_EVS_LONG_EVENT_MSG_MID")
 
 
 def judge_default_telemetry(mids_seen: set[int], node: int) -> list[str]:
@@ -410,10 +410,11 @@ def sb_counters(n: Node, mark: int) -> tuple[int, int] | None:
 
 
 def c_pipe_depth_probe(ctx: "Ctx") -> None:
-    """Pilot probe: TLMO's pipe (depth 48, limit 32 per stream) takes the 48 default streams and a burst of
-    verification packets without software bus pipe overflows or message-limit errors."""
+    """Verify actual kernel queue capacities and the declared paced live burst envelope."""
+    import preflight
     n = boot(ctx, (1,))[1]
     n.ensure_command_path()
+    preflight.verify_capacities(preflight.process_inventory(n.pids()[0]), n.cpu)
     sb_send_hk = spec.cmd_mid(spec.CFE_SB_SEND_HK_TOPIC)
     time.sleep(6.0)
     mark = n.g.mark()
@@ -423,7 +424,7 @@ def c_pipe_depth_probe(ctx: "Ctx") -> None:
     if before is None:
         raise Fail("no cFE SB housekeeping arrived after a framed CFE_SB SEND_HK")
     burst = [verif(m, 1000 + i) for i in range(8) for m in (E8, E9, EA, EB)]
-    n.inject(burst, burst=32, gap=0.0)
+    n.inject(burst, burst=8, gap=0.6)
     time.sleep(5.0)
     mark = n.g.mark()
     n.send(sb_send_hk, 0)
@@ -433,4 +434,159 @@ def c_pipe_depth_probe(ctx: "Ctx") -> None:
         raise Fail("no cFE SB housekeeping arrived after the burst")
     if after != before:
         raise Fail(f"software bus PipeOverflowErrorCounter/MsgLimitErrorCounter went from {before} to {after} during steady "
-                   f"state and a burst of 32 verification packets")
+                   f"state and four paced bursts of eight verification packets")
+
+
+@dataclass(frozen=True)
+class StreamStat:
+    slot: int
+    mid: int
+    cls: int
+    decimation: int
+    queued: int
+    received: int
+    sent: int
+    dropped: int
+    decimated: int
+    errors: int
+
+
+def parse_stream_stats(packet: bytes) -> tuple[StreamStat, ...]:
+    expected = spec.TLM_HDR + spec.TLMO_STREAM_SIZE
+    if len(packet) != expected:
+        raise Fail(f"STREAM_TLM has {len(packet)} bytes; expected full-sized {expected}")
+    count, spare = struct.unpack_from("<HH", packet, spec.TLM_HDR)
+    if count > 64 or spare:
+        raise Fail(f"STREAM_TLM invalid count/spare {count}/{spare}")
+    rows = []
+    last_slot = -1
+    for i in range(64):
+        offset = spec.TLM_HDR + 4 + i * 32
+        raw = packet[offset:offset + 32]
+        if i >= count:
+            if any(raw):
+                raise Fail(f"STREAM_TLM unused tail row {i} is nonzero")
+            continue
+        slot, reserved, mid, cls, decimation, queued, rx, sent, drop, decimated, errors = struct.unpack(spec.TLMO_STREAM_FMT, raw)
+        if reserved or not last_slot < slot < 64 or not mid or cls > 3 or not decimation:
+            raise Fail(f"STREAM_TLM row {i} invalid slot/spare/MID/class/decimation")
+        rows.append(StreamStat(slot, mid, cls, decimation, queued, rx, sent, drop, decimated, errors))
+        last_slot = slot
+    if len({row.mid for row in rows}) != len(rows):
+        raise Fail("STREAM_TLM contains duplicate stream MIDs")
+    return tuple(rows)
+
+
+def stream_stats(n: Node, *, held: bool = False) -> tuple[StreamStat, ...]:
+    got = n.request(lambda: n.cmd("TLMO", "SEND_STREAM_STATS", gap=0),
+                    spec.app_mid("TLMO", "STREAM_TLM", n.id), timeout=2, held_snapshot=held)
+    if not got:
+        raise Fail(f"{n.cpu}: SEND_STREAM_STATS produced no full snapshot within 2 s")
+    return parse_stream_stats(got[0].data)
+
+
+def check_stream(p: Problems, row: StreamStat, *, received: int, sent: int, queued: int, decimated: int) -> None:
+    p.check((row.received, row.sent, row.queued, row.decimated, row.dropped, row.errors) ==
+            (received, sent, queued, decimated, 0, 0), f"stream {row.mid:#06x} counters {row}; expected "
+            f"Received/Sent/Queued/Decimated {received}/{sent}/{queued}/{decimated}, no drops/errors")
+
+
+def c_stream_profiles(ctx: "Ctx") -> None:
+    n = boot(ctx, (1,))[1]
+    p = Problems()
+    default = stream_stats(n)
+    p.check([(r.slot, r.mid, r.cls, r.decimation) for r in default] ==
+            [(i, mid, cls, 1) for i, (mid, cls) in enumerate(spec.tlmo_default_streams(n.id).items())],
+            "default full STREAM_TLM has57 ordered slots with Decimation1 and zero tail")
+    stats_mid = spec.app_mid("TLMO", "STREAM_TLM")
+    table = tb.TlmoTable(256, 32, ((EA, 2, 2), (EB, 3, 3), (stats_mid, 0, 1), (CLASS_TLM, 0, 1),
+                                     (TLMO_HK, 0, 1), (EVS, 0, 1)))
+    n.load_table("TLMO", table.pack())
+    for mid in (EVS, TLMO_HK):
+        n.cmd("TLMO", "REMOVE_STREAM", struct.pack("<I", mid))
+    n.cmd("TLMO", "RESET_COUNTERS")
+    n.cmd("TLMO", "SET_BUDGET", budget_payload(0))
+    mark = n.g.mark()
+    n.inject([verif(mid, i) for i in range(12) for mid in (EA, EB)], burst=8, gap=0.6)
+    time.sleep(0.2)
+    snapshot = {row.mid: row for row in stream_stats(n, held=True)}
+    check_stream(p, snapshot[EA], received=12, sent=0, queued=6, decimated=6)
+    check_stream(p, snapshot[EB], received=12, sent=0, queued=4, decimated=8)
+    actual = [(d.mid, index_of(d.data)) for d in n.g.since(mark) if d.mid in (EA, EB)]
+    wanted = [(EA, i) for i in range(0, 12, 2)] + [(EB, i) for i in range(0, 12, 3)]
+    p.check(actual == wanted, f"held drain must contain exactly the decimated class-ordered packet list: {actual}")
+    drained = {row.mid: row for row in stream_stats(n)}
+    check_stream(p, drained[EA], received=12, sent=6, queued=0, decimated=6)
+    check_stream(p, drained[EB], received=12, sent=4, queued=0, decimated=8)
+    n.cmd("TLMO", "ADD_STREAM", stream_payload(TLMO_HK, 0))
+    for profile, budget, classes in ((0, 16, (2, 3)), (1, 8, (2, 2)), (2, 4, (1, 1))):
+        n.cmd("TLMO", "SELECT_PROFILE", struct.pack("<B3x", profile))
+        cm = class_map(n)
+        effective = dict((mid, cls) for mid, cls in cm.streams if mid)
+        p.check((cm.budget, effective[EA], effective[EB]) == (budget, *classes), f"profile {profile} applies budget/map")
+        hk = n.hk("TLMO")
+        p.check((hk["SelectedProfile"], hk["BudgetPacketsPerCycle"]) == (profile, budget), "HK reports selected profile and actual budget")
+    n.cmd("TLMO", "SET_CLASS", stream_payload(EB, 0))
+    n.cmd("TLMO", "SET_BUDGET", budget_payload(7))
+    cm = class_map(n)
+    p.check(cm.budget == 7 and dict(cm.streams).get(EB) == 0, "runtime class/budget overrides apply")
+    n.cmd("TLMO", "SELECT_PROFILE", struct.pack("<B3x", 1))
+    cm = class_map(n)
+    p.check(cm.budget == 8 and dict(cm.streams).get(EB) == 0, "profile reapplies budget and preserves base-class override")
+    n.cmd("TLMO", "ADD_STREAM", stream_payload(EVS, 0))
+    n.load_table("TLMO", table.pack())
+    cm = class_map(n)
+    p.check(cm.budget == 256 and dict(cm.streams).get(EB) == 3, "activation selects profile0/table budget and resets runtime base class")
+    p.check(n.hk("TLMO")["SelectedProfile"] == 0, "table activation resets SelectedProfile to0")
+    reset = {row.mid: row for row in stream_stats(n)}
+    check_stream(p, reset[EA], received=0, sent=0, queued=0, decimated=0)
+    check_stream(p, reset[EB], received=0, sent=0, queued=0, decimated=0)
+    n.load_table("TLMO", tb.split_image(n.table_image("TLMO"), "TLMO")[1])
+    p.raise_if()
+
+
+def stage_priority_table(n: Node, table: tb.TlmoTable) -> str:
+    """Stage and validate a native image before holding packets for an activation test."""
+    n.table_loads += 1
+    name = spec.TABLES["TLMO"][1]
+    filename = f"acc{n.table_loads}.tbl"
+    (n.cf / filename).write_bytes(tb.with_body(n.table_image("TLMO"), "TLMO", table.pack()))
+    mark = n.g.mark()
+    n.send(spec.tbl_cmd_mid(n.id), spec.CFE_TBL_LOAD_CC, spec.tbl_load_payload("/cf/" + filename))
+    if not n.wait_event(mark, "CFE_TBL", spec.CFE_TBL_FILE_LOADED_INF_EID, 2):
+        raise Fail("reorder table native LOAD did not complete within2s")
+    mark = n.g.mark()
+    n.send(spec.tbl_cmd_mid(n.id), spec.CFE_TBL_VALIDATE_CC, spec.tbl_validate_payload(name))
+    if not n.wait_event(mark, "CFE_TBL", spec.CFE_TBL_VALIDATION_INF_EID, 2):
+        raise Fail("reorder table native VALIDATE did not complete within2s")
+    return name
+
+
+def c_stream_reorder(ctx: "Ctx") -> None:
+    n = boot(ctx, (1,))[1]
+    p = Problems()
+    stats_mid = spec.app_mid("TLMO", "STREAM_TLM")
+    initial = tb.TlmoTable(256, 32, ((EA, 3, 3), (EB, 1, 1), (stats_mid, 0, 1), (EVS, 0, 1)))
+    replacement = tb.TlmoTable(0, 32, ((EB, 1, 1), (EA, 0, 3), (stats_mid, 0, 1)))
+    n.load_table("TLMO", initial.pack())
+    name = stage_priority_table(n, replacement)
+    n.cmd("TLMO", "REMOVE_STREAM", struct.pack("<I", EVS))
+    n.cmd("TLMO", "SET_BUDGET", budget_payload(0))
+    mark = n.g.mark()
+    n.inject([verif(EA, 1), verif(EA, 2), verif(EB, 3)])
+    time.sleep(0.2)
+    n.send(spec.tbl_cmd_mid(n.id), spec.CFE_TBL_ACTIVATE_CC, spec.tbl_activate_payload(name))
+    time.sleep(0.6)
+    p.check(not n.g.since(mark, EA) and not n.g.since(mark, EB), "table replacement budget0 retains held packets")
+    snapshot = {row.mid: row for row in stream_stats(n, held=True)}
+    p.check((snapshot[EA].slot, snapshot[EB].slot, snapshot[EA].cls) == (1, 0, 0), "reordered streams retain MID ownership in new slots")
+    check_stream(p, snapshot[EA], received=0, sent=0, queued=1, decimated=0)
+    check_stream(p, snapshot[EB], received=0, sent=0, queued=1, decimated=0)
+    actual = [(d.mid, index_of(d.data)) for d in n.g.since(mark) if d.mid in (EA, EB)]
+    p.check(actual == [(EB, 3), (EA, 1)], f"retained queue classes survive table slot reorder: {actual}")
+    n.inject([verif(EA, 4)])
+    stats = {row.mid: row for row in stream_stats(n)}
+    check_stream(p, stats[EA], received=1, sent=2, queued=0, decimated=0)
+    n.cmd("TLMO", "ADD_STREAM", stream_payload(EVS, 0))
+    n.load_table("TLMO", tb.split_image(n.table_image("TLMO"), "TLMO")[1])
+    p.raise_if()

@@ -26,11 +26,12 @@ HIDDEN_CHECKS: dict[str, tuple[str, str]] = {
     "s5-hidden-gw": ("gw", "hidden"),
     "s6-hidden-sfi-clusters": ("sfi", "hidden_clusters"),
     "s6-hidden-sfi": ("sfi", "hidden"),
+    "s7-hidden-mode": ("mode", "hidden"),
 }
-COMPONENT_DIRS = {"stor": "apps/stor", "cmdi": "apps/cmdi", "tlmo": "apps/tlmo", "gw": "apps/gw", "sfi": "apps/sfi",
+COMPONENT_DIRS = {"stor": "apps/stor", "cmdi": "apps/cmdi", "tlmo": "apps/tlmo", "gw": "apps/gw", "sfi": "apps/sfi", "mode": "apps/mode",
                   "cmdval_lib": "libs/cmdval_lib"}
 ENTRY = {"stor": "STOR_AppMain", "cmdi": "CMDI_AppMain", "tlmo": "TLMO_AppMain", "gw": "GW_AppMain",
-         "sfi": "SFI_AppMain", "cmdval_lib": "CMDVAL_ValidateFrame"}
+         "sfi": "SFI_AppMain", "mode": "MODE_AppMain", "cmdval_lib": "CMDVAL_ValidateFrame"}
 RUN_TIMEOUT_S = 300
 BEGIN_RE = re.compile(r"^\[BEGIN\] \d+ (.+?)\s*$")
 UNMODELLED_RE = re.compile(r"unmodelled call: (\w+)")
