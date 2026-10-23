@@ -2516,9 +2516,9 @@ takes `target` (`cpu1`, `cpu2` or `mission`).
 
 | Capability | Plugin (`ctf/plugins/<dir>`, class) | Instructions |
 |------------|-------------------------------------|--------------|
-| Build and send CMDI frames from the table key | `cmdi_plugin`, `CmdiPlugin` | `SendCmdiCommand`, `SendCmdiRawPacket`, `ReplayCmdiFrame` |
+| Build and send CMDI frames from the table key; stage NEXT through cFE TBL | `cmdi_plugin`, `CmdiPlugin` | `SendCmdiCommand`, `SendCmdiRawPacket`, `ReplayCmdiFrame`, `PrepareCmdiKeyTable`, `ActivateCmdiKeyTable` |
 | Drive two nodes in one test | CTF's own cfs plugin, configured as in S8.2 | CTF's `RegisterCfs`, `StartCfs`, `ShutdownCfs`, `CheckTlmValue`, `CheckEvent`, ... with `target` |
-| Record telemetry arrival order on a node's TLMO port | `tlm_order_plugin`, `TlmOrderPlugin` | `StartTlmRecording`, `CheckTlmOrder`, `StopTlmRecording` |
+| Record telemetry arrival order/counts on a node's TLMO port | `tlm_order_plugin`, `TlmOrderPlugin` | `StartTlmRecording`, `CheckTlmOrder`, `CheckTlmCounters`, `StopTlmRecording` |
 | UDP and TCP endpoints and PTY pairs facing GW, carrying CMDI frames with stream framing | `link_plugin`, `LinkPlugin` | `OpenUdpLink`, `OpenTcpServer`, `WaitLinkConnected`, `OpenPtyPair`, `SendLinkCmdiCommand`, `SendLinkPacket`, `CheckLinkPacket`, `CheckNoLinkPacket`, `CloseLink`, `OpenGwRelay`, `SetGwRelayEnabled` |
 | Stop and start an app through ES commands and wait on events | `es_app_plugin`, `EsAppPlugin` | `StopApp`, `StartApp`, `WaitForEvent` |
 | Reassemble ground STOR transfers from the raw TLMO listener tap | `stor_ground_plugin`, `StorGroundPlugin` | `StartStorGroundCapture`, `CheckStorGroundTransfer` |
@@ -2560,6 +2560,34 @@ CMDI rejects, so every command in these tests goes through this plugin.
   across cmdi, es_app and link plugins; explicit sequences advance the
   allocator if newer by S3.6 serial arithmetic. Replaying does not.
 
+- `PrepareCmdiKeyTable`: `target`, `path`, `active_key_hex`,
+  `next_key_hex`; before StartCfs only. Creates a native cFE table image
+  for `CMDI.ValTable` at `path` relative to that target's scratch run
+  directory (the same path restrictions as node_file_plugin). Both keys
+  must decode to CMDVAL_KEY_LEN bytes; ACTIVE/NEXT must be nonzero and
+  distinct. Payload is S3.3's default CMDI_ValTable_t with only
+  Validation.HmacKey, NextKey and NextValid (1) changed. Use the build's
+  native cFE table-file header and layout, zero padding/spares; no new
+  flight command or key file format. Fail on invalid arguments, a running
+  target, an existing destination or image-generation/write errors.
+- `ActivateCmdiKeyTable`: `target`, `path`, `key_hex`, `source_id`,
+  optional `timeout` (default 10 s, for the whole instruction). Uses that
+  prepared image only; `cf/x.tbl` maps to onboard `/cf/x.tbl`. Send native
+  cFE TBL LOAD (file source, that onboard filename), VALIDATE (inactive
+  buffer, table `CMDI.ValTable`), then ACTIVATE (`CMDI.ValTable`), on
+  CFE_TBL_CMD_MID using the bundled CFE_TBL_LOAD_CC,
+  CFE_TBL_VALIDATE_CC and CFE_TBL_ACTIVATE_CC and their native payloads.
+  Each command is an authenticated CMDI frame with the supplied key/source
+  and shared serial allocator. Await successful load, validation and
+  activation completion in native TBL telemetry/events before the next
+  step; fail on any negative result or timeout, with its reason. After
+  activation await CMDI HK NextValid 1 and GW HK ValTableShared 1 and two
+  GW wakeups, all within timeout. This is S3.6 table activation, including
+  its replay/statistics reset; it never switches keys, rewrites the live
+  default table, restarts CMDI/GW, or changes the plugin's configured key.
+  Later commands explicitly supply key_hex. The prepared image is removed
+  with RemoveNodeFile even on failure.
+
 **Two nodes.** No new instruction: the configuration of S8.2 plus
 `target` on every instruction, CTF's and the plugins'. If CTF's cfs plugin
 needs a change to run two local targets side by side, it is a patch
@@ -2584,6 +2612,16 @@ STOR segments; patch it if it does not.
   MID reached its minimum count, and, with `counter_offset`, the uint32 at
   that offset strictly increases within each MID.
 - `StopTlmRecording`: `target`, `name`.
+- `CheckTlmCounters`: `target`, `name`, `mid`, `counter_offset`,
+  `values` (ordered list of uint32 values). Inspect all datagrams of that
+  MID recorded so far under name, reading a little-endian uint32 at the
+  absolute packet byte offset. Require exactly the listed values in that
+  order, with no missing, extra or short packet; fail with actual/expected
+  values. MID accepts a CCDD name or number. This is a synchronous check,
+  not a wait/minimum-count assertion; scripts first await a stream snapshot
+  proving their final injection has drained. Recording continues, so a
+  later check can verify the cumulative sequence. Unknown recording,
+  malformed arguments or raw-tap errors fail the instruction/test.
 
 **`link_plugin`.** Endpoints on the test's side of a GW connection, each
 known by `name`. GW is a TCP client (S5.2), so the plugin plays the
@@ -2698,7 +2736,8 @@ message of STOR, CMDI, TLMO, GW, SFI and MODE with all its function codes
 `STOR_XFER_SEG_MID`, `STOR_XFER_ACK_MID`, `SFI_FAULT_MID`,
 `SFI_HEALTH_MID`, `MODE_PEER_MID` and `GW_KEEPALIVE_MID`), every telemetry message
 (HK and the other packets of C.3), their MIDs in both `set1` and `set2`,
-and the two ES commands of S8.3. Add probe lines for every new message to
+the two ES commands and the three native TBL commands used in S8.3.
+Add probe lines for every new message to
 `ctf/ccdd/tools/layout_probe.c` (and include paths to `probe_layout.sh`)
 so that `ccdd/tools/probe_layout.sh | ccdd/tools/check_layout.py` covers
 them, and make that check pass. The `ci_lab_*` and `to_lab_*` definitions
@@ -2731,6 +2770,9 @@ nonzero if any fails.
 | 10 | `st_gw_failover.json` | pinned two-node primary cut, backup selection and failback sequence below |
 | 11 | `st_cmdi_replay.json` | replay an identical frame, rejection accounting and non-execution below |
 | 12 | `st_fault_log_transfer.json` | fault onset/clear, binary log dump and byte-checked STOR transfer to ground below |
+| 13 | `st_safe_mode_node_loss.json` | CRITICAL precedence, both-link peer loss, guarded SAFE exit and quiet recovery with TLMO/STOR profiles below |
+| 14 | `st_key_switch.json` | authenticated CMDI/GW key switches, retired-key rejection, retained replay windows and exact source statistics below |
+| 15 | `st_tlmo_profiles.json` | exact per-stream decimation counts and MODE-driven budget/class profiles through stream snapshots below |
 
 `st_gw_commands.json` is the single CTF test an earlier revision of this
 task required as `gw_udp.json`. The two fixture scripts
@@ -2738,7 +2780,7 @@ task required as `gw_udp.json`. The two fixture scripts
 unframed commands and enable TO_LAB, which no longer runs: port them to
 `cmdi_plugin` (and drop the TO_LAB enable step) so that every script in
 `ctf/tests/` passes against your build; `run_system_tests.sh` runs them
-before the twelve above. Update `ctf/README.md` for the CMDI command path,
+before the fifteen above. Update `ctf/README.md` for the CMDI command path,
 the always-on TLMO output, the two targets and the plugins.
 
 ### S8.6 Required integrated script contents
@@ -2747,11 +2789,23 @@ The following sequences are normative script contents, in addition to
 S8.5 setup/cleanup. Every observation is from TLMO; no script edits a
 running node's files to simulate a fault. The scripts use C.7 timing
 bounds, timeouts up to 30 s for recovery and up to 15 s for transfer, and
-finish within 180 s each. All scripts 1..8 and the smoke scripts first
-send MODE SET_ENABLE 0; new scripts enable it only as specified. The
+finish within 180 s each. Every script and smoke script first sends MODE
+SET_ENABLE 0 on each started node and waits for HK Enabled 0 and the
+initial profile completion barrier of C.7. Scripts enable MODE only as
+specified below (script 9 enables after that barrier). The
 SFI heartbeat script therefore retains its explicit StartApp step.
+No script restarts SFI while MODE runs. Register event/report capture
+before stimuli; use CheckEvent's captured history for early arrivals,
+and WaitForEvent only for events still expected after it starts.
+Commands below use the target's C.3 MID names and CCDD payloads, with all
+spares zero. Scheduled HK observations include C.7's one-HK-period
+allowance; request replies use its 2 s bound at sufficient budget. Scripts
+13-15 use packets <=1024 bytes for injected verification traffic, at most
+8 per burst and burst starts >=0.6 s apart. For full stream snapshots use
+budget 256, one outstanding large request, capture it and wait >=0.6 s
+before another large request (the PLAN timing/envelope rules apply).
 
-1. `st_mode_fault_response.json`: start cpu1; keep peer monitors unarmed,
+9. `st_mode_fault_response.json`: start cpu1; keep peer monitors unarmed,
    MODE enabled. Wait for all five real SFI apps OK; RESET_COUNTERS on
    MODE and GW, record mode/response status. StopApp GW, without a manual
    StartApp. Observe SFI HB_MISS_ERR (12) and an active HEARTBEAT report
@@ -2763,7 +2817,7 @@ SFI heartbeat script therefore retains its explicit StartApp step.
    NOMINAL only after the continuous 20 s healthy interval (S7.2).
    Then NOMINAL budget 16 and threshold 80; the final START count is 1.
    Record events before StopApp so an early event is not missed.
-2. `st_gw_failover.json`: start both nodes, MODE disabled during setup.
+10. `st_gw_failover.json`: start both nodes, MODE disabled during setup.
    Configure two UDP connections per node, indices 0 primary/1 backup,
    KeepAliveEnabled 1, PeerNode other node. Primary: cpu1 LocalPort 3101,
    RemotePort 3201, cpu2 LocalPort 3102, RemotePort 3202. Backup:
@@ -2786,7 +2840,7 @@ SFI heartbeat script therefore retains its explicit StartApp step.
    from release of MODE's preference for route 0; other routes use
    S5.4's primary-UP timer. Require NOMINAL after 20 s quiet recovery
    on both. Close both relays on cleanup.
-3. `st_cmdi_replay.json`: cpu1, MODE disabled. Reset CMDI and SAMPLE_APP
+11. `st_cmdi_replay.json`: cpu1, MODE disabled. Reset CMDI and SAMPLE_APP
    counters using source 2; use source 2 for all setup and observations in
    this script, and source 1 only for the two NOOPs and their replays.
    SendCmdiCommand SAMPLE_APP NOOP with automatic fresh serial
@@ -2797,7 +2851,7 @@ SFI heartbeat script therefore retains its explicit StartApp step.
    remains 1. A new fresh-serial NOOP executes and raises that counter
    to 2. Account separately for authenticated commands used to request
    statistics; they use source 2, so source-1 statistics stay exact.
-4. `st_fault_log_transfer.json`: cpu1, MODE disabled; start raw ground
+12. `st_fault_log_transfer.json`: cpu1, MODE disabled; start raw ground
    capture before the stimulus. Send SFI SET_WATCH_ENABLE index 6,
    Enabled 1; inject three values 9 on topic 0xEF payload byte 8, then
    one value 10. Require one CRITICAL LIMIT onset and one clear in
@@ -2809,6 +2863,197 @@ SFI heartbeat script therefore retains its explicit StartApp step.
    Require XfersCompleted 1, then delete fault/log.bin, ACK_FAULT 22 and
    verify latch clear. Remove /cf/sfi_faults.bin with RemoveNodeFile
    path cf/sfi_faults.bin during cleanup.
+13. `st_safe_mode_node_loss.json`: start cpu1 and cpu2, disable MODE
+    first on both as above. Use script 10's exact primary/backup relay
+    ports (3101/3201, 3102/3202; 3111/3211, 3112/3212), connection
+    indices 0/1, addresses 127.0.0.1, KeepAliveEnabled 1 and PeerNode
+    other node, Interface UDP 1, Enabled 1, DevicePath empty and unused
+    Subs INVALID. Here Subs contain only SFI_HEALTH_MID and MODE_PEER_MID;
+    SET_ROUTE 0 health and 1 mode, Primary 0, Backup 1. No verification
+    route/stream is needed. Send SFI SET_PEER_ENABLE 1 (CC 10) and MODE
+    SET_PEER_ENABLE 1 (CC 5) on both; require both connections UP, SFI
+    PeerArmed 1 and MODE SEND_STATUS PeerArmed 1 after real cross-node
+    contact. Wait for the five real monitored apps OK. Enable MODE
+    (CC 2, Enabled 1), require NOMINAL budget 16/threshold 80, then reset
+    SFI, MODE and GW counters (CC 1 each) on both. Do not reset them
+    again until all final assertions are captured.
+    On cpu1 SFI SET_WATCH_ENABLE (CC 8, Index 6, Enabled 1); inject with
+    SendCmdiRawPacket MID 0x18EF, CC 0, payload_hex
+    `000000000000000009000000`, count 3, interval 0.6. Require LIMIT_ERR
+    (SFI 23), one FaultType LIMIT 4, SourceIndex 6, Severity CRITICAL 2,
+    Active/Latched 1 report (slot 22), and MODE TRANSITION_INF (12) to
+    SAFE 2 within the next MODE wakeup plus C.7's 2 s. MODE RESPONSE_INF
+    (15) names slot 22 attempt 1. Require MODE status Profile
+    {TlmProfile 2, PurgeThreshold 50, GwEnabledMask 0x03}; actual TLMO HK
+    SelectedProfile 2/BudgetPacketsPerCycle 4 and STOR HK
+    PurgeThresholdPercent 50, with TLMO PROFILE_INF (26), STOR
+    SET_PARAM_INF (16) and GW MASK_INF (32). SET_MODE NOMINAL (CC 3,
+    Mode 0) and SET_MODE DEGRADED (Mode 1) both fail with MODE_ERR (14),
+    increment CommandErrorCounter to 2, and leave SAFE unchanged.
+    Cut BOTH relays with SetGwRelayEnabled false, leaving sockets and
+    both nodes/apps running. After the cut, GW SEND_CONN_STATUS (CC 7)
+    records the now-stable LastKeepAliveSeconds for each connection;
+    SFI/MODE HK give their independent PeerLastSeconds. Require GW
+    KEEPALIVE_ERR (29),
+    ConnectionsUp 0 and links 0/1 DOWN within [5,8] s of the cut (never
+    before the 6 s keep-alive deadline); SFI LINK_ERR (32), active
+    slots 48/49 within 10 s of the cut. Require SFI NODE_LOSS_ERR (30),
+    slot 56 FaultType 7/SourceIndex 0/Severity 1/Active 1 and PeerLost 1
+    within C.7's [10,12] s of last health receipt; independently MODE
+    PEER_LOSS_ERR (18)/PeerLost 1 within [10,12] s of last mode receipt.
+    Those receipt fields export uint32 Seconds: a value L denotes
+    [L,L+1), not exact time L. Require each onset timestamp in [L+10,L+13)
+    for its own peer field; similarly use [K+6,K+8) for a connection's
+    last keep-alive Seconds K (6 s plus the 10 Hz 1 s tolerance and
+    <1 s quantization). Full-precision deadline boundaries remain the
+    synthetic-time checks of C.7; do not invent a raw keep-alive SB MID.
+    cpu1 remains SAFE despite WARNING losses; cpu2 enters DEGRADED.
+    On cpu1 inject one in-range value with the same MID/payload, last
+    uint32 10 (`0A000000`); require WATCH_CLEAR_INF (17), slot 22 clear
+    with Latched 1, but no automatic SAFE exit. While loss is active,
+    SET_MODE NOMINAL fails (MODE_ERR, CommandErrorCounter 3). SET_MODE
+    DEGRADED now succeeds (CONTROL_INF 13/TRANSITION_INF 12), with no
+    CRITICAL/SAFE-target fault remaining; actual budget 8/threshold 65.
+    Restore both relays by 20 s after the cut and clear the LIMIT within
+    30 s of its onset; all slots must clear before their first 30 s
+    retry deadlines. These are script deadlines, not relaxed fault timers.
+    Require GW UP, SFI LINK_CLEAR_INF (33) for 48/49 and
+    NODE_RESTORED_INF (31) for 56, MODE PEER_RESTORED_INF (19), both
+    PeerLost 0 and no active fault. Stay DEGRADED until a continuous
+    healthy interval completes: NOMINAL in C.7's [20,23] s from the first
+    healthy MODE wakeup, or [20,25] s from the last SFI clear when that
+    clear removes the final guard. When peer restore removes the final
+    guard, use [20,25] s from its event/receipt bound instead; the healthy
+    MODE wakeup remains the [20,23] s reference in either ordering.
+    Require actual NOMINAL budget 16/threshold 80 on both. Final SFI
+    LinkFaults 2, NodeLossFaults 1 each; LimitFaults 1/0 and FaultReports
+    8/6 on cpu1/cpu2. MODE PeerLosses 1 each, Transitions 3/2,
+    ResponsesSent 4/3, RestartsSent/ActionErrors 0; Attempts 1 and
+    Exhausted/Active 0 for slots 48,49,56 on both and 22 on cpu1.
+    ACK_FAULT these inactive slots (CC 6); require ACK_INF (25). Disable
+    MODE, remove routes with SET_ROUTE INVALID MsgId, REMOVE_CONN 0/1
+    (CC 3), restore/CloseLink both relays even on failure, and shut down
+    both nodes. No app restart, SFI restart or forged SFI fault report.
+14. `st_key_switch.json`: cpu1, MODE disabled throughout. Before startup
+    PrepareCmdiKeyTable at cf/ctf_key1.tbl with ACTIVE K0 (S3.3 default)
+    and NEXT K1 (32 bytes 0x01), and cf/ctf_key2.tbl with ACTIVE K1 and
+    NEXT K2 (32 bytes 0x02). Start cpu1, apply the initial-profile barrier,
+    and use source 2 for all setup/observations. OpenUdpLink `key_link`
+    local_port 3301, remote_port 3302. GW ADD_CONN (CC 2) Index 0,
+    Interface UDP 1, Enabled 1, LocalPort 3302, RemotePort 3301,
+    RemoteAddr 127.0.0.1, DevicePath empty, remaining Subs INVALID,
+    KeepAliveEnabled 0, PeerNode 0, Subs only verification MID 0x18E7;
+    no routes. Wait for GW CONN_UP_INF (20)/ConnectionsUp 1 and
+    ValTableShared 1. SAMPLE_APP commands and CMDI_CMD_MID are not Subs.
+    Run two consecutive lanes, first K0->K1 with SWITCH_KEY over CMDI
+    UDP 1234, then K1->K2 with SWITCH_KEY over key_link into GW. In each
+    lane ActivateCmdiKeyTable for its prepared file under the current
+    ACTIVE key, require NextValid 1, then reset CMDI, GW and SAMPLE_APP
+    (CC 1) using source 2/current key. Record a source-statistics baseline
+    after these resets; no table activation or app restart until that
+    lane's final observations. Reset in the stated CMDI, GW, SAMPLE_APP
+    order, then issue exactly one baseline SEND_SOURCE_STATS: source 1 is
+    all zero, source 2 Accepted 3 and all errors zero (CMDI's own reset
+    has cleared its frame's count). Use scheduled HK for subsequent
+    observations; the only further source-2 CMDI UDP frames are lane 1's
+    switch, the verification injection, GW SEND_CONN_STATUS (CC 7), and
+    the final SEND_SOURCE_STATS. No extra polling commands are permitted.
+    Source 1 sends SAMPLE_APP NOOP (CC 0) over CMDI with explicit serial
+    100 and save_frame `old_frame`; require SAMPLE_APP HK
+    CommandCounter 1. Send CMDI SWITCH_KEY (CC 4) under current ACTIVE,
+    source 2/fresh serial, by SendCmdiCommand in lane 1 or
+    SendLinkCmdiCommand in lane 2. Require KEY_SWITCH_INF (CMDI 16),
+    KeySwitches 1 and NextValid 0. The switch frame's MAC is valid under
+    the retiring key; do not disable any validation check. Supply the new
+    key explicitly to every subsequent setup/observation command. Wait
+    two GW wakeups before link checks, including C.7's 10 Hz +1 s bound.
+    Within 30 s of the saved frame's timestamp, ReplayCmdiFrame
+    old_frame unchanged: require CMDI REJECT_ERR (12) HMAC/source 1.
+    Send the same SAMPLE_APP NOOP over CMDI with source 1/sequence 100,
+    new key and fresh onboard timestamp: require REJECT_ERR REPLAY.
+    The first rejection proves retired-key rejection; the second proves
+    retained serial state after SWITCH_KEY. Neither executes. Send a
+    fresh new-key NOOP, source 1/sequence 101 over CMDI; it executes,
+    CommandCounter 2. On key_link send a retired-key NOOP then a fresh
+    new-key NOOP, source 1/serials 102 then 103: require GW
+    FRAME_REJECT_ERR (25) HMAC/connection 0 for the first and unchanged
+    SAMPLE_APP CommandCounter 2; the second raises it to 3. SendCmdiRawPacket
+    MID 0x18E7, CC 0, payload_hex `000000000000000000000000`, count 1,
+    source 2/new key, then CheckLinkPacket
+    key_link MID 0x18E7, key_hex new key, count 1, timeout 2; shared GW
+    egress must authenticate with the switched key too.
+    Request GW SEND_CONN_STATUS, then final SEND_SOURCE_STATS (CMDI CC 5,
+    SOURCE_STATS_INF 18) and scheduled HK under the new key: source-1
+    row Accepted 2, HmacErrors 1, ReplayErrors 1,
+    Format/Crc/Source/AgeErrors 0. All unused rows and OTHER stay zero.
+    Source-2 Accepted is exactly 7 in lane 1 and 6 in lane 2, including
+    the final statistics request itself; every source-2 error is zero.
+    GW ingress bypasses CMDI UDP statistics: lane-2 SWITCH_KEY and both
+    link NOOPs never enter those source rows or frame counters.
+    CMDI HK FramesAccepted 9/8 and FramesReceived 11/10 in lanes 1/2,
+    HmacErrors/ReplayErrors 1 each, SourceSlotsUsed 2, all other reason
+    counters 0. GW since reset: FramesReceived/RxFrames
+    2 in lane 1, 3 in lane 2; HmacErrors/RxErrors 1, RxPackets and
+    PacketsIngressed 1/2 respectively, other reason/ingress errors and
+    LoopDrops 0. In particular GW has no replay rejection/window.
+    Finish lane 1 before preparing lane 2's serial-100 stimulus: its
+    table activation intentionally clears replay/source state. Each lane
+    has a 30 s stimulus-to-replay deadline, not a wait of 30 s.
+    Cleanup under K2 (or the last confirmed ACTIVE key on failure): GW
+    REMOVE_CONN 0, CloseLink key_link, RemoveNodeFile both prepared
+    images even on failure, StopTlmRecording if used, ShutdownCfs. No
+    default table rewrite or restart is used to switch or restore keys;
+    fresh scratch nodes in the next script start with K0.
+15. `st_tlmo_profiles.json`: cpu1, MODE disabled for the whole script;
+    explicit MODE SET_MODE still applies profiles per S7.2. Use source 2
+    for control and source 1 for injections. After the initial profile
+    barrier, MODE SET_MODE NOMINAL (CC 3, Mode 0), APPLY_PROFILE (CC 7)
+    and verify TLMO SelectedProfile 0/budget 16 and STOR threshold 80.
+    Use default verification streams A=0x18EA (base class 2, slot 38)
+    and B=0x18EB (base class 3, slot 42), with SBN's 57-stream default
+    table and no additions/removals. SEND_CLASS_MAP (TLMO CC 4) must
+    confirm those slots/MIDs/classes before counters are asserted.
+    SET_DECIMATION (TLMO CC 7) A=2 and B=3, each SET_DECIMATION_INF (24),
+    establishes phase 0. SET_BUDGET (CC 3, Packets 256) for snapshots
+    and RESET_COUNTERS (CC 1); resetting retains those zero phases.
+    StartTlmRecording `profiles`. SendCmdiRawPacket for each MID, CC 0,
+    payload_hex `000000000000000000000000`, count 12, interval 0.6,
+    counter_offset 16, counter_start 1. Run streams sequentially with
+    >=0.6 s between bursts; only these injections use A/B. Wait until
+    all 12 frames per stream have been processed and kept packets drain
+    (allow CMDI ingress and following TLMO drain each its next 10 Hz
+    wakeup +1 s under C.7); then SEND_STREAM_STATS
+    (CC 9, STREAM_STATS_INF 28), capture its full reply within 2 s.
+    Match by Slot and MsgId, not array position alone: A has Received 12,
+    Sent 6, Decimated 6; B Received 12, Sent 4, Decimated 8. Both have
+    Dropped/SendErrors/Queued 0, Decimation 2/3 and Class 2/3. Exact
+    delivered payload counters are A {1,3,5,7,9,11}, B {1,4,7,10};
+    CheckTlmCounters on recording profiles, each MID, counter_offset 16,
+    must match those lists exactly as well as the stream Sent counts.
+    No global Sent total is asserted because background traffic continues.
+    After the first snapshot, MODE APPLY_PROFILE restores actual budget
+    16; then MODE SET_MODE DEGRADED (Mode 1) changes it to 8. Require
+    CONTROL_INF (13),
+    TRANSITION_INF (12), TLMO PROFILE_INF (26), actual SelectedProfile 1
+    and budget 8, STOR threshold 65, MODE status Profile.TlmProfile 1.
+    MODE remains disabled, so no automatic 20 s recovery races the test.
+    Do not send SELECT_PROFILE directly. Do not change factors or reset
+    counters/phases. Inject 6 more packets per stream, counter_start 13,
+    otherwise the same encoding/pacing; phases after 12 were both 0.
+    Require at budget 8 the next kept A counters {13,15,17} and B
+    {13,16} drain without drops. After observing budget 8, temporarily
+    SET_BUDGET 256, await >=0.6 s since the prior full snapshot and
+    SEND_STREAM_STATS again, with no other large request outstanding.
+    A now Received 18/Sent 9/Decimated 9, B 18/6/12; both still
+    Dropped/SendErrors/Queued 0, factors 2/3, effective Class 2/2.
+    CheckTlmCounters cumulative values A {1,3,5,7,9,11,13,15,17},
+    B {1,4,7,10,13,16}; require StreamCount 57, entries in ascending
+    slots with the remaining seven entries all zero in both snapshots.
+    TLMO HK PacketsDecimated 21; other streams remain factor 1.
+    MODE APPLY_PROFILE must restore actual budget 8 after the temporary
+    override. Cleanup: SET_DECIMATION A/B 1, MODE SET_MODE NOMINAL,
+    require budget 16/threshold 80, StopTlmRecording profiles and
+    ShutdownCfs even on failure. No file artifacts or SFI restart.
 
 ### S8 Acceptance
 
@@ -2820,7 +3065,9 @@ Each script of S8.5, and each ported smoke script, is then run by name
 with `ctf/run_ctf.sh`, in a private network namespace with nothing else
 running, with `CFS_RUN_DIR` and `CFS_RUN_DIR_CPU2` pointing at scratch
 copies of the installed trees and a 300-second limit per script, and must
-pass; `ctf/run_system_tests.sh` must exist and run them in order. The
+pass; `ctf/run_system_tests.sh` must exist and run both smoke scripts then
+all fifteen st_ scripts in S8.5 order (17 results). Each script's own
+180 s completion requirement remains within the 300 s grading limit. The
 scripts, plugins and patches are also read in human review for whether
 they test what the table says. Acceptance runs its own headless checks
 against your build for the live behaviour of S1 to S7; those do not use
@@ -2855,14 +3102,16 @@ your CTF code.
   restart protocol, slot mapping/cooldown/cap lifetime and both peer timers.
   SFI DESIGN.md records latch versus physical state, mixed cluster history,
   event-window saturation and fault-log format. CMDI/GW notes cover shared
-  runtime key ownership and CMDI replay-state lifetime. Required unit tests
+  runtime key ownership and CMDI replay-state lifetime. TLMO notes cover
+  decimation phases, profile mapping/budget overrides and snapshot counters.
+  Required unit tests
   exercise these behaviours and error paths with synthetic cFE time, not
   host sleeps; line coverage for MODE is per source file as for every app.
 - Report at `docs/reports/system.md` with the sections `Design summary`,
   `Interfaces`, `Unit tests` (counts per app and library), `Coverage` (per
   source file), `System tests` (results of `ctf/run_system_tests.sh`, and
   the CTF plugins and patches you added) and `Limitations`. `Interfaces` includes the full MID/topic inventory,
-  mode/fault transitions and profiles; `System tests` includes all twelve
+  mode/fault transitions and profiles; `System tests` includes all fifteen
   st_ scripts and both smoke scripts; `Design summary` includes scheduler
   arithmetic (32 used, 0 spare) and peer/replay/key lifetimes.
 - Commit the work.

@@ -100,7 +100,8 @@ Round counts and time budgets are TBD by owner.
 - gcov line coverage >= 95 percent per new source file for all seven components (six apps and cmdval_lib),
   including code inherited from the lab apps.
 - DESIGN.md per component, at most 80 lines; docs/reports/system.md with its six
-  sections, the system-tests section referring to ctf/run_system_tests.sh.
+  sections, the system-tests section referring to ctf/run_system_tests.sh
+  and reporting all fifteen st_ scripts plus both smoke scripts.
 - Static mission checks: OSAL_CONFIG_MAX_FILE_NAME = 32 and
   OSAL_CONFIG_QUEUE_MAX_DEPTH = 512 for both CPUs; allowed mission SB pool
   overrides support the declared live burst envelope. MODE app/table installed on both CPUs, prefix/entry
@@ -112,7 +113,7 @@ Round counts and time budgets are TBD by owner.
   and SFI's default MODE app slot. All new table types/defaults validated.
 - N: require apps/mode/DESIGN.md <=80 lines, unit-test module coverage >=95%,
   all seven design notes, six report sections with complete MID inventory,
-  state/profile/restart/lifetime decisions and 14 CTF results. New per-source
+  state/profile/restart/lifetime decisions and 17 CTF results. New per-source
   code is included in the same -Werror/runtest/coverage gates.
 - Unit-test count reflects CI_LAB and TO_LAB tests no longer being built.
 
@@ -388,9 +389,11 @@ Round counts and time budgets are TBD by owner.
 ### S8 CTF system tests
 - Run ctf/setup_ctf.sh fresh (patches under ctf/shims/patches/ applied, plugins
   under ctf/plugins/ loaded via additional_plugins_path).
-- CCDD layout probe for every new app plus ES START_APP/STOP_APP.
+- CCDD layout probe for every new app plus ES START_APP/STOP_APP and the
+  native TBL LOAD/VALIDATE/ACTIVATE commands used to stage NEXT.
 - `ctf --pluginInfo` lists every pinned instruction: SendCmdiCommand,
-  SendCmdiRawPacket, ReplayCmdiFrame; StartTlmRecording, CheckTlmOrder, StopTlmRecording;
+  SendCmdiRawPacket, ReplayCmdiFrame, PrepareCmdiKeyTable, ActivateCmdiKeyTable;
+  StartTlmRecording, CheckTlmOrder, CheckTlmCounters, StopTlmRecording;
   OpenUdpLink, OpenTcpServer, WaitLinkConnected, OpenPtyPair, SendLinkPacket,
   SendLinkCmdiCommand, CheckLinkPacket, CheckNoLinkPacket, CloseLink, OpenGwRelay, SetGwRelayEnabled; StopApp,
   StartApp, WaitForEvent; CheckNodeFile, CompareNodeFiles, RemoveNodeFile; StartStorGroundCapture,
@@ -398,9 +401,15 @@ Round counts and time budgets are TBD by owner.
 - Run the two ported smoke scripts and each st_*.json (st_gw_commands,
   st_cmdval_hmac, st_tlmo_priority, st_gw_udp, st_gw_tcp, st_gw_serial,
   st_sfi_heartbeat, st_stor_transfer, st_mode_fault_response, st_gw_failover,
-  st_cmdi_replay, st_fault_log_transfer) by name with run_ctf.sh, CFS_RUN_DIR and
+  st_cmdi_replay, st_fault_log_transfer, st_safe_mode_node_loss, st_key_switch,
+  st_tlmo_profiles) by name with run_ctf.sh, CFS_RUN_DIR and
   CFS_RUN_DIR_CPU2 on scratch copies, 300 s limit each; ctf/run_system_tests.sh
-  exists and invokes both smoke scripts then the twelve st_ scripts in order.
+  exists and invokes both smoke scripts then the fifteen st_ scripts in order
+  (17 results). Each script must finish within the spec's 180 s budget;
+  retain the 300 s per-script grading limit. The host-coordinated serialized
+  timing lane, watchdog/rerun policy, raw timestamp bounds, initial MODE
+  disable/profile barrier and burst/large-request rules above apply to these
+  runs too. Scripts 13-15 never restart SFI while MODE runs.
 - New script content checks mirror S8.6, not just existence: stopped GW has no
   manual START, DEGRADED/profile/recovery assertions and one restart; failover
   uses two transparent UDP relays and verifies both-node mode and duplicate-free
@@ -415,6 +424,49 @@ Round counts and time budgets are TBD by owner.
   closing sockets; restoring it recovers keep-alives. All instructions return
   failure with a logged reason on argument/I/O/timeout errors. Human review
   checks that each script demonstrates its named behaviour.
+- Run and review `st_safe_mode_node_loss.json` (order 13): two nodes,
+  script 10's exact relay ports/health-mode routes; critical LIMIT slot 22
+  forces cpu1 SAFE, with actual TLMO profile 2/budget 4 and STOR threshold
+  50, and rejects NOMINAL/DEGRADED exits. Cut both relay paths, not the
+  apps: verify links 48/49, independent peer-mode loss and SFI NODE_LOSS
+  slot 56 with C.7/S8.6 bounds. cpu1 stays SAFE despite the warning
+  demands, cpu2 becomes DEGRADED. Clear LIMIT, reject NOMINAL while loss
+  remains, accept guarded DEGRADED; restore relays by cut+20 s and clear
+  each fault before its retry deadline. Review continuous quiet recovery,
+  final profiles and exact SFI/MODE counters/attempts in S8.6, ACKs and
+  cleanup. A latched inactive fault must not block recovery; no manual
+  NOMINAL shortcut, node stop or SFI restart may substitute for this path.
+- Run and review `st_key_switch.json` (order 14): two prebuilt native
+  CMDI.ValTable fixtures, K0->K1 through CMDI and K1->K2 through GW;
+  all staging is authenticated native TBL LOAD/VALIDATE/ACTIVATE. Review
+  retained ACTIVE/NEXT validation, KEY_SWITCH_INF/KeySwitches/NextValid,
+  unchanged old-frame HMAC rejection and fresh-key duplicate-serial REPLAY
+  rejection within 30 s, then fresh commands executing through both paths.
+  GW must share the new key for ingress and egress. Require source-1
+  Accepted/HmacErrors/ReplayErrors 2/1/1, source-2 Accepted 7/6 by lane,
+  zero other source errors/rows, CMDI HK totals and exact GW frame/packet
+  counters specified in S8.6. No table activation/reset/restart may erase
+  the replay window between the stimulus, switch and replay assertions.
+  Review prepared-image removal, active-key cleanup and link closure.
+- Run and review `st_tlmo_profiles.json` (order 15): MODE first disabled,
+  initial barrier complete, factors 2/3 at phase 0 on default slots 38/42.
+  Inject 12 then 6 packets each with pinned counters/pacing. Verify full
+  SEND_STREAM_STATS snapshots Received/Sent/Decimated 12/6/6 and 12/4/8,
+  then 18/9/9 and 18/6/12, zero drops/errors/queues, exact raw delivered
+  counter lists via CheckTlmCounters, 57 ordered used slots/zero tail.
+  MODE SET_MODE DEGRADED, without direct SELECT_PROFILE, must change
+  actual budget 16->8 and classes 2/3->2/2; factor/phase/counters persist.
+  Observe budget 8 before temporarily raising to 256 for the full reply;
+  APPLY_PROFILE restores 8. Verify PacketsDecimated 21, restore factors
+  and NOMINAL budget/threshold, and close raw recording on cleanup.
+- Plugin review/negative tests: PrepareCmdiKeyTable rejects malformed or
+  equal/zero keys, unsafe paths, existing destinations and running targets;
+  probe the native image/header/layout. ActivateCmdiKeyTable uses authenticated
+  native commands in completion order, fails on TBL rejection/timeouts and
+  never silently changes the configured key or default disk table. Confirm
+  source/serial allocation is shared with the other plugins. CheckTlmCounters
+  must fail on missing/extra/out-of-order/short packets and raw-tap errors,
+  including a duplicate that a minimum-count assertion would miss.
 
 ## Pilot must confirm (pack should probe these and fail loudly, not silently)
 - Zero-timeout reads on a PTY fd through OSAL.
