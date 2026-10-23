@@ -272,6 +272,10 @@ Round counts and time budgets are TBD by owner.
   failback, return to primary after [10,12] s from continuous UP (or preference
   release for overridden routes). Keep the existing TCP no-listener 18-26 s
   cycle test with keep-alives disabled. MODE disabled for isolated GW cases.
+- Out of scope (owner decision): dedicated hidden vectors for an interrupted
+  primary stability interval, both endpoints unavailable, table-activation
+  preference reset and the full TCP timeout versus keep-alive distinction;
+  adversarial plugin checks beyond `s8-plugin-negative` basics.
 
 ### S6 SFI
 - Unit tests: SFI_ComputeClusters vectors.
