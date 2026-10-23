@@ -13,6 +13,7 @@ import hmac
 import io
 import json
 import logging
+import time
 import zlib
 import sys
 from lib.plugin_manager import Plugin, ArgTypes
@@ -37,6 +38,8 @@ class AcceptanceDispatchPlugin(Plugin):
             data = dict(data) if isinstance(data, dict) else data
             if instruction == "AcceptanceSerialProbe":
                 result = self.serial_probe()
+            elif instruction == "AcceptanceModeDisabled":
+                result = self.mode_disabled(**data)
             elif instruction == "AcceptanceNativePrepare":
                 from ctf_native_probe import prepare_native_probe
                 run_dir = Global.config.get(data["target"], "cfs_run_dir")
@@ -117,6 +120,39 @@ class AcceptanceDispatchPlugin(Plugin):
             return False
 
     @staticmethod
+    def mode_disabled(target, timeout=5):
+        if not 0 < timeout <= 10:
+            raise ValueError("MODE isolation timeout must be in (0,10]")
+        dispatched = Global.plugin_manager.find_plugin_for_command_and_execute
+        end = time.monotonic() + timeout
+        setup = [
+            {"instruction": "SendCmdiCommand", "data": {
+                "target": target, "mid": "MODE_CMD_MID", "cc": "MODE_SET_ENABLE_CC",
+                "args": {"Payload": {"Enabled": 0}}, "source_id": 2}},
+            {"instruction": "ClearTlmPacket", "data": {"target": target, "mid": "MODE_HK_TLM_MID"}},
+            {"instruction": "SendCmdiCommand", "data": {
+                "target": target, "mid": "MODE_SEND_HK_MID", "cc": "MODE_SEND_HK_CC", "args": {}, "source_id": 2}},
+        ]
+        for item in setup:
+            if dispatched(item) is not True:
+                print("ADVERSARIAL_MODE_SETUP|{}|{} failed before fresh MODE HK acknowledgement".format(
+                    target, item["instruction"]), flush=True)
+                return False
+        check = {"instruction": "CheckTlmValue", "data": {
+            "target": target, "mid": "MODE_HK_TLM_MID",
+            "args": [{"compare": "==", "variable": "Payload.Enabled", "value": 0}]}}
+        while True:
+            Global.time_manager.pre_command()
+            if dispatched(check) is True:
+                return True
+            remaining = end - time.monotonic()
+            if remaining <= 0:
+                print("ADVERSARIAL_MODE_SETUP|{}|no fresh MODE HK Enabled 0 within {} s after authenticated disable".format(
+                    target, timeout), flush=True)
+                return False
+            time.sleep(min(0.1, remaining))
+
+    @staticmethod
     def serial_probe():
         key = bytes.fromhex("6346532d636d6476616c2d746573742d6b65792d303132333435363738396162")
         frames = []
@@ -146,10 +182,10 @@ class AcceptanceDispatchPlugin(Plugin):
                 "target": "cpu1", "mid": 0x1801, "payload_hex": "", "cc": 0,
                 "sequence": 100, "save_frame": "acceptance_saved_frame"}})
             es_stop = dispatched({"instruction": "StopApp", "data": {
-                "target": "cpu1", "app": "GW", "timeout": 5}})
+                "target": "cpu1", "app": "GW", "timeout": 12}})
             es_start = dispatched({"instruction": "StartApp", "data": {
                 "target": "cpu1", "app": "GW", "entry": "GW_AppMain", "file": "/cf/gw.so",
-                "priority": 70, "stack_size": 131072, "timeout": 5}})
+                "priority": 70, "stack_size": 131072, "timeout": 10}})
             link_result = dispatched({"instruction": "OpenUdpLink", "data": {
                 "name": "acceptance_serial_link", "local_port": 3349, "remote_port": 3350}})
             link = dispatched({"instruction": "SendLinkCmdiCommand", "data": {
@@ -352,7 +388,9 @@ def adversarial_vectors() -> list[dict]:
          "setup": [{"instruction": "AcceptanceNativePrepare", "data": {"target": "cpu1"}, "wait": 0}],
          "expected": True, "prepare_before_start": True, "native_probe": True},
         {"id": "cross-plugin-shared-cmdi-serials", "instruction": "AcceptanceSerialProbe",
-         "data": {}, "setup": [], "expected": True, "start_before": True},
+         "data": {}, "setup": [
+             {"instruction": "AcceptanceModeDisabled", "data": {"target": "cpu1", "timeout": 5}},
+         ], "expected": True, "start_before": True, "process_limit": 45},
         {"id": "link-connect-timeout", "instruction": "WaitLinkConnected",
          "data": {"name": "never-connected", "timeout": 0.05},
          "setup": [{"instruction": "OpenTcpServer", "data": {"name": "never-connected", "port": 3349}, "wait": 0}],

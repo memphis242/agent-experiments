@@ -29,6 +29,17 @@ def noop_cmd(node: Node) -> bytes:
     return fr.build_command(spec.sample_cmd_mid(node.id), spec.SAMPLE_NOOP_CC)
 
 
+def wait_sample_counter(node: Node, expected: int, timeout: float = 3.2) -> None:
+    """Observe GW delivery through SAMPLE_APP execution and a following housekeeping reply."""
+    end = time.monotonic() + timeout
+    actual = sample_counters(node)[0]
+    while actual != expected and time.monotonic() < end:
+        time.sleep(0.1)
+        actual = sample_counters(node)[0]
+    if actual != expected:
+        raise Fail(f"{node.cpu}: SAMPLE_APP CommandCounter {actual}, expected {expected} after GW ingress within {timeout:.1f} s")
+
+
 def judge_reason_deltas(d: dict[str, int], want: dict[str, int]) -> list[str]:
     """Each reason counter must have risen by exactly `want` (missing reasons: 0)."""
     p = Problems()
@@ -369,8 +380,7 @@ def c_key_rotation(ctx: "Ctx") -> None:
         p.check(decoded.command == fr.build_verification(spec.verif_mid(0xEA), 40, counter=701),
                 "GW egress authenticates under the switched shared ACTIVE key")
         endpoint.sendto(n.frame(noop_cmd(n), key=next_key, source_id=1, sequence=700), (spec.HOST, 51021))
-        n.settle()
-        p.check(sample_counters(n)[0] == baseline + 3, "GW ingress follows the shared switched key")
+        wait_sample_counter(n, (baseline + 3) % 256)
         # Table mask applies to GW as well as CMDI. Staging retains ACTIVE.
         n.load_table("CMDI", tb.CmdiTable(key=next_key, mask=0x0D, next_key=original, next_valid=1).pack())
         switch = fr.build_command(spec.app_mid("CMDI", "CMD"), spec.CC["CMDI"]["SWITCH_KEY"])
@@ -378,7 +388,8 @@ def c_key_rotation(ctx: "Ctx") -> None:
         before_cmdi, before_gw = n.hk("CMDI"), n.hk("GW")
         n.send_raw(bad)
         endpoint.sendto(bad, (spec.HOST, 51021))
-        n.settle()
+        n.last_send = time.monotonic()
+        n.settle(1.1)
         after_cmdi, after_gw = n.hk("CMDI"), n.hk("GW")
         p.check(after_cmdi["HmacErrors"] == before_cmdi["HmacErrors"] + 1 and after_cmdi["NextValid"] == 1,
                 "CMDI enforces mandatory SWITCH_KEY HMAC with ordinary HMAC disabled")

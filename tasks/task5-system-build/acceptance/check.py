@@ -53,7 +53,7 @@ from node import Node  # noqa: E402
 
 ID_RE = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 TOTAL_BUDGET_S = 180 * 60
-JOBS = "-j16"
+JOBS = "-j32"
 DEFAULT_GROUP_JOBS = 1
 SUBSYSTEMS = {
     "S1": "S1 STOR base", "S2": "S2 STOR transfer", "S3": "S3 CMDVAL and CMDI", "S4": "S4 TLMO", "S5": "S5 GW",
@@ -161,6 +161,7 @@ class Ctx:
 
     def runtest(self) -> subprocess.CompletedProcess[str]:
         self.build()
+        st.verify_osal_test_queue_quota()
         with self.runtest_lock:
             if self.runtest_proc is None:
                 self.runtest_proc = self.sh(["make", JOBS, "native_std.runtest"], 900)
@@ -201,16 +202,22 @@ class Ctx:
         self.end_callbacks.append(fn)
 
     def shutdown_session(self) -> None:
+        errors = []
         for fn in reversed(self.end_callbacks):
             try:
                 fn()
-            except Exception:  # noqa: BLE001 - clean-up must continue
-                traceback.print_exc()
+            except Exception as exc:  # noqa: BLE001 - attempt every owned cleanup
+                errors.append(f"session callback: {exc}")
         self.end_callbacks = []
         self.cache = {}
-        for n in self.nodes.values():
-            n.stop()
-        self.nodes = {}
+        nodes, self.nodes = self.nodes, {}
+        for n in nodes.values():
+            try:
+                n.stop()
+            except Exception as exc:  # noqa: BLE001 - one node cannot skip another
+                errors.append(f"{n.cpu}: {exc}")
+        if errors:
+            raise Fail("owned session cleanup failed: " + "; ".join(errors))
 
     def session(self, nodes: tuple[int, ...], seed: dict[int, dict[str, bytes]] | None = None,
                 startup_edit: Callable[[str], str] | None = None) -> dict[int, Node]:
@@ -229,6 +236,7 @@ class Ctx:
             for nid in nodes:
                 n = Node(self.tree, self.work / "nodes" / f"s{self.session_no}-cpu{nid}", nid, self.pristine(nid))
                 n.prepare(startup_edit=startup_edit, seed=(seed or {}).get(nid))
+                self.nodes[nid] = n
                 try:
                     n.start()
                 except PrereqFail as exc:
@@ -254,11 +262,14 @@ class Ctx:
                     n.prepare(startup_edit=startup_edit, seed=(seed or {}).get(nid))
                     n.start()
                 preflight.verify_nodes(tuple((n.cpu, n.pids()[0]) for n in started.values()))
-            (self.work / "queue-preflight.json").write_text(json.dumps(self.queue_preflight, indent=2) + "\n")
-        except BaseException:
             for n in started.values():
-                n.stop()
-            self.nodes = {}
+                n.begin_observation()
+            (self.work / "queue-preflight.json").write_text(json.dumps(self.queue_preflight, indent=2) + "\n")
+        except BaseException as exc:
+            try:
+                self.shutdown_session()
+            except Fail as cleanup:
+                raise Fail(f"{exc}; {cleanup}") from exc
             raise
         return started
 
@@ -279,7 +290,11 @@ def hidden_text(check_id: str) -> str:
 def hidden(check_id: str) -> Callable[[Ctx], None]:
     def run(ctx: Ctx) -> None:
         ctx.build()
-        ctx.runtest()  # coverage data is measured before the tests are wired in
+        try:
+            ctx.runtest()  # coverage data is measured before the tests are wired in
+        except EnvironmentFail:
+            # Hidden component runners use stubbed OSAL and need no kernel queues.
+            pass
         if ctx.hidden is None:
             ctx.hidden = HiddenTests(ctx.tree, PACK, ctx.sh)
         spec_ = BY_ID[check_id]
@@ -300,7 +315,7 @@ def table(app: str) -> Callable[[Ctx], None]:
 C = CheckSpec
 CHECKS: list[CheckSpec] = [
     # ---------------------------------------------------------------- N
-    C("n-build-werror", "N", "N Build", "make native_std.prep and make -j16 native_std.install must succeed with no compiler "
+    C("n-build-werror", "N", "N Build", "make native_std.prep and make -j32 native_std.install must succeed with no compiler "
       "warnings, with -Werror kept in sample_defs/arch_build_custom.cmake.", st.c_build_werror, "build"),
     C("n-component-layout", "N", "C.2 Application structure", "Each of apps/stor, apps/cmdi, apps/tlmo, apps/gw and apps/sfi "
       "must have fsw/src, fsw/inc, fsw/tables, config, unit-test and DESIGN.md, the headers <app>_topicids.h, <app>_eventids.h, "
@@ -329,7 +344,7 @@ CHECKS: list[CheckSpec] = [
     C("n-change-scope", "N", "N Build (files changed)", "Existing apps, including apps/ci_lab and apps/to_lab, must be unchanged; "
       "outside the new apps and library only the files of C.6, the run scripts of C.1, tools/udp_harness.py, the CTF files "
       "of S7 and the reports may change.", st.c_change_scope, "misc"),
-    C("n-unit-tests", "N", "N Build (unit tests)", "make -j16 native_std.runtest must pass, with CI_LAB's and TO_LAB's own unit "
+    C("n-unit-tests", "N", "N Build (unit tests)", "make -j32 native_std.runtest must pass, with CI_LAB's and TO_LAB's own unit "
       "tests no longer built or run.", st.c_unit_tests, "cpu"),
     C("n-coverage-tests", "N", "N Unit tests", "Every source module of stor, cmdi, tlmo, gw, sfi and cmdval_lib must have "
       "unit-test/coveragetest/coveragetest_<module>.c, built and run by make native_std.runtest with passing assertions only.",
@@ -766,7 +781,11 @@ def run_one(ctx: Ctx, spec_: CheckSpec, results: Results) -> None:
 
     try:
         attempt()
-        results.put(spec_.check_id, True, "", f"{time.monotonic() - t0:.0f} s")
+        observations = getattr(ctx, "cache", {}).pop("live-observations", [])
+        detail = f"{time.monotonic() - t0:.0f} s"
+        if observations:
+            detail += "; " + "; ".join(observations)
+        results.put(spec_.check_id, True, "", detail)
     except BudgetExceeded as exc:
         results.put(spec_.check_id, False, spec_.feedback, f"not run: {exc}", ran=False)
         raise

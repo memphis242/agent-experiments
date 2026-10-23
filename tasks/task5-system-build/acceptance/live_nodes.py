@@ -12,6 +12,7 @@ from common import Fail, Problems, short
 from live_common import boot
 from node import Node, console_events, find_node_pids
 import preflight
+import lifecycle
 
 if TYPE_CHECKING:
     from check import Ctx
@@ -55,24 +56,39 @@ def c_queue_capacity(ctx: "Ctx") -> None:
 
 
 def ram_disk_identity(pid: int) -> tuple[str, tuple[int, int]] | None:
-    """(host view path, (st_dev, st_ino)) of the OSAL RAM volume directory as process `pid` sees it, in the
-    order the POSIX OSAL chooses its location (/dev/shm, $TMPDIR, /var/tmp, /tmp)."""
+    """Return the unique POSIX OSAL RAM volume directory and its filesystem identity."""
     root = Path(f"/proc/{pid}/root")
     try:
         env = dict(kv.split("=", 1) for kv in (Path(f"/proc/{pid}/environ").read_bytes().decode(errors="replace").split("\0"))
                    if "=" in kv)
     except OSError:
         env = {}
+    matches: list[tuple[str, tuple[int, int]]] = []
     for base in ("/dev/shm", env.get("TMPDIR"), "/var/tmp", "/tmp"):
         if not base:
             continue
-        cand = root / base.lstrip("/") / "osal:RAM"
         try:
-            st = cand.stat()
+            entries = tuple((root / base.lstrip("/")).glob("osal:*"))
         except OSError:
             continue
-        return f"{base}/osal:RAM", (st.st_dev, st.st_ino)
-    return None
+        for cand in entries:
+            try:
+                st = cand.stat()
+            except OSError:
+                continue
+            if cand.is_dir():
+                matches.append((str(cand.relative_to(root)), (st.st_dev, st.st_ino)))
+    return resolve_ram_volume_identity(matches, pid)
+
+
+def resolve_ram_volume_identity(matches: list[tuple[str, tuple[int, int]]], pid: int = 0) -> tuple[str, tuple[int, int]] | None:
+    unique = {identity: path for path, identity in matches}
+    if len(unique) > 1:
+        raise Fail(f"pid {pid} exposes multiple OSAL RAM volume directories: {sorted(path for path, _ in matches)}")
+    if not unique:
+        return None
+    identity, path = next(iter(unique.items()))
+    return path, identity
 
 
 def c_ram_disks_distinct(ctx: "Ctx") -> None:
@@ -108,6 +124,7 @@ def c_run_scripts(ctx: "Ctx") -> None:
     for nid in (1, 2):
         n = Node(ctx.tree, ctx.work / "nodes" / f"runscripts-cpu{nid}", nid, ctx.pristine(nid))
         n.prepare()
+        n.psp_baseline = lifecycle.segments()
         env = dict(os.environ, CFS_TIMEOUT="40")
         if nid == 2:
             env["CFS_CPU"] = "cpu2"
@@ -123,6 +140,7 @@ def c_run_scripts(ctx: "Ctx") -> None:
             if not p.check(proc.returncode == 0, f"cpu{nid}: run_cfs.sh exited {proc.returncode}: {short(proc.stderr, 300)}"):
                 continue
             pids = find_node_pids(n.exe, nid)
+            n.owned_pids.update(pids)
             for pid in pids:
                 preflight.verify_capacities(preflight.process_inventory(pid), f"cpu{nid}")
             p.check(bool(pids), f"cpu{nid}: no core-cpu{nid} runs from build-native_std/exe/cpu{nid}")

@@ -46,6 +46,7 @@ class ClassMap:
     budget: int
     count: int
     streams: tuple[tuple[int, int], ...]  # 64 slots (mid, class)
+    decimation: tuple[int, ...]  # runtime factor in the corresponding slot
 
 
 def parse_class_map(pkt: bytes) -> ClassMap:
@@ -53,8 +54,8 @@ def parse_class_map(pkt: bytes) -> ClassMap:
     if len(pkt) < need:
         raise Fail(f"the class map packet is {len(pkt)} bytes; the specified payload needs {need}")
     budget, count = struct.unpack_from("<HH", pkt, spec.TLM_HDR)
-    streams = tuple(struct.unpack_from("<IB", pkt, spec.TLM_HDR + 4 + i * 8) for i in range(spec.TLMO_MAX_STREAMS))
-    return ClassMap(budget, count, streams)
+    rows = tuple(struct.unpack_from("<IBB", pkt, spec.TLM_HDR + 4 + i * 8) for i in range(spec.TLMO_MAX_STREAMS))
+    return ClassMap(budget, count, tuple((mid, cls) for mid, cls, _dec in rows), tuple(dec for _mid, _cls, dec in rows))
 
 
 def class_map(n: Node) -> ClassMap:
@@ -253,6 +254,7 @@ def c_set_budget(ctx: "Ctx") -> None:
 def c_add_remove_stream(ctx: "Ctx") -> None:
     n = boot(ctx, (1,))[1]
     p = Problems()
+    default_count = len(spec.tlmo_default_streams(n.id))
     mark = n.g.mark()
     n.cmd("TLMO", "ADD_STREAM", stream_payload(EE, 2))
     p.check(bool(n.wait_event(mark, "TLMO", EID["ADD_STREAM_INF"])), "ADD_STREAM produced no TLMO_ADD_STREAM_INF_EID")
@@ -261,9 +263,12 @@ def c_add_remove_stream(ctx: "Ctx") -> None:
     time.sleep(0.6)
     p.check(len(n.g.since(mark, EE)) == 3, f"{len(n.g.since(mark, EE))} of 3 packets of an added stream arrived")
     cm = class_map(n)
-    p.check(cm.count == 49 and dict(x for x in cm.streams if x[0]).get(EE) == 2, f"class map after ADD_STREAM: count {cm.count}")
-    p.check(cm.streams.index(next(x for x in cm.streams if x[0] == EE)) == 48 if any(x[0] == EE for x in cm.streams) else False,
-            "the added stream does not fill the lowest unused slot (48)")
+    p.check(cm.count == default_count + 1 and dict(x for x in cm.streams if x[0]).get(EE) == 2,
+            f"class map after ADD_STREAM: count {cm.count}, expected {default_count + 1}")
+    slot = next((i for i, row in enumerate(cm.streams) if row[0] == EE), None)
+    p.check(slot == default_count, f"the added stream does not fill the lowest unused slot ({default_count})")
+    if slot is not None:
+        p.check(cm.decimation[slot] == 1, "ADD_STREAM did not initialize Decimation to 1")
     mark = n.g.mark()
     n.cmd("TLMO", "ADD_STREAM", stream_payload(EE, 1))
     n.cmd("TLMO", "ADD_STREAM", stream_payload(EF, 4))
@@ -294,8 +299,8 @@ def c_table_update(ctx: "Ctx") -> None:
     p = Problems()
     n.cmd("TLMO", "ADD_STREAM", stream_payload(EE, 2))
     base = tb.TlmoTable.unpack(tb.split_image(n.table_image("TLMO"), "TLMO")[1])
-    streams = tuple((m, 3 if m == E8 else c) for m, c in base.streams)
-    new = tb.TlmoTable(budget=5, capacity=64, streams=streams)
+    streams = tuple((m, 3 if m == E8 else c, dec) for m, c, dec in base.streams)
+    new = tb.TlmoTable(budget=5, capacity=64, streams=streams, profiles=base.profiles)
     mark = n.g.mark()
     n.load_table("TLMO", new.pack())
     p.check(bool(n.wait_event(mark, "TLMO", EID["TBL_UPDATE_INF"], 3.0)), "a table update produced no TLMO_TBL_UPDATE_INF_EID")
@@ -309,7 +314,8 @@ def c_table_update(ctx: "Ctx") -> None:
     n.inject([verif(EE, 900)], burst=1)
     time.sleep(0.6)
     p.check(not n.g.since(mark, EE), "packets of an added stream still arrive after the table update")
-    bad = tb.TlmoTable(budget=5, capacity=64, streams=tuple((m, 4 if m == E9 else c) for m, c in streams))
+    bad = tb.TlmoTable(budget=5, capacity=64, streams=tuple((m, 4 if m == E9 else c, dec) for m, c, dec in streams),
+                       profiles=base.profiles)
     try:
         n.load_table("TLMO", bad.pack(), expect_valid=False)
     except Fail as exc:
@@ -327,8 +333,11 @@ def c_class_map(ctx: "Ctx") -> None:
     p.check(bool(n.wait_event(mark, "TLMO", EID["CLASS_MAP_INF"])), "SEND_CLASS_MAP produced no TLMO_CLASS_MAP_INF_EID")
     p.check(n.hk("TLMO")["CommandCounter"] == (before + 1) % 256, "SEND_CLASS_MAP did not increment CommandCounter")
     image = tb.TlmoTable.unpack(tb.split_image(n.table_image("TLMO"), "TLMO")[1])
-    p.check(cm.budget == 16 and cm.count == 48, f"class map budget/StreamCount {cm.budget}/{cm.count} != 16/48")
-    p.check(tuple(cm.streams) == tuple(image.streams), "the class map slots differ from the runtime list loaded from the table")
+    default_count = len(spec.tlmo_default_streams(n.id))
+    p.check(cm.budget == 16 and cm.count == default_count,
+            f"class map budget/StreamCount {cm.budget}/{cm.count} != 16/{default_count}")
+    rows = tuple((mid, cls, dec) for (mid, cls), dec in zip(cm.streams, cm.decimation))
+    p.check(rows == image.streams, "the class map slots/classes/decimation differ from the runtime list loaded from the table")
     p.raise_if()
 
 
@@ -336,7 +345,7 @@ def c_tlmo_commands(ctx: "Ctx") -> None:
     n = boot(ctx, (1,))[1]
     p = Problems()
     hk = n.hk("TLMO")
-    p.check(hk["QueueCapacity"] == 64 and hk["ActiveStreams"] == 48 and hk["BudgetPacketsPerCycle"] == 16,
+    p.check(hk["QueueCapacity"] == 64 and hk["ActiveStreams"] == len(spec.tlmo_default_streams(n.id)) and hk["BudgetPacketsPerCycle"] == 16,
             f"QueueCapacity/ActiveStreams/Budget {hk['QueueCapacity']}/{hk['ActiveStreams']}/{hk['BudgetPacketsPerCycle']}")
     p.check(hk["PacketsReceived"] > 0 and hk["Sent1"] + hk["Sent0"] > 0, "PacketsReceived/SentByClass do not count forwarded telemetry")
     mark = n.g.mark()

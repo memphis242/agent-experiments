@@ -252,6 +252,42 @@ def stage_mode_table(n: Node, table: tb.ModeTable) -> None:
         raise Fail('snapshot fixture native table VALIDATE did not complete')
 
 
+@dataclass(frozen=True)
+class RestartStopTimeoutEvidence:
+    response_time: float
+    error_times: tuple[float, ...]
+    stop_complete_time: float
+    stop_targets: tuple[str, ...]
+    start_count: int
+    action_error_delta: int
+    restart_delta: int
+    restart_phase: int
+    attempts_before: int
+    attempts_after: int
+    cooldown_before: int
+    cooldown_after: int
+
+
+def judge_restart_stop_timeout(evidence: RestartStopTimeoutEvidence) -> None:
+    """Validate a STOP timeout without treating it as proof of START snapshotting."""
+    if evidence.stop_targets != ('GW',) or evidence.start_count:
+        raise Fail(f'snapshot STOP timeout requires one native GW STOP and no START: {evidence}')
+    if len(evidence.error_times) != 1:
+        raise Fail(f'snapshot STOP timeout requires exactly one ACTION_ERR: {evidence}')
+    elapsed = evidence.error_times[0] - evidence.response_time
+    # MODE runs at 1 Hz; C.7 permits two additional seconds in live checks.
+    quantum = 1 / 65536
+    if not 5 - quantum <= elapsed <= 8 + quantum:
+        raise Fail(f'snapshot STOP timeout must occur within [5,8] onboard seconds; observed {elapsed:.6f}')
+    if evidence.stop_complete_time + quantum < evidence.error_times[0]:
+        raise Fail('snapshot restart timed out despite completed native STOP before its timeout wakeup')
+    if (evidence.action_error_delta != 1 or evidence.restart_delta != 0 or
+            evidence.restart_phase != 0 or evidence.attempts_before != 1 or
+            evidence.attempts_after != evidence.attempts_before or
+            evidence.cooldown_after != evidence.cooldown_before):
+        raise Fail(f'snapshot STOP timeout changed counters, attempt or cooldown incorrectly: {evidence}')
+
+
 def restart_snapshot_live(ctx: 'Ctx') -> None:
     """Activate staged parameters inside a real STOP/START response interval."""
     n=boot(ctx,(1,))[1]
@@ -266,6 +302,7 @@ def restart_snapshot_live(ctx: 'Ctx') -> None:
     restarts[3]=('GW','GW_AppMain','/cf/gw.so',65536,71)
     new=replace(old,enabled=1,restarts=tuple(restarts))
     stage_mode_table(n,new)
+    baseline=n.hk('MODE')
     control(n,'SET_ENABLE',1)
     mark=n.g.mark();n.cmd('SFI','REPORT_LINK',bytes((2,1,0,0)))
     if not n.wait_event(mark,'MODE',spec.EID['MODE']['RESPONSE_INF'],4):
@@ -276,25 +313,71 @@ def restart_snapshot_live(ctx: 'Ctx') -> None:
     n.send(spec.tbl_cmd_mid(n.id),spec.CFE_TBL_ACTIVATE_CC,spec.tbl_activate_payload('MODE.ModeTable'))
     if not n.wait_event(mark,'CFE_TBL',spec.CFE_TBL_UPDATE_SUCCESS_INF_EID,5,text='MODE.ModeTable'):
         raise Fail('snapshot table activation did not complete')
+    def captured_commands(from_mark: int, cc: int) -> list[bytes]:
+        return [d.data[8:] for d in n.g.since(from_mark,spec.es_cmd_mid(n.id))
+                if len(d.data)>=8 and d.data[6]==cc]
     def start_payload(from_mark: int, expected_stack: int, expected_priority: int) -> None:
-        def captured() -> list[bytes]:
-            return [d.data[8:] for d in n.g.since(from_mark,spec.es_cmd_mid(n.id))
-                    if len(d.data)==128 and d.data[6]==spec.CFE_ES_START_APP_CC]
-        if not n.g.wait(lambda:bool(captured()),9):
+        if not n.g.wait(lambda:bool(captured_commands(from_mark,spec.CFE_ES_START_APP_CC)),9):
             raise Fail('snapshot restart did not expose native ES START command')
-        values=struct.unpack('<20s20s64sQBxH4x',captured()[0])
+        starts=captured_commands(from_mark,spec.CFE_ES_START_APP_CC)
+        if len(starts)!=1 or len(starts[0])!=120:
+            raise Fail(f'snapshot restart requires one native ES START payload, observed {[len(p) for p in starts]}')
+        values=struct.unpack('<20s20s64sQBxH4x',starts[0])
         expected=(b'GW',b'GW_AppMain',b'/cf/gw.so',expected_stack,0,expected_priority)
         actual=tuple(v.split(b'\0',1)[0] if isinstance(v,bytes) else v for v in values)
         if actual!=expected:
             raise Fail(f'ES START snapshot {actual}, expected {expected}')
-    start_payload(mark,131072,70)
+    if not n.g.wait(lambda:bool(captured_commands(mark,spec.CFE_ES_START_APP_CC)) or
+                    bool(n.events(mark,'MODE',spec.EID['MODE']['ACTION_ERR'])),9):
+        raise Fail('snapshot restart produced neither START nor a bounded STOP timeout')
+    timed_out=not captured_commands(mark,spec.CFE_ES_START_APP_CC)
+    if timed_out:
+        # Observe native removal and a further owner wakeup before ruling out a late START.
+        stopped=n.wait_event(mark,'CFE_ES',spec.CFE_ES_STOP_INF_EID,10,text='GW')
+        if not stopped:
+            raise Fail('snapshot STOP timeout could not confirm subsequent native GW removal')
+        time.sleep(1.2)
+        after=status(n)
+        hk=n.hk('MODE')
+        response=n.events(mark,'MODE',spec.EID['MODE']['RESPONSE_INF'])[0]
+        errors=n.events(mark,'MODE',spec.EID['MODE']['ACTION_ERR'])
+        stops=captured_commands(mark,spec.CFE_ES_STOP_APP_CC)
+        if any(len(payload)!=20 for payload in stops):
+            raise Fail('snapshot STOP command does not use the native application-name payload')
+        evidence=RestartStopTimeoutEvidence(
+            response_time=response.seconds+response.subseconds/65536,
+            error_times=tuple(event.seconds+event.subseconds/65536 for event in errors),
+            stop_complete_time=stopped[0].seconds+stopped[0].subseconds/65536,
+            stop_targets=tuple(payload.split(b'\0',1)[0].decode('latin-1') for payload in stops),
+            start_count=len(captured_commands(mark,spec.CFE_ES_START_APP_CC)),
+            action_error_delta=hk['ActionErrors']-baseline['ActionErrors'],
+            restart_delta=hk['RestartsSent']-baseline['RestartsSent'],
+            restart_phase=after.restart_phase,
+            attempts_before=before.faults[50].attempts, attempts_after=after.faults[50].attempts,
+            cooldown_before=before.faults[50].next_eligible, cooldown_after=after.faults[50].next_eligible)
+        judge_restart_stop_timeout(evidence)
+        ctx.cache.setdefault('live-observations',[]).append(
+            'restart snapshot: validated native STOP timeout, one ACTION_ERR and no START; '
+            'live old-parameter START snapshot path unexercised; '
+            'required hidden case Native restart snapshot and action order provides deterministic snapshot coverage')
+    else:
+        start_payload(mark,131072,70)
+        if not n.wait_event(mark,'CFE_ES',spec.CFE_ES_START_INF_EID,8,text='GW'):
+            raise Fail('snapshot START did not register GW')
+        ctx.cache.setdefault('live-observations',[]).append('restart snapshot: live START retained dispatch parameters')
     if status(n).faults[50].next_eligible!=before.faults[50].next_eligible:
         raise Fail('table activation changed existing response cooldown')
     n.cmd('SFI','REPORT_LINK',bytes((2,0,0,0)));wait_report(n,mark,50,0)
+    # The next attempt starts with an absent target and must use the activated table.
+    if not timed_out:
+        es_stop_app(n,'GW')
     eligibility=before.faults[50].next_eligible
     end=time.monotonic()+34
     while n.onboard_seconds()<eligibility and time.monotonic()<end:
         time.sleep(0.3)
+    if timed_out and (captured_commands(mark,spec.CFE_ES_START_APP_CC) or
+                      len(n.events(mark,'MODE',spec.EID['MODE']['ACTION_ERR']))!=1):
+        raise Fail('snapshot STOP timeout emitted a late START or repeated ACTION_ERR before retry eligibility')
     mark=n.g.mark();n.cmd('SFI','REPORT_LINK',bytes((2,1,0,0)))
     start_payload(mark,65536,71)
     n.cmd('SFI','REPORT_LINK',bytes((2,0,0,0)))

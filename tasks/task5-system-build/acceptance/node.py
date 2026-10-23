@@ -7,6 +7,7 @@ conditions many checks share) with a detail for the experimenter.
 from __future__ import annotations
 
 import os
+import json
 import re
 import shutil
 import signal
@@ -20,6 +21,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import frames as fr
+import lifecycle
 import spec
 import tables as tb
 from common import Fail, PrereqFail
@@ -201,12 +203,19 @@ class Node:
         self.table_loads = 0
         self.key = fr.DEFAULT_KEY
         self.started = False
+        self.owned_pids: set[int] = set()
+        self.psp_baseline: tuple[lifecycle.Segment, ...] | None = None
+        self.sb_baseline: tuple[int, int, int] | None = None
+        self.observation_log_start = 0
+        self.observation_mark = 0
 
     # -- lifecycle -------------------------------------------------------------
     def env(self) -> dict[str, str]:
         return dict(os.environ, CFS_CPU=self.cpu, CFS_RUN_DIR=str(self.run_dir), CFS_TIMEOUT=str(BOOT_TIMEOUT_S))
 
     def prepare(self, startup_edit: Callable[[str], str] | None = None, seed: dict[str, bytes] | None = None) -> None:
+        if self.started or self.psp_baseline is not None:
+            raise Fail(f"{self.cpu} preparation requires complete owned-node and PSP cleanup")
         if self.root.exists():
             shutil.rmtree(self.root)
         src = self.tree / "build-native_std" / "exe" / self.cpu
@@ -225,6 +234,9 @@ class Node:
 
     def start(self) -> None:
         """Run tools/run_cfs.sh for this processor and wait for the first TLMO datagram (no enable step)."""
+        self.owned_pids.clear()
+        self.psp_baseline = lifecycle.segments()
+        self.sb_baseline = None
         self.ground = Ground(spec.tlmo_port(self.id), spec.evs_long_mid(self.id))
         script = self.root / "tools" / "run_cfs.sh"
         try:
@@ -238,7 +250,8 @@ class Node:
             tail = (proc.stdout + proc.stderr)[-700:]
             self.stop()
             raise PrereqFail(f"CFS_CPU={self.cpu} tools/run_cfs.sh exited {proc.returncode}: {tail}")
-        if not find_node_pids(self.exe, self.id):
+        self.owned_pids.update(find_node_pids(self.exe, self.id))
+        if not self.owned_pids:
             self.stop()
             raise PrereqFail(f"CFS_CPU={self.cpu} tools/run_cfs.sh returned success but no core-{self.cpu} is running "
                              f"from build-native_std/exe/{self.cpu}")
@@ -270,25 +283,33 @@ class Node:
         return "\n".join(out)
 
     def stop(self) -> None:
-        if self.started:
-            script = self.root / "tools" / "stop_cfs.sh"
-            if script.is_file():
+        try:
+            self.owned_pids.update(find_node_pids(self.exe, self.id))
+            if self.started:
+                script = self.root / "tools" / "stop_cfs.sh"
+                if script.is_file():
+                    try:
+                        subprocess.run(["bash", str(script)], env=self.env(), capture_output=True, timeout=30, check=False)
+                    except subprocess.TimeoutExpired:
+                        pass
+            for pid in find_node_pids(self.exe, self.id):
                 try:
-                    subprocess.run(["bash", str(script)], env=self.env(), capture_output=True, timeout=30, check=False)
-                except subprocess.TimeoutExpired:
+                    os.kill(pid, signal.SIGKILL)
+                except OSError:
                     pass
-        for pid in find_node_pids(self.exe, self.id):
-            try:
-                os.kill(pid, signal.SIGKILL)
-            except OSError:
-                pass
-        end = time.monotonic() + 5
-        while find_node_pids(self.exe, self.id) and time.monotonic() < end:
-            time.sleep(0.05)
-        if self.ground is not None:
-            self.ground.close()
-            self.ground = None
-        self.started = False
+            end = time.monotonic() + 5
+            while find_node_pids(self.exe, self.id) and time.monotonic() < end:
+                time.sleep(0.05)
+            if find_node_pids(self.exe, self.id):
+                raise Fail(f"{self.cpu} cleanup: owned node remains alive; PSP objects retained")
+            if self.psp_baseline is not None:
+                lifecycle.retire_psp(self.exe, self.psp_baseline, frozenset(self.owned_pids))
+                self.psp_baseline = None
+        finally:
+            if self.ground is not None:
+                self.ground.close()
+                self.ground = None
+            self.started = False
 
     def alive(self) -> bool:
         return bool(find_node_pids(self.exe, self.id))
@@ -498,6 +519,10 @@ class Node:
             if not bad:
                 raise Fail(f"{self.cpu}: a {name} image that the specification requires to be rejected was not "
                            f"reported invalid by validation ({'accepted' if ok else 'no result'})")
+            mark = g.mark()
+            self.send(tbl, spec.CFE_TBL_ABORT_LOAD_CC, spec.tbl_activate_payload(name))
+            if not self.wait_event(mark, "CFE_TBL", spec.CFE_TBL_LOAD_ABORT_INF_EID, timeout, text=name):
+                raise Fail(f"{self.cpu}: native ABORT_LOAD of invalid {name} did not complete")
             return
         if bad or not ok:
             raise Fail(f"{self.cpu}: validation of {name} " + (f"failed: {bad[0].text}" if bad else
@@ -533,10 +558,8 @@ class Node:
             self.send_raw(self.frame(pkt, **opts))  # type: ignore[arg-type]
         time.sleep(max(gap, 0.6))
 
-    def verify_observation_integrity(self) -> None:
-        """Check collector health, fault mirrors, and SB allocator evidence."""
-        if self.g.listener_errors:
-            raise Fail(f"{self.cpu} telemetry collector: expected successful listeners; observed {self.g.listener_errors}")
+    def read_sb_counters(self) -> tuple[int, int, int]:
+        """Request current native SB counters through the authenticated ground path."""
         sb_mid = spec.named_tlm_mid("CFE_SB_HK_TLM_MID", self.id)
         previous_budget = self.tlmo_budget
         self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", 256, 0))
@@ -550,11 +573,40 @@ class Node:
         try:
             if appended:
                 self.cmd("TLMO", "ADD_STREAM", struct.pack("<IB3x", sb_mid, 1))
-            self.request(lambda: self.send(spec.cmd_mid(spec.CFE_SB_SEND_HK_TOPIC, self.id), 0), sb_mid)
+            reply = self.request(lambda: self.send(spec.cmd_mid(spec.CFE_SB_SEND_HK_TOPIC, self.id), 0), sb_mid)[-1].data
         finally:
             if appended:
                 self.cmd("TLMO", "REMOVE_STREAM", struct.pack("<I", sb_mid))
             self.cmd("TLMO", "SET_BUDGET", struct.pack("<HH", previous_budget, 0))
+        if len(reply) < 32:
+            raise Fail(f"{self.cpu} SB housekeeping: expected at least32 bytes; observed {len(reply)}")
+        return reply[19], *struct.unpack_from("<HH", reply, 28)
+
+    def begin_observation(self) -> None:
+        """Snapshot counters and allocator logs after the complete node startup."""
+        self.sb_baseline = self.read_sb_counters()
+        self.observation_log_start = len(self.console_log())
+        self.observation_mark = self.g.mark()
+        (self.run_dir / "acceptance-sb-baseline.json").write_text(
+            json.dumps({"counters": self.sb_baseline, "console_offset": self.observation_log_start}) + "\n")
+
+    def verify_observation_integrity(self) -> None:
+        """Check collector health, fault mirrors, and measured SB counter deltas."""
+        if self.g.listener_errors:
+            raise Fail(f"{self.cpu} telemetry collector: expected successful listeners; observed {self.g.listener_errors}")
+        if self.sb_baseline is None:
+            raise Fail(f"{self.cpu} SB live envelope: missing post-startup baseline")
+        current = self.read_sb_counters()
+        delta = tuple((after - before) % modulus for before, after, modulus in
+                      zip(self.sb_baseline, current, (256, 65536, 65536), strict=True))
+        with (self.run_dir / "acceptance-sb-observations.jsonl").open("a") as stream:
+            stream.write(json.dumps({"baseline": self.sb_baseline, "current": current,
+                                     "send_pipe_message_limit_delta": delta}) + "\n")
+        allocation_events = [event for event in self.g.events(self.observation_mark, "CFE_SB")
+                             if event.eid in (16, 20)]
+        if allocation_events:
+            raise Fail(f"{self.cpu} SB live envelope: allocator error events after setup: "
+                       f"{[(event.eid, event.text) for event in allocation_events]}")
         packets = self.g.since()
         raw_mid = spec.app_mid("SFI", "FAULT", self.id)
         mirror_mid = spec.app_mid("SFI", "FAULT_TLM", self.id)
@@ -563,14 +615,11 @@ class Node:
         if raw != mirrored:
             raise Fail(f"{self.cpu} SFI fault publication: expected byte-identical raw/mirror report payloads; "
                        f"observed {len(raw - mirrored)} missing mirrors and {len(mirrored - raw)} missing raw reports")
-        for d in packets:
-            if d.mid == sb_mid and len(d.data) >= 32:
-                errors = d.data[19]
-                overflow, message_limit = struct.unpack_from("<HH", d.data, 28)
-                if errors or overflow or message_limit:
-                    raise Fail(f"{self.cpu} SB live envelope: expected zero send/pipe/message-limit errors; "
-                               f"observed {errors}/{overflow}/{message_limit}")
-        log = self.console_log()
+        log = self.console_log()[self.observation_log_start:]
+        allocation_console = [(app, eid, text) for app, eid, text in console_events(log)
+                              if app == "CFE_SB" and eid in (16, 20)]
+        if allocation_console:
+            raise Fail(f"{self.cpu} SB live envelope: native allocation failure: {allocation_console}")
         failure = re.search(r"(?im)^.*(?:GetPoolBuf.*(?:fail|error)|(?:SB|pool).*allocat.*fail|"
                             r"(?:SB|pool).*insufficient.*(?:memory|buffer)).*$", log)
         if failure:

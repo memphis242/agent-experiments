@@ -272,6 +272,10 @@ replies must reach TLMO within 2 seconds at a nonzero sufficient budget.
 Healthy recovery after 20 seconds is checked in [20,23] seconds from the
 first MODE healthy wakeup, or [20,25] from SFI's clear report. Tests use
 telemetry timestamps and event receipt bounds, not sleep-only proofs.
+Acceptance records SB counter baselines and allocator-log positions
+after startup and required setup complete; only errors arising during a
+declared live traffic envelope are attributed to it, and startup
+counters are reported separately.
 Timing-sensitive live checks run in a host-coordinated serialized lane
 with reserved CPU capacity and no concurrent builds. A detected scheduling
 stall invalidates the attempt and triggers one clean serialized rerun;
@@ -2312,7 +2316,10 @@ than sending it in the onset wakeup. For a successfully transmitted STOP, absenc
 later wakeup sends START on the next wakeup. A timeout deadline is tested
 after checking app presence, so disappearance/registration at the exact
 deadline succeeds. ActionErrors counts each transmit failure or timeout
-once. A clear cancels pending future retries, not a restart sequence
+once. Live restart tests accept the STOP-timeout outcome when the ES
+app record is still present at the 5 s deadline; hidden unit tests
+exercise successful STOP, intervening table activation and START with the
+dispatch snapshot. once. A clear cancels pending future retries, not a restart sequence
 already in progress; disabling MODE cancels that sequence.
 RestartsSent counts successfully transmitted START commands, not STOP
 or failed transmissions. Recovery of the physical

@@ -178,7 +178,7 @@ class HiddenTests:
         if not targets:
             return
         # One parallel make for every runner; -k keeps building the others when one component does not compile.
-        proc = self.sh(["make", "-C", str(bdir), "-k", "-j16", *targets.values()], 900)
+        proc = self.sh(["make", "-C", str(bdir), "-k", "-j32", *targets.values()], 900)
         log = (proc.stdout + proc.stderr).splitlines()
         errs = [ln for ln in log if "error" in ln.lower() or "undefined reference" in ln]
         for (comp, unit), target in targets.items():

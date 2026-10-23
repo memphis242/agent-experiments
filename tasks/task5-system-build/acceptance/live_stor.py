@@ -15,7 +15,7 @@ import frames as fr
 import spec
 import tables as tb
 from common import Fail, Problems
-from live_common import boot
+from live_common import boot, wait_hk_field
 from node import Datagram, Node
 
 if TYPE_CHECKING:
@@ -252,6 +252,12 @@ def c_startup_and_hk(ctx: "Ctx") -> None:
     s = session(ctx, default_boot=True)
     n = s.n
     p = Problems()
+    mark = s.mark()
+    s.cmd("RESET_COUNTERS")
+    if not s.wait_event(mark, spec.EID["STOR"]["RESET_INF"]):
+        raise Fail("STOR RESET_COUNTERS produced no acknowledgement after initial profile setup")
+    wait_hk_field(n, "STOR", lambda hk: hk["CommandCounter"] == 0 and hk["CommandErrorCounter"] == 0,
+                  3.1, "STOR counter reset must be acknowledged before absolute counter assertions")
     from node import console_events
     inits = [e for e in console_events(n.console_log()) if e[0] == "STOR" and e[1] == 1]
     p.check(len(inits) == 1, f"STOR_INIT_INF_EID (1) appears {len(inits)} times in the console event output")
@@ -516,7 +522,12 @@ def c_purge_archived_first(ctx: "Ctx") -> None:
     p = Problems()
     hk = s.hk()
     p.check(hk["TelemetryBytesUsed"] == 8000, f"TelemetryBytesUsed {hk['TelemetryBytesUsed']} != 8000 (an .arc file counts)")
-    for i in range(0, 15, 3):
+    packet_count = 18
+    packets_per_file = (4096 - CFE_FS_HDR) // PKT
+    assert packets_per_file > 0
+    unpurged_bytes = sum(len(data) for data in seed.values()) + packet_count * PKT + ceil_div(packet_count, packets_per_file) * CFE_FS_HDR
+    assert unpurged_bytes > quota // 2 and unpurged_bytes - 4000 <= quota // 2
+    for i in range(0, packet_count, 3):
         s.inject(INJ_A, 3, PKT, first_index=i)
     s.cmd("CLOSE_FILES")
     s.wakeup()
@@ -753,12 +764,18 @@ def c_file_quota_rejection(ctx: "Ctx") -> None:
     left = [str(x.relative_to(s.files_dir)) for x in s.files_dir.rglob("*") if x.is_file()] if s.files_dir.is_dir() else []
     p.check(not left, f"partial files left in the file area: {left}")
     small = (s.cf / "stor_tbl.tbl").stat().st_size
+    mark = s.mark()
     s.cmd("ADD_FILE", add_payload("/cf/stor_tbl.tbl", "small.tbl"))
+    if len(s.wait_event(mark, 22)) != 1:
+        raise Fail("the small file add was not acknowledged before the exact-quota add")
     big.write_bytes(bytes(quota - small))
     mark = s.mark()
     s.cmd("ADD_FILE", add_payload("/cf/big.bin", "fill.bin"))
     p.check(len(s.wait_event(mark, 22)) == 1, "a file that exactly fills FileQuotaBytes was not accepted")
     p.check(s.hk()["FileBytesUsed"] == quota, "FileBytesUsed does not equal the quota after filling it")
+    fill = s.files_dir / "fill.bin"
+    p.check(fill.is_file() and fill.stat().st_size == quota - small,
+            "the exact-quota file is missing or has the wrong size")
     big.write_bytes(bytes(1))
     mark = s.mark()
     s.cmd("ADD_FILE", add_payload("/cf/big.bin", "one-more.bin"))
@@ -1095,7 +1112,12 @@ def c_transfer_abort_and_rejections(ctx: "Ctx") -> None:
     mark = s.mark()
     s.cmd("TRANSFER", transfer_payload(0, 3, 0, "d/big.bin", "far/big.bin"))
     s.cmd("TRANSFER", transfer_payload(0, 3, 0, "d/big.bin", "far/again.bin"))
-    p.check(bool(s.wait_event(mark, 29)) and len(s.events(mark, 30)) == 1, "a TRANSFER while one is active was not rejected with event 30")
+    p.check(bool(s.wait_event(mark, 29, 2.2)), "the accepted TRANSFER produced no start event 29")
+    p.check(len(s.wait_event(mark, 30, 2.2)) == 1, "a TRANSFER while one is active was not rejected exactly once with event 30")
+    busy = s.hk()
+    p.check(busy["CommandCounter"] == (a["CommandCounter"] + 1) % 256
+            and busy["CommandErrorCounter"] == (a["CommandErrorCounter"] + 1) % 256,
+            "accepted and busy TRANSFER commands did not count exactly one success and one error")
     wait_until(lambda: s.hk()["XferState"] == 2, 8.0)
     mid = s.hk()
     p.check(mid["XferState"] == 2, f"XferState {mid['XferState']} after the last segment to a peer (AWAITING_ACK is 2)")
@@ -1109,8 +1131,7 @@ def c_transfer_abort_and_rejections(ctx: "Ctx") -> None:
                                          f"XferState {after['XferState']}")
     mark = s.mark()
     s.cmd("ABORT_TRANSFER")
-    s.settle()
-    p.check(bool(s.events(mark, 30)) and s.hk()["CommandErrorCounter"] == after["CommandErrorCounter"] + 1,
+    p.check(bool(s.wait_event(mark, 30, 2.2)) and s.hk()["CommandErrorCounter"] == (after["CommandErrorCounter"] + 1) % 256,
             "ABORT_TRANSFER with no transfer active was not rejected with event 30")
     p.check((s.files_dir / "d" / "big.bin").is_file(), "an aborted transfer applied a success action")
     p.raise_if()

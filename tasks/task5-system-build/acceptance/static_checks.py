@@ -15,7 +15,8 @@ from typing import TYPE_CHECKING
 
 import spec
 import tables as tb
-from common import Fail, InfraError, Problems
+from common import EnvironmentFail, Fail, InfraError, Problems
+import preflight
 
 # A coverage figure: a percentage ("97.5%", "100 percent") or covered/total lines ("44 / 44", "176 of 176").
 COVERAGE_FIGURE_RE = re.compile(r"\d+(?:\.\d+)?\s*(?:%|percent\b)|\b\d+\s*(?:/|of)\s*\d+\b", re.IGNORECASE)
@@ -176,7 +177,7 @@ def c_startup_scripts(ctx: "Ctx") -> None:
 
 def judge_install_custom(text: str, cpu: str) -> list[str]:
     p = Problems()
-    code = strip_cmake_comments(text)
+    code = expand_simple_foreach(strip_cmake_comments(text))
     m = re.search(r"set\s*\(\s*APP_INCLUDE_TABLE_LIST(.*?)\)\s*\n", code, re.S | re.I)
     block = m.group(1) if m else ""
     p.check(m is not None, f"{cpu}/install_custom.cmake has no APP_INCLUDE_TABLE_LIST")
@@ -193,6 +194,27 @@ def judge_install_custom(text: str, cpu: str) -> list[str]:
         p.check(re.search(r"target_compile_definitions\s*\(\s*" + re.escape(t) + r"\b[^)]*APP_DEFINITION_TABLE_LIST", code) is not None,
                 f"{cpu}/install_custom.cmake does not give {t} the APP_DEFINITION_TABLE_LIST definitions")
     return p.items
+
+
+def expand_simple_foreach(code: str) -> str:
+    """Expand literal CMake foreach loops used to apply target properties."""
+    loop = re.compile(r"\bforeach\s*\(\s*(\w+)\s+([^()]*)\)\s*(.*?)\bendforeach\s*(?:\(\s*[^)]*\))?",
+                      re.I | re.S)
+    for _ in range(32):
+        match = loop.search(code)
+        if match is None:
+            return code
+        variable, values, body = match.groups()
+        tokens = values.split()
+        if tokens[:2] == ["IN", "ITEMS"]:
+            tokens = tokens[2:]
+        if not tokens or any("$" in token for token in tokens):
+            return code
+        variable_ref = re.compile(r"\$\{" + re.escape(variable) + r"\}|\$" + re.escape(variable)
+                                  + r"(?![A-Za-z0-9_])", re.I)
+        expanded = "\n".join(variable_ref.sub(value, body) for value in tokens)
+        code = code[:match.start()] + expanded + code[match.end():]
+    return code
 
 
 def c_install_custom(ctx: "Ctx") -> None:
@@ -343,6 +365,7 @@ def c_build_werror(ctx: "Ctx") -> None:
 
 def c_unit_tests(ctx: "Ctx") -> None:
     ctx.build()
+    verify_osal_test_queue_quota()
     proc = ctx.runtest()
     p = Problems()
     if proc.returncode != 0:
@@ -355,8 +378,28 @@ def c_unit_tests(ctx: "Ctx") -> None:
     p.raise_if()
 
 
+def verify_osal_test_queue_quota() -> None:
+    """Prove the pinned OSAL stress test's simultaneous queue allocation is possible."""
+    try:
+        msg_max = int(Path("/proc/sys/fs/mqueue/msg_max").read_text())
+    except (OSError, ValueError) as exc:
+        raise EnvironmentFail(f"ENVIRONMENT OSAL unit-test queue preflight cannot read msg_max: {exc}") from exc
+    inventory = osal_test_queue_inventory()
+    try:
+        soft_limit, _hard_limit = preflight.resource.getrlimit(preflight.resource.RLIMIT_MSGQUEUE)
+    except (OSError, ValueError) as exc:
+        raise EnvironmentFail(f"ENVIRONMENT OSAL unit-test queue preflight cannot read RLIMIT_MSGQUEUE: {exc}") from exc
+    preflight.validate_limits(msg_max, soft_limit, inventory, uid=preflight.os.geteuid())
+
+
+def osal_test_queue_inventory() -> tuple[preflight.Queue, ...]:
+    """The upstream stress case creates 64 queues at half the configured maximum depth."""
+    return tuple(preflight.Queue(f"osal-unit-stress-{index}", 256, 4) for index in range(64))
+
+
 def c_coverage_tests_present(ctx: "Ctx") -> None:
     ctx.build()
+    verify_osal_test_queue_quota()
     ctx.runtest()
     p = Problems()
     results = ctx.tree / "build-native_std" / "test-results"
@@ -439,6 +482,7 @@ def judge_coverage(srcs: dict[str, list[str]], cov: dict[str, dict[str, tuple[in
 
 def c_coverage(ctx: "Ctx") -> None:
     ctx.build()
+    verify_osal_test_queue_quota()
     if ctx.runtest().returncode != 0:
         raise Fail("make native_std.runtest does not pass, so there is no complete coverage data")
     srcs = {comp: [s.name for s in component_sources(ctx.tree, comp)] for comp in spec.COMPONENTS}
@@ -709,11 +753,10 @@ def c_mid_inventory(ctx: "Ctx") -> None:
     """Probe candidate headers independently of its CCDD inventory on both native CPUs."""
     ctx.build()
     headers = []
-    for base in (ctx.tree / "apps", ctx.tree / "cfe/modules"):
-        for path in base.glob("*/config/default_*_msgids.h"):
-            if any(part in ("ci_lab", "to_lab") for part in path.parts):
-                continue
-            headers.append(path)
+    for app in active_mission_apps(ctx.tree):
+        headers.extend((ctx.tree / "apps" / app / "config").glob("default_*_msgids.h"))
+    for module in active_cfe_modules(ctx.tree):
+        headers.extend((ctx.tree / "cfe/modules" / module / "config").glob("default_*_msgids.h"))
     if not headers:
         raise Fail("no bundled native MID headers found for the independent inventory")
     include_names = sorted({path.name.removeprefix("default_") for path in headers})
@@ -745,13 +788,36 @@ def c_mid_inventory(ctx: "Ctx") -> None:
     p.raise_if()
 
 
+def active_mission_apps(tree: Path) -> tuple[str, ...]:
+    targets = strip_cmake_comments(read(tree / "sample_defs/targets.cmake"))
+    apps = []
+    for match in re.finditer(r"\blist\s*\(\s*APPEND\s+MISSION_GLOBAL_APPLIST\s+([^)]*)\)", targets, re.I):
+        apps.extend(match.group(1).split())
+    for cpu in ("cpu1", "cpu2"):
+        apps.extend(applist(targets, f"{cpu}_APPLIST") or [])
+    return tuple(app for app in dict.fromkeys(apps) if app not in ("ci_lab", "to_lab"))
+
+
+def active_cfe_modules(tree: Path) -> tuple[str, ...]:
+    """Read the pinned literal mission core-module list and simple target overrides."""
+    defaults = strip_cmake_comments(read(tree / "cfe/cmake/mission_defaults.cmake"))
+    match = re.search(r"\bset\s*\(\s*MISSION_CORE_MODULES\s+(.*?)\)", defaults, re.I | re.S)
+    modules = match.group(1).replace('"', "").split() if match else []
+    targets = strip_cmake_comments(read(tree / "sample_defs/targets.cmake"))
+    for operation, values in re.findall(r"\blist\s*\(\s*(APPEND|REMOVE_ITEM)\s+MISSION_CORE_MODULES\s+([^)]*)\)",
+                                        targets, re.I | re.S):
+        names = values.replace('"', "").split()
+        if operation.upper() == "APPEND":
+            modules.extend(names)
+        else:
+            modules = [module for module in modules if module not in names]
+    return tuple(dict.fromkeys(modules))
+
+
 def judge_mode_integration(tree: Path) -> list[str]:
     p = Problems()
-    limits = "\n".join(strip_c_comments(read(path)) for base in (tree / "sample_defs", tree / "apps/sch_lab/config")
-                       for path in base.rglob("*.h"))
-    matches = re.findall(r"#\s*define\s+SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES\s+\(?\s*(\d+)", limits)
-    p.check(bool(matches) and all(int(value) == 32 for value in matches),
-            "SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES must remain 32")
+    p.check(compiled_schedule_capacity(tree) == 32,
+            "native SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES must evaluate to 32")
     for cpu in ("cpu1", "cpu2"):
         for item in judge_install_custom(read(tree / "sample_defs" / cpu / "install_custom.cmake"), cpu):
             p.check(False, item)
@@ -853,6 +919,34 @@ def native_compiler_arguments(tree: Path, cpu: str) -> list[str]:
             for directory in sorted(base.glob(pattern)):
                 arguments += ["-I", str(directory)]
     return arguments
+
+
+def compiled_schedule_capacity(tree: Path) -> int | None:
+    """Compile the configured sch_lab header for each processor and return its effective capacity."""
+    source = schedule_capacity_probe_source()
+    probe_dir = tree / "build-native_std" / "schedule-capacity-probe"
+    probe_dir.mkdir(parents=True, exist_ok=True)
+    probe = probe_dir / "capacity.c"
+    probe.write_text(source)
+    capacities = []
+    for cpu in ("cpu1", "cpu2"):
+        try:
+            arguments = native_compiler_arguments(tree, cpu)
+        except Fail:
+            return None
+        binary = probe_dir / cpu
+        proc = subprocess.run(["cc", "-std=c11", "-Werror", *arguments, str(probe), "-o", str(binary)],
+                              capture_output=True, text=True, timeout=60)
+        if proc.returncode:
+            return None
+        capacities.append(32)
+    return capacities[0] if len(capacities) == 2 and all(value == 32 for value in capacities) else None
+
+
+def schedule_capacity_probe_source() -> str:
+    return ('#include "sch_lab_interface_cfg.h"\n'
+            '_Static_assert(SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES == 32, "schedule capacity");\n'
+            'int main(void) { return SCH_LAB_MISSION_MAX_SCHEDULE_ENTRIES; }\n')
 
 
 def c_sb_pool_sizing(ctx: "Ctx") -> None:

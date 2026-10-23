@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 import spec
+import lifecycle
 from common import Fail, PrereqFail, Problems, short
 from node import find_node_pids
 
@@ -343,14 +344,17 @@ def judge_script_static(text: str, name: str) -> list[str]:
     return p.items
 
 
-def kill_nodes_under(base: Path) -> None:
+def kill_nodes_under(base: Path) -> set[int]:
+    owned = set()
     for cpu in (1, 2):
         for d in base.glob(f"*/cpu{cpu}"):
             for pid in find_node_pids(d, cpu):
+                owned.add(pid)
                 try:
                     os.kill(pid, signal.SIGKILL)
                 except OSError:
                     pass
+    return owned
 
 
 def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float = SCRIPT_LIMIT_S, extra_env: dict[str, str] | None = None) -> tuple[int, str]:  # noqa: ANN001
@@ -359,6 +363,9 @@ def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float
     env.setup()
     ctx.build()
     base = ctx.work / "ctf-run" / label
+    active_lifetime = base / ".acceptance-active-lifetime"
+    if active_lifetime.exists():
+        raise Fail(f"CTF lifecycle {label}: previous owned cleanup failed; keyfiles retained")
     shutil.rmtree(base, ignore_errors=True)
     run1, run2 = base / "cpu1", base / "cpu2"
     shutil.copytree(ctx.tree / "build-native_std" / "exe" / "cpu1", run1, symlinks=True)
@@ -376,12 +383,14 @@ def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float
     stop = threading.Event()
     queue_errors: list[Exception] = []
     checked: set[tuple[str, int]] = set()
+    owned_pids: set[int] = set()
     def monitor_queues() -> None:
         seen: dict[tuple[str, int], float] = {}
         while not stop.wait(0.2):
             ready = []
             for cpu, run in ((1, run1), (2, run2)):
                 for pid in find_node_pids(run, cpu):
+                    owned_pids.add(pid)
                     key = (f"cpu{cpu}", pid)
                     seen.setdefault(key, time.monotonic())
                     if key not in checked:
@@ -404,13 +413,14 @@ def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float
     if side is not None:
         th = threading.Thread(target=side, args=(stop,), daemon=True)
         th.start()
+    psp_baseline = lifecycle.segments()
+    active_lifetime.touch()
     started = time.monotonic()
     run_env = env.env(run1, run2, results)
     run_env.update(extra_env or {})
     try:
-        proc = subprocess.run(["bash", str(env.ctf / "run_ctf.sh"), str(script)], env=run_env,
-                              capture_output=True, text=True, errors="replace", timeout=ctx.timeout_for(limit),
-                              start_new_session=True)
+        proc = lifecycle.run_owned_session(["bash", str(env.ctf / "run_ctf.sh"), str(script)], env=run_env,
+                                           timeout=ctx.timeout_for(limit))
         rc, out = proc.returncode, proc.stdout + proc.stderr
     except subprocess.TimeoutExpired as exc:
         rc, out = -1, f"did not finish within {limit} s; " + str(exc.stdout or "")[-500:]
@@ -419,7 +429,19 @@ def run_ctf_script(ctx: "Ctx", script: Path, label: str, side=None, limit: float
         monitor.join(timeout=1)
         if th is not None:
             th.join(timeout=3)
-        kill_nodes_under(ctx.work / "ctf-run")
+        owned_pids.update(kill_nodes_under(ctx.work / "ctf-run"))
+        end = time.monotonic() + 5
+        while any(find_node_pids(run, cpu) for cpu, run in ((1, run1), (2, run2))):
+            if time.monotonic() >= end:
+                raise Fail("CTF cleanup: owned node remains alive; PSP objects retained")
+            time.sleep(0.05)
+        monitor.join(timeout=5)
+        if monitor.is_alive():
+            raise Fail("CTF cleanup: queue monitor remains active; PSP objects retained")
+        for run in (run1, run2):
+            lifecycle.retire_psp(run, psp_baseline, frozenset(owned_pids))
+        active_lifetime.unlink()
+    (results / "acceptance-process-output.log").write_text(out)
     if queue_errors:
         raise queue_errors[0]
     ctx.cache["ctf-queue-checked-" + label] = tuple(checked)
@@ -679,10 +701,15 @@ def c_plugin_adversarial(ctx: "Ctx") -> None:
         doc["tests"] = [{"test_number": vector["id"], "description": vector["id"], "instructions": instructions}]
         script = ctx.work / f"ctf-adversarial-{number}.json"
         script.write_text(json.dumps(doc))
-        rc, out = run_ctf_script(ctx, script, f"plugin-adversarial-{number}", limit=20)
+        limit = vector.get("process_limit", 20)
+        assert 20 <= limit <= 45
+        rc, out = run_ctf_script(ctx, script, f"plugin-adversarial-{number}", limit=limit)
         elapsed = ctx.cache["ctf-elapsed-plugin-adversarial-" + str(number)]
-        p.check(elapsed <= 23, f"{vector['id']} exceeded its timeout plus cleanup")
-        p.check(rc == 0, f"{vector['id']} CTF process aborted with exit {rc}: {short(out, 700)}")
+        p.check(elapsed <= limit + 3, f"{vector['id']} exceeded its timeout plus cleanup")
+        diagnostics = "\n".join(line for line in out.splitlines() if line.startswith(
+            ("ADVERSARIAL_EXCEPTION|", "ADVERSARIAL_MODE_SETUP|")))
+        failure_detail = short(diagnostics, 700) if diagnostics else short(out, 700)
+        p.check(rc == 0, f"{vector['id']} CTF process aborted with exit {rc}: {failure_detail}")
         p.check("Traceback (most recent call last)" not in out,
                 f"{vector['id']} raised out of the plugin: {short(out, 500)}")
         p.check(f"ADVERSARIAL_EXCEPTION|{vector['id']}|" not in out,
